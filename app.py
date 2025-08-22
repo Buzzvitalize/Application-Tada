@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session
 from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem
 from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
+from sqlalchemy import func
 import os
 
 app = Flask(__name__)
@@ -19,7 +20,7 @@ with app.app_context():
     # sample data
     if not Client.query.first():
         sample_client = Client(name='Juan Perez', identifier='001-0000000-1', phone='809-000-0000', email='juan@example.com')
-        sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0)
+        sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios')
         db.session.add_all([sample_client, sample_product])
         db.session.commit()
 
@@ -92,9 +93,25 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total):
     return output
 
 # Routes
-@app.route('/')
-def index():
-    return redirect(url_for('list_quotations'))
+@app.before_request
+def require_login():
+    allowed = {'login', 'static'}
+    if request.endpoint not in allowed and 'user' not in session:
+        return redirect(url_for('login'))
+
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if request.form.get('username') == 'admin' and request.form.get('pin') == '363636':
+            session['user'] = 'admin'
+            return redirect(url_for('list_quotations'))
+        flash('Credenciales inválidas')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
 
 # Clients CRUD
 @app.route('/clientes', methods=['GET', 'POST'])
@@ -128,7 +145,8 @@ def products():
         product = Product(
             name=request.form['name'],
             unit=request.form['unit'],
-            price=_to_float(request.form['price'])
+            price=_to_float(request.form['price']),
+            category=request.form.get('category')
         )
         db.session.add(product)
         db.session.commit()
@@ -178,12 +196,16 @@ def new_quotation():
             product = Product.query.get(pid)
             if not product:
                 continue
+            qty = _to_int(q)
+            percent = _to_float(d)
+            discount_amount = product.price * qty * (percent / 100)
             items.append({
                 'product_name': product.name,
                 'unit': product.unit,
                 'unit_price': product.price,
-                'quantity': _to_int(q),
-                'discount': _to_float(d),
+                'quantity': qty,
+                'discount': discount_amount,
+                'category': product.category,
             })
         subtotal, itbis, total = calculate_totals(items)
         quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total)
@@ -220,6 +242,7 @@ def quotation_to_order(quotation_id):
             unit_price=item.unit_price,
             quantity=item.quantity,
             discount=item.discount,
+            category=item.category,
         )
         db.session.add(o_item)
     db.session.commit()
@@ -250,6 +273,7 @@ def order_to_invoice(order_id):
             unit_price=item.unit_price,
             quantity=item.quantity,
             discount=item.discount,
+            category=item.category,
         )
         db.session.add(i_item)
     order.status = 'Entregado'
@@ -276,7 +300,20 @@ def invoice_pdf(invoice_id):
 
 @app.route('/reportes')
 def reportes():
-    return render_template('reportes.html')
+    total_invoices = db.session.query(func.count(Invoice.id)).scalar() or 0
+    total_sales = db.session.query(func.sum(Invoice.total)).scalar() or 0
+    sales_by_category = db.session.query(
+        InvoiceItem.category,
+        func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount)
+    ).group_by(InvoiceItem.category).all()
+    stats = {
+        'clients': Client.query.count(),
+        'products': Product.query.count(),
+        'quotations': Quotation.query.count(),
+        'orders': Order.query.count(),
+        'invoices': total_invoices,
+    }
+    return render_template('reportes.html', total_sales=total_sales, sales_by_category=sales_by_category, stats=stats)
 
 if __name__ == '__main__':
     app.run(debug=True)

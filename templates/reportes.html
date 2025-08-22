@@ -2,5 +2,52 @@
 {% block title %}Reportes{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Reportes</h1>
-<div class="card">Próximamente...</div>
+
+<div class="grid md:grid-cols-5 gap-4 mb-6">
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Clientes</div>
+    <div class="text-2xl font-bold">{{ stats.clients }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Productos</div>
+    <div class="text-2xl font-bold">{{ stats.products }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Cotizaciones</div>
+    <div class="text-2xl font-bold">{{ stats.quotations }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Pedidos</div>
+    <div class="text-2xl font-bold">{{ stats.orders }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Facturas</div>
+    <div class="text-2xl font-bold">{{ stats.invoices }}</div>
+  </div>
+</div>
+
+<div class="card mb-6">
+  <div class="text-sm text-gray-500">Ventas Totales</div>
+  <div class="text-2xl font-bold">{{ '%.2f'|format(total_sales) }}</div>
+</div>
+
+<div class="card">
+  <h2 class="text-xl font-semibold mb-2">Ventas por Categoría</h2>
+  <table class="min-w-full">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Categoría</th>
+        <th class="p-2 text-right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cat, amount in sales_by_category %}
+      <tr class="border-t">
+        <td class="p-2">{{ cat or 'Sin categoría' }}</td>
+        <td class="p-2 text-right">{{ '%.2f'|format(amount) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}

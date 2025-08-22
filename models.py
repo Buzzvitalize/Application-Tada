@@ -17,6 +17,7 @@ class Product(db.Model):
     name = db.Column(db.String(120), nullable=False)
     unit = db.Column(db.String(20), nullable=False)
     price = db.Column(db.Float, nullable=False)
+    category = db.Column(db.String(50))
 
 class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -37,6 +38,7 @@ class QuotationItem(db.Model):
     unit_price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     discount = db.Column(db.Float, default=0.0)
+    category = db.Column(db.String(50))
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -59,6 +61,7 @@ class OrderItem(db.Model):
     unit_price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     discount = db.Column(db.Float, default=0.0)
+    category = db.Column(db.String(50))
 
 class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -80,3 +83,4 @@ class InvoiceItem(db.Model):
     unit_price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     discount = db.Column(db.Float, default=0.0)
+    category = db.Column(db.String(50))

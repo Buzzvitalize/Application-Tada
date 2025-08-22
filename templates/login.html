@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gray-100">
+  <form method="post" class="card w-80 space-y-4">
+    <h1 class="text-xl font-semibold text-center">Iniciar Sesión</h1>
+    <input name="username" placeholder="Usuario" class="input" required>
+    <input name="pin" placeholder="PIN" class="input" type="password" required>
+    <button class="btn-primary w-full">Entrar</button>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="text-red-600 text-center">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+  </form>
+</body>
+</html>
