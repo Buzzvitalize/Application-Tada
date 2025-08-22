@@ -6,9 +6,15 @@
   padding: 0.5rem 1rem;
   border-radius: 0.375rem;
   font-weight: 600;
+  transition: background-color 0.2s, transform 0.2s;
 }
 .btn-primary:hover {
   background-color: #1d4ed8; /* blue-700 */
+  transform: scale(1.03);
+}
+.btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #2563eb;
 }
 
 .btn-secondary {
@@ -33,6 +39,7 @@
   border-radius: 0.375rem;
   padding: 0.5rem 0.75rem;
   width: 100%;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .input:focus {
   outline: none;
