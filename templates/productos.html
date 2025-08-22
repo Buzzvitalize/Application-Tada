@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Productos{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Productos</h1>
+<form method="post" class="card mb-6 space-y-4">
+  <div class="grid md:grid-cols-3 gap-4">
+    <input name="name" placeholder="Nombre" class="input" required>
+    <input name="unit" placeholder="Unidad" class="input" required>
+    <input name="price" placeholder="Precio" class="input" required>
+  </div>
+  <button class="btn-primary">Agregar</button>
+</form>
+<div class="card">
+  <table class="min-w-full">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Nombre</th>
+        <th class="p-2 text-left">Unidad</th>
+        <th class="p-2 text-left">Precio</th>
+        <th class="p-2 text-left">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in products %}
+      <tr class="border-t">
+        <td class="p-2">{{ p.name }}</td>
+        <td class="p-2">{{ p.unit }}</td>
+        <td class="p-2">{{ '%.2f'|format(p.price) }}</td>
+        <td class="p-2"><a class="text-red-500" href="{{ url_for('delete_product', product_id=p.id) }}">Eliminar</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

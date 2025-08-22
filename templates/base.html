@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Sistema{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+</head>
+<body class="flex min-h-screen bg-gray-100">
+    <aside class="w-64 bg-gray-800 text-white flex flex-col">
+        <div class="p-4 text-xl font-bold border-b border-gray-700">Menú</div>
+        <nav class="px-2 py-4 space-y-1 flex-1">
+            <a href="{{ url_for('list_quotations') }}" class="block p-2 rounded hover:bg-gray-700">Cotizaciones</a>
+            <a href="{{ url_for('list_orders') }}" class="block p-2 rounded hover:bg-gray-700">Pedidos</a>
+            <a href="{{ url_for('list_invoices') }}" class="block p-2 rounded hover:bg-gray-700">Facturas</a>
+            <a href="{{ url_for('clients') }}" class="block p-2 rounded hover:bg-gray-700">Clientes</a>
+            <a href="{{ url_for('products') }}" class="block p-2 rounded hover:bg-gray-700">Productos</a>
+            <a href="{{ url_for('reportes') }}" class="block p-2 rounded hover:bg-gray-700">Reportes</a>
+        </nav>
+    </aside>
+    <main class="flex-1 p-6">
+        <div class="max-w-7xl mx-auto">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="mb-4">
+              {% for message in messages %}
+                <div class="bg-green-100 text-green-800 p-2 mb-2">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+        </div>
+    </main>
+</body>
+</html>
