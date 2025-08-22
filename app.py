@@ -26,6 +26,19 @@ with app.app_context():
 # Utility functions
 ITBIS_RATE = 0.18
 
+def _to_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _to_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
 
 def calculate_totals(items):
     subtotal = sum((item['unit_price'] * item['quantity']) - item['discount'] for item in items)
@@ -110,7 +123,7 @@ def delete_client(client_id):
 @app.route('/productos', methods=['GET', 'POST'])
 def products():
     if request.method == 'POST':
-        product = Product(name=request.form['name'], price=float(request.form['price']))
+        product = Product(name=request.form['name'], price=_to_float(request.form['price']))
         db.session.add(product)
         db.session.commit()
         flash('Producto agregado')
@@ -149,7 +162,12 @@ def new_quotation():
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
         for n, p, q, d in zip(names, prices, quantities, discounts):
-            items.append({'product_name': n, 'unit_price': float(p or 0), 'quantity': int(q or 0), 'discount': float(d or 0)})
+            items.append({
+                'product_name': n,
+                'unit_price': _to_float(p),
+                'quantity': _to_int(q),
+                'discount': _to_float(d),
+            })
         subtotal, itbis, total = calculate_totals(items)
         quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total)
         db.session.add(quotation)
