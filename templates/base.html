@@ -2,38 +2,55 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
 </head>
-<body class="flex min-h-screen bg-gray-100">
-    <aside class="w-64 bg-gray-800 text-white flex flex-col">
-        <div class="p-4 text-xl font-bold border-b border-gray-700">Menú</div>
-        <nav class="px-2 py-4 space-y-1 flex-1">
-            <a href="{{ url_for('list_quotations') }}" class="block p-2 rounded hover:bg-gray-700">Cotizaciones</a>
-            <a href="{{ url_for('list_orders') }}" class="block p-2 rounded hover:bg-gray-700">Pedidos</a>
-            <a href="{{ url_for('list_invoices') }}" class="block p-2 rounded hover:bg-gray-700">Facturas</a>
-            <a href="{{ url_for('clients') }}" class="block p-2 rounded hover:bg-gray-700">Clientes</a>
-              <a href="{{ url_for('products') }}" class="block p-2 rounded hover:bg-gray-700">Productos</a>
-              <a href="{{ url_for('reportes') }}" class="block p-2 rounded hover:bg-gray-700">Reportes</a>
-              <a href="{{ url_for('contabilidad') }}" class="block p-2 rounded hover:bg-gray-700">Contabilidad</a>
-              <a href="{{ url_for('settings') }}" class="block p-2 rounded hover:bg-gray-700">Ajustes</a>
-        </nav>
-        <div class="p-4 border-t border-gray-700"><a href="{{ url_for('logout') }}" class="block p-2 rounded hover:bg-gray-700">Salir</a></div>
-    </aside>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-800 text-white flex flex-col transform -translate-x-full md:translate-x-0 md:relative transition-transform duration-200 z-50">
+      <div class="p-4 text-xl font-bold border-b border-gray-700">Menú</div>
+      <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
+          <a href="{{ url_for('list_quotations') }}" class="block p-2 rounded hover:bg-gray-700">Cotizaciones</a>
+          <a href="{{ url_for('list_orders') }}" class="block p-2 rounded hover:bg-gray-700">Pedidos</a>
+          <a href="{{ url_for('list_invoices') }}" class="block p-2 rounded hover:bg-gray-700">Facturas</a>
+          <a href="{{ url_for('clients') }}" class="block p-2 rounded hover:bg-gray-700">Clientes</a>
+          <a href="{{ url_for('products') }}" class="block p-2 rounded hover:bg-gray-700">Productos</a>
+          <a href="{{ url_for('reportes') }}" class="block p-2 rounded hover:bg-gray-700">Reportes</a>
+          <a href="{{ url_for('contabilidad') }}" class="block p-2 rounded hover:bg-gray-700">Contabilidad</a>
+          <a href="{{ url_for('settings') }}" class="block p-2 rounded hover:bg-gray-700">Ajustes</a>
+      </nav>
+      <div class="p-4 border-t border-gray-700"><a href="{{ url_for('logout') }}" class="block p-2 rounded hover:bg-gray-700">Salir</a></div>
+  </aside>
+  <div class="md:ml-64 flex flex-col min-h-screen">
+    <header class="md:hidden bg-gray-800 text-white p-4 flex items-center">
+      <button id="menu-btn" class="focus:outline-none">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <span class="ml-2 font-semibold">Menú</span>
+    </header>
     <main class="flex-1 p-6">
-        <div class="max-w-7xl mx-auto">
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            <div class="mb-4">
-              {% for message in messages %}
-                <div class="bg-green-100 text-green-800 p-2 mb-2">{{ message }}</div>
-              {% endfor %}
-            </div>
-          {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-        </div>
+      <div class="max-w-7xl mx-auto">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="mb-4">
+            {% for message in messages %}
+              <div class="bg-green-100 text-green-800 p-2 mb-2">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+      </div>
     </main>
+  </div>
+  <script>
+    const menuBtn = document.getElementById('menu-btn');
+    const sidebar = document.getElementById('sidebar');
+    menuBtn && menuBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('-translate-x-full');
+    });
+  </script>
 </body>
 </html>
+
