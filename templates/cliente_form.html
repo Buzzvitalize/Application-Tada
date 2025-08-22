@@ -5,9 +5,16 @@
 <form method="post" class="card space-y-4">
   <div class="grid md:grid-cols-2 gap-4">
     <input name="name" value="{{ client.name }}" placeholder="Nombre" class="input" required>
-    <input name="identifier" value="{{ client.identifier }}" placeholder="Cédula/RNC" class="input" required>
+    <input name="identifier" value="{{ client.identifier }}" placeholder="Cédula/RNC" class="input">
     <input name="phone" value="{{ client.phone }}" placeholder="Teléfono" class="input" required>
     <input name="email" value="{{ client.email }}" placeholder="Email" class="input">
+    <input name="street" value="{{ client.street }}" placeholder="Calle" class="input" required>
+    <input name="sector" value="{{ client.sector }}" placeholder="Sector" class="input" required>
+    <input name="province" value="{{ client.province }}" placeholder="Provincia" class="input" required>
+  </div>
+  <div class="flex space-x-4">
+    <label><input type="radio" name="type" value="final" {% if client.is_final_consumer %}checked{% endif %}> Consumidor Final</label>
+    <label><input type="radio" name="type" value="fiscal" {% if not client.is_final_consumer %}checked{% endif %}> Comprobante Fiscal</label>
   </div>
   <button class="btn-primary">Guardar</button>
 </form>

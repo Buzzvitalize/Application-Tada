@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session
-from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem
+from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo
 from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
@@ -17,9 +17,31 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'database.sqlite')
 with app.app_context():
     db.init_app(app)
     db.create_all()
-    # sample data
+    # sample data and company info
+    if not CompanyInfo.query.first():
+        company = CompanyInfo(
+            name='Empresa Demo',
+            street='Calle 1',
+            sector='Centro',
+            province='Santo Domingo',
+            phone='809-000-0000',
+            rnc='101000000',
+            website='',
+            logo='',
+        )
+        db.session.add(company)
+        db.session.commit()
     if not Client.query.first():
-        sample_client = Client(name='Juan Perez', identifier='001-0000000-1', phone='809-000-0000', email='juan@example.com')
+        sample_client = Client(
+            name='Juan Perez',
+            identifier='001-0000000-1',
+            phone='809-000-0000',
+            email='juan@example.com',
+            street='Av. Siempre Viva',
+            sector='Centro',
+            province='Santo Domingo',
+            is_final_consumer=False,
+        )
         sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios')
         db.session.add_all([sample_client, sample_product])
         db.session.commit()
@@ -49,22 +71,46 @@ def calculate_totals(items):
     return subtotal, itbis, total
 
 
-def generate_pdf(title, company, client, items, subtotal, itbis, total):
+def get_company_info():
+    c = CompanyInfo.query.first()
+    return {
+        'name': c.name,
+        'address': f"{c.street}, {c.sector}, {c.province}",
+        'rnc': c.rnc,
+        'phone': c.phone,
+        'website': c.website,
+        'logo': c.logo,
+        'ncf_final': c.ncf_final,
+        'ncf_fiscal': c.ncf_fiscal,
+    }
+
+
+def generate_pdf(title, company, client, items, subtotal, itbis, total, ncf=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Helvetica', 'B', 16)
+    if company.get('logo'):
+        pdf.image(company['logo'], 10, 8, 33)
+        pdf.cell(40)
     pdf.cell(0, 10, company['name'], ln=1)
     pdf.set_font('Helvetica', '', 10)
     pdf.cell(0, 5, company['address'], ln=1)
     pdf.cell(0, 5, f"RNC: {company['rnc']} Tel: {company['phone']}", ln=1)
+    if company.get('website'):
+        pdf.cell(0, 5, company['website'], ln=1)
     pdf.ln(5)
     pdf.set_font('Helvetica', 'B', 14)
     pdf.cell(0, 10, title, ln=1, align='C')
+    if ncf:
+        pdf.set_font('Helvetica', '', 12)
+        pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='C')
     pdf.ln(5)
     pdf.set_font('Helvetica', '', 12)
     pdf.cell(0, 6, f"Cliente: {client.name}", ln=1)
-    pdf.cell(0, 6, f"Cédula/RNC: {client.identifier}", ln=1)
+    if client.identifier:
+        pdf.cell(0, 6, f"Cédula/RNC: {client.identifier}", ln=1)
     pdf.cell(0, 6, f"Teléfono: {client.phone}", ln=1)
+    pdf.cell(0, 6, f"Dirección: {client.street}, {client.sector}, {client.province}", ln=1)
     if client.email:
         pdf.cell(0, 6, f"Email: {client.email}", ln=1)
     pdf.ln(5)
@@ -118,11 +164,20 @@ def logout():
 @app.route('/clientes', methods=['GET', 'POST'])
 def clients():
     if request.method == 'POST':
+        is_final = request.form.get('type') == 'final'
+        identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
+        if not is_final and not identifier:
+            flash('El identificador es obligatorio para comprobante fiscal')
+            return redirect(url_for('clients'))
         client = Client(
             name=request.form['name'],
-            identifier=request.form['identifier'],
+            identifier=identifier,
             phone=request.form['phone'],
-            email=request.form.get('email')
+            email=request.form.get('email'),
+            street=request.form['street'],
+            sector=request.form['sector'],
+            province=request.form['province'],
+            is_final_consumer=is_final
         )
         db.session.add(client)
         db.session.commit()
@@ -143,10 +198,19 @@ def delete_client(client_id):
 def edit_client(client_id):
     client = Client.query.get_or_404(client_id)
     if request.method == 'POST':
+        is_final = request.form.get('type') == 'final'
+        identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
+        if not is_final and not identifier:
+            flash('El identificador es obligatorio para comprobante fiscal')
+            return redirect(url_for('edit_client', client_id=client.id))
         client.name = request.form['name']
-        client.identifier = request.form['identifier']
+        client.identifier = identifier
         client.phone = request.form['phone']
         client.email = request.form.get('email')
+        client.street = request.form['street']
+        client.sector = request.form['sector']
+        client.province = request.form['province']
+        client.is_final_consumer = is_final
         db.session.commit()
         flash('Cliente actualizado')
         return redirect(url_for('clients'))
@@ -217,11 +281,20 @@ def new_quotation():
         if client_id:
             client = Client.query.get_or_404(client_id)
         else:
+            is_final = request.form.get('client_type') == 'final'
+            identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
+            if not is_final and not identifier:
+                flash('El identificador es obligatorio para comprobante fiscal')
+                return redirect(url_for('new_quotation'))
             client = Client(
                 name=request.form['client_name'],
-                identifier=request.form['client_identifier'],
+                identifier=identifier,
                 phone=request.form['client_phone'],
-                email=request.form.get('client_email')
+                email=request.form.get('client_email'),
+                street=request.form['client_street'],
+                sector=request.form['client_sector'],
+                province=request.form['client_province'],
+                is_final_consumer=is_final,
             )
             db.session.add(client)
             db.session.flush()
@@ -268,10 +341,19 @@ def edit_quotation(quotation_id):
             client = Client.query.get_or_404(client_id)
         else:
             client = quotation.client
+            is_final = request.form.get('client_type') == 'final'
+            identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
+            if not is_final and not identifier:
+                flash('El identificador es obligatorio para comprobante fiscal')
+                return redirect(url_for('edit_quotation', quotation_id=quotation.id))
             client.name = request.form['client_name']
-            client.identifier = request.form['client_identifier']
+            client.identifier = identifier
             client.phone = request.form['client_phone']
             client.email = request.form.get('client_email')
+            client.street = request.form['client_street']
+            client.sector = request.form['client_sector']
+            client.province = request.form['client_province']
+            client.is_final_consumer = is_final
         quotation.items.clear()
         db.session.flush()
         items = []
@@ -318,10 +400,30 @@ def edit_quotation(quotation_id):
     return render_template('cotizacion_edit.html', quotation=quotation, clients=clients,
                            products=products, items=items)
 
+
+@app.route('/ajustes', methods=['GET', 'POST'])
+def settings():
+    company = CompanyInfo.query.first()
+    if request.method == 'POST':
+        company.name = request.form['name']
+        company.street = request.form['street']
+        company.sector = request.form['sector']
+        company.province = request.form['province']
+        company.phone = request.form['phone']
+        company.rnc = request.form['rnc']
+        company.website = request.form.get('website')
+        company.logo = request.form.get('logo')
+        company.ncf_final = _to_int(request.form.get('ncf_final')) or company.ncf_final
+        company.ncf_fiscal = _to_int(request.form.get('ncf_fiscal')) or company.ncf_fiscal
+        db.session.commit()
+        flash('Ajustes guardados')
+        return redirect(url_for('settings'))
+    return render_template('ajustes.html', company=company)
+
 @app.route('/cotizaciones/<int:quotation_id>/pdf')
 def quotation_pdf(quotation_id):
     quotation = Quotation.query.get_or_404(quotation_id)
-    company = {'name': 'Mi Empresa', 'address': 'Dirección', 'rnc': '123456789', 'phone': '809-555-5555'}
+    company = get_company_info()
     pdf_file = generate_pdf('Cotización', company, quotation.client, quotation.items, quotation.subtotal, quotation.itbis, quotation.total)
     return send_file(pdf_file, download_name=f'cotizacion_{quotation_id}.pdf', as_attachment=True)
 
@@ -360,7 +462,15 @@ def list_orders():
 @app.route('/pedidos/<int:order_id>/facturar')
 def order_to_invoice(order_id):
     order = Order.query.get_or_404(order_id)
-    invoice = Invoice(client_id=order.client_id, order_id=order.id, subtotal=order.subtotal, itbis=order.itbis, total=order.total)
+    company = CompanyInfo.query.first()
+    if order.client.is_final_consumer:
+        ncf = f"B02{company.ncf_final:08d}"
+        company.ncf_final += 1
+    else:
+        ncf = f"B01{company.ncf_fiscal:08d}"
+        company.ncf_fiscal += 1
+    invoice = Invoice(client_id=order.client_id, order_id=order.id, subtotal=order.subtotal,
+                      itbis=order.itbis, total=order.total, ncf=ncf)
     db.session.add(invoice)
     db.session.flush()
     for item in order.items:
@@ -393,8 +503,8 @@ def list_invoices():
 @app.route('/facturas/<int:invoice_id>/pdf')
 def invoice_pdf(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
-    company = {'name': 'Mi Empresa', 'address': 'Dirección', 'rnc': '123456789', 'phone': '809-555-5555'}
-    pdf_file = generate_pdf('Factura', company, invoice.client, invoice.items, invoice.subtotal, invoice.itbis, invoice.total)
+    company = get_company_info()
+    pdf_file = generate_pdf('Factura', company, invoice.client, invoice.items, invoice.subtotal, invoice.itbis, invoice.total, ncf=invoice.ncf)
     return send_file(pdf_file, download_name=f'factura_{invoice_id}.pdf', as_attachment=True)
 
 @app.route('/reportes')

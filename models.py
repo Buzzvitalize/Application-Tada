@@ -8,9 +8,13 @@ db = SQLAlchemy()
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    identifier = db.Column(db.String(50), nullable=False)
+    identifier = db.Column(db.String(50))
     phone = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120))
+    street = db.Column(db.String(120), nullable=False)
+    sector = db.Column(db.String(120), nullable=False)
+    province = db.Column(db.String(120), nullable=False)
+    is_final_consumer = db.Column(db.Boolean, default=True)
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,6 +78,7 @@ class Invoice(db.Model):
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
+    ncf = db.Column(db.String(20), unique=True)
 
     client = db.relationship('Client')
     items = db.relationship('InvoiceItem', cascade='all, delete-orphan')
@@ -88,3 +93,17 @@ class InvoiceItem(db.Model):
     discount = db.Column(db.Float, default=0.0)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
+
+
+class CompanyInfo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    street = db.Column(db.String(120), nullable=False)
+    sector = db.Column(db.String(120), nullable=False)
+    province = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(50), nullable=False)
+    rnc = db.Column(db.String(50), nullable=False)
+    website = db.Column(db.String(120))
+    logo = db.Column(db.String(120))
+    ncf_final = db.Column(db.Integer, default=1)
+    ncf_fiscal = db.Column(db.Integer, default=1)
