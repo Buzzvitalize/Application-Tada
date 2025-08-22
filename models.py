@@ -50,6 +50,7 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     quotation_id = db.Column(db.Integer, db.ForeignKey('quotation.id'))
+    date = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default='Pendiente')
     delivery_date = db.Column(db.DateTime)
     subtotal = db.Column(db.Float, nullable=False)

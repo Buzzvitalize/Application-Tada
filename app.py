@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, send_file,
 from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo
 from fpdf import FPDF
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import func
 from werkzeug.utils import secure_filename
 from uuid import uuid4
@@ -89,7 +89,8 @@ def get_company_info():
     }
 
 
-def generate_pdf(title, company, client, items, subtotal, itbis, total, ncf=None, output_path=None, qr_url=None):
+def generate_pdf(title, company, client, items, subtotal, itbis, total,
+                 ncf=None, output_path=None, qr_url=None, date=None, valid_until=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Helvetica', 'B', 16)
@@ -113,6 +114,11 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total, ncf=None
     if ncf:
         pdf.set_font('Helvetica', '', 12)
         pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='C')
+    if date:
+        pdf.set_font('Helvetica', '', 12)
+        pdf.cell(0, 6, f"Fecha: {date.strftime('%d/%m/%Y %H:%M')}", ln=1, align='C')
+        if valid_until:
+            pdf.cell(0, 6, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", ln=1, align='C')
     pdf.ln(5)
     pdf.set_font('Helvetica', '', 12)
     pdf.cell(0, 6, f"Cliente: {client.name}", ln=1)
@@ -293,7 +299,8 @@ def list_quotations():
     if q:
         query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
     quotations = query.order_by(Quotation.date.desc()).all()
-    return render_template('cotizaciones.html', quotations=quotations, q=q)
+    return render_template('cotizaciones.html', quotations=quotations, q=q,
+                           timedelta=timedelta, now=datetime.utcnow())
 
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 def new_quotation():
@@ -456,15 +463,26 @@ def quotation_pdf(quotation_id):
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
     qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    valid_until = quotation.date + timedelta(days=30)
     generate_pdf('Cotización', company, quotation.client, quotation.items,
                  quotation.subtotal, quotation.itbis, quotation.total,
-                 output_path=pdf_path, qr_url=qr_url)
+                 output_path=pdf_path, qr_url=qr_url,
+                 date=quotation.date, valid_until=valid_until)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 @app.route('/cotizaciones/<int:quotation_id>/convertir')
 def quotation_to_order(quotation_id):
     quotation = Quotation.query.get_or_404(quotation_id)
-    order = Order(client_id=quotation.client_id, quotation_id=quotation.id, subtotal=quotation.subtotal, itbis=quotation.itbis, total=quotation.total)
+    if datetime.utcnow() > quotation.date + timedelta(days=30):
+        flash('La cotización ha expirado')
+        return redirect(url_for('list_quotations'))
+    order = Order(
+        client_id=quotation.client_id,
+        quotation_id=quotation.id,
+        subtotal=quotation.subtotal,
+        itbis=quotation.itbis,
+        total=quotation.total,
+    )
     db.session.add(order)
     db.session.flush()
     for item in quotation.items:
@@ -490,7 +508,7 @@ def list_orders():
     query = Order.query.join(Client)
     if q:
         query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
-    orders = query.order_by(Order.id.desc()).all()
+    orders = query.order_by(Order.date.desc()).all()
     return render_template('pedido.html', orders=orders, q=q)
 
 @app.route('/pedidos/<int:order_id>/facturar')
@@ -524,6 +542,20 @@ def order_to_invoice(order_id):
     flash('Factura generada')
     return redirect(url_for('list_invoices'))
 
+@app.route('/pedidos/<int:order_id>/pdf')
+def order_pdf(order_id):
+    order = Order.query.get_or_404(order_id)
+    company = get_company_info()
+    filename = f'pedido_{order_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    generate_pdf('Pedido', company, order.client, order.items,
+                 order.subtotal, order.itbis, order.total,
+                 output_path=pdf_path, qr_url=qr_url,
+                 date=order.date)
+    return send_file(pdf_path, download_name=filename, as_attachment=True)
+
 # Invoices
 @app.route('/facturas')
 def list_invoices():
@@ -544,7 +576,8 @@ def invoice_pdf(invoice_id):
     qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
     generate_pdf('Factura', company, invoice.client, invoice.items,
                  invoice.subtotal, invoice.itbis, invoice.total,
-                 ncf=invoice.ncf, output_path=pdf_path, qr_url=qr_url)
+                 ncf=invoice.ncf, output_path=pdf_path, qr_url=qr_url,
+                 date=invoice.date)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 @app.route('/pdfs/<path:filename>')

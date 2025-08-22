@@ -2,7 +2,7 @@
 {% block title %}Editar Producto{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Editar Producto</h1>
-<form method="post" class="card space-y-4">
+<form method="post" class="card space-y-4 max-w-4xl mx-auto">
   <div class="grid md:grid-cols-4 gap-4 items-center">
     <input name="name" value="{{ product.name }}" placeholder="Nombre" class="input" required>
     <select name="unit" class="input" required>
