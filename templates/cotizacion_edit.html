@@ -51,16 +51,20 @@
   const clientSelect = document.getElementById('client-select');
   const newClient = document.getElementById('new-client');
   const productContainer = document.getElementById('productos');
-  const initialClient = clientSelect.value;
+  let previousClient = clientSelect.value;
+  const clientItems = {};
+  clientItems[previousClient] = productContainer.innerHTML;
 
   clientSelect.addEventListener('change', () => {
     newClient.style.display = clientSelect.value ? 'none' : 'grid';
     const required = clientSelect.value ? false : true;
     newClient.querySelectorAll('input').forEach(i => i.required = required);
-    if (clientSelect.value !== initialClient) {
-      productContainer.innerHTML = '';
-      addProductRow();
-    }
+    clientItems[previousClient] = productContainer.innerHTML;
+    const saved = clientItems[clientSelect.value] || '';
+    productContainer.innerHTML = saved;
+    if (!saved) addProductRow();
+    productContainer.querySelectorAll('.product-row').forEach(bindProduct);
+    previousClient = clientSelect.value;
   });
 
   function bindProduct(row) {

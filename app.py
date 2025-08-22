@@ -93,14 +93,19 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total, ncf=None
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Helvetica', 'B', 16)
+    text_x = 10
     if company.get('logo'):
         pdf.image(company['logo'], 10, 8, 33)
-        pdf.cell(40)
+        text_x = 50
+    pdf.set_xy(text_x, 10)
     pdf.cell(0, 10, company['name'], ln=1)
     pdf.set_font('Helvetica', '', 10)
+    pdf.set_x(text_x)
     pdf.cell(0, 5, company['address'], ln=1)
+    pdf.set_x(text_x)
     pdf.cell(0, 5, f"RNC: {company['rnc']} Tel: {company['phone']}", ln=1)
     if company.get('website'):
+        pdf.set_x(text_x)
         pdf.cell(0, 5, company['website'], ln=1)
     pdf.ln(5)
     pdf.set_font('Helvetica', 'B', 14)
