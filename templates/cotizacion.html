@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Nueva Cotización{% endblock %}
+{% block content %}
+<h1 class="text-2xl mb-4">Nueva Cotización</h1>
+<form method="post" id="quotation-form" class="space-y-4">
+  <div class="grid grid-cols-2 gap-2">
+    <input name="client_name" placeholder="Nombre" class="border p-2" required>
+    <input name="client_identifier" placeholder="Cédula/RNC" class="border p-2" required>
+    <input name="client_phone" placeholder="Teléfono" class="border p-2" required>
+    <input name="client_email" placeholder="Email" class="border p-2">
+  </div>
+  <div>
+    <h2 class="text-xl mb-2">Productos</h2>
+    <div id="productos">
+      <div class="flex space-x-2 mb-2">
+        <input name="product_name[]" placeholder="Nombre" class="border p-2 w-1/3" required>
+        <input name="product_price[]" placeholder="Precio" class="border p-2 w-1/4" required>
+        <input name="product_quantity[]" placeholder="Cantidad" class="border p-2 w-1/6" required>
+        <input name="product_discount[]" placeholder="Desc." class="border p-2 w-1/6">
+      </div>
+    </div>
+    <button type="button" id="add-product" class="bg-gray-500 text-white px-2 py-1">Agregar Producto</button>
+  </div>
+  <button class="bg-blue-500 text-white px-4 py-2">Guardar</button>
+</form>
+<script>
+  document.getElementById('add-product').addEventListener('click', function() {
+    const container = document.getElementById('productos');
+    const row = document.createElement('div');
+    row.className = 'flex space-x-2 mb-2';
+    row.innerHTML = '<input name="product_name[]" placeholder="Nombre" class="border p-2 w-1/3" required>\
+<input name="product_price[]" placeholder="Precio" class="border p-2 w-1/4" required>\
+<input name="product_quantity[]" placeholder="Cantidad" class="border p-2 w-1/6" required>\
+<input name="product_discount[]" placeholder="Desc." class="border p-2 w-1/6">';
+    container.appendChild(row);
+  });
+</script>
+{% endblock %}

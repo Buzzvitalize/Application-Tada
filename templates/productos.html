@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Productos{% endblock %}
+{% block content %}
+<h1 class="text-2xl mb-4">Productos</h1>
+<form method="post" class="mb-4 space-y-2">
+  <input name="name" placeholder="Nombre" class="border p-2 w-full" required>
+  <input name="price" placeholder="Precio" class="border p-2 w-full" required>
+  <button class="bg-blue-500 text-white px-4 py-2">Agregar</button>
+</form>
+<table class="w-full border">
+  <tr class="bg-gray-100"><th class="border p-2">Nombre</th><th class="border p-2">Precio</th><th class="border p-2">Acciones</th></tr>
+  {% for p in products %}
+  <tr>
+    <td class="border p-2">{{ p.name }}</td>
+    <td class="border p-2">{{ '%.2f'|format(p.price) }}</td>
+    <td class="border p-2"><a class="text-red-500" href="{{ url_for('delete_product', product_id=p.id) }}">Eliminar</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

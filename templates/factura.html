@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Facturas{% endblock %}
+{% block content %}
+<h1 class="text-2xl mb-4">Facturas</h1>
+<table class="w-full border">
+  <tr class="bg-gray-100"><th class="border p-2">ID</th><th class="border p-2">Cliente</th><th class="border p-2">Total</th><th class="border p-2">Acciones</th></tr>
+  {% for f in invoices %}
+  <tr>
+    <td class="border p-2">{{ f.id }}</td>
+    <td class="border p-2">{{ f.client.name }}</td>
+    <td class="border p-2">{{ '%.2f'|format(f.total) }}</td>
+    <td class="border p-2"><a class="text-blue-500" href="{{ url_for('invoice_pdf', invoice_id=f.id) }}">PDF</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
