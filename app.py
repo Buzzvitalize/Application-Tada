@@ -43,7 +43,8 @@ def _to_int(value):
 
 def calculate_totals(items):
     subtotal = sum((item['unit_price'] * item['quantity']) - item['discount'] for item in items)
-    itbis = subtotal * ITBIS_RATE
+    itbis = sum(((item['unit_price'] * item['quantity']) - item['discount']) * ITBIS_RATE
+                for item in items if item.get('has_itbis'))
     total = subtotal + itbis
     return subtotal, itbis, total
 
@@ -138,22 +139,42 @@ def delete_client(client_id):
     flash('Cliente eliminado')
     return redirect(url_for('clients'))
 
+@app.route('/clientes/edit/<int:client_id>', methods=['GET', 'POST'])
+def edit_client(client_id):
+    client = Client.query.get_or_404(client_id)
+    if request.method == 'POST':
+        client.name = request.form['name']
+        client.identifier = request.form['identifier']
+        client.phone = request.form['phone']
+        client.email = request.form.get('email')
+        db.session.commit()
+        flash('Cliente actualizado')
+        return redirect(url_for('clients'))
+    return render_template('cliente_form.html', client=client)
+
 # Products CRUD
 @app.route('/productos', methods=['GET', 'POST'])
 def products():
+    units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
+    categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
     if request.method == 'POST':
         product = Product(
             name=request.form['name'],
             unit=request.form['unit'],
             price=_to_float(request.form['price']),
-            category=request.form.get('category')
+            category=request.form.get('category'),
+            has_itbis=bool(request.form.get('has_itbis'))
         )
         db.session.add(product)
         db.session.commit()
         flash('Producto agregado')
         return redirect(url_for('products'))
-    products = Product.query.all()
-    return render_template('productos.html', products=products)
+    cat = request.args.get('cat')
+    query = Product.query
+    if cat:
+        query = query.filter_by(category=cat)
+    products = query.all()
+    return render_template('productos.html', products=products, units=units, categories=categories, current_cat=cat)
 
 @app.route('/productos/delete/<int:product_id>')
 def delete_product(product_id):
@@ -162,6 +183,22 @@ def delete_product(product_id):
     db.session.commit()
     flash('Producto eliminado')
     return redirect(url_for('products'))
+
+@app.route('/productos/edit/<int:product_id>', methods=['GET', 'POST'])
+def edit_product(product_id):
+    product = Product.query.get_or_404(product_id)
+    units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
+    categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
+    if request.method == 'POST':
+        product.name = request.form['name']
+        product.unit = request.form['unit']
+        product.price = _to_float(request.form['price'])
+        product.category = request.form.get('category')
+        product.has_itbis = bool(request.form.get('has_itbis'))
+        db.session.commit()
+        flash('Producto actualizado')
+        return redirect(url_for('products'))
+    return render_template('producto_form.html', product=product, units=units, categories=categories)
 
 # Quotations
 @app.route('/cotizaciones')
@@ -206,6 +243,7 @@ def new_quotation():
                 'quantity': qty,
                 'discount': discount_amount,
                 'category': product.category,
+                'has_itbis': product.has_itbis,
             })
         subtotal, itbis, total = calculate_totals(items)
         quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total)
@@ -220,6 +258,65 @@ def new_quotation():
     clients = Client.query.all()
     products = Product.query.all()
     return render_template('cotizacion.html', clients=clients, products=products)
+
+@app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
+def edit_quotation(quotation_id):
+    quotation = Quotation.query.get_or_404(quotation_id)
+    if request.method == 'POST':
+        client_id = request.form.get('client_id')
+        if client_id:
+            client = Client.query.get_or_404(client_id)
+        else:
+            client = quotation.client
+            client.name = request.form['client_name']
+            client.identifier = request.form['client_identifier']
+            client.phone = request.form['client_phone']
+            client.email = request.form.get('client_email')
+        quotation.items.clear()
+        db.session.flush()
+        items = []
+        product_ids = request.form.getlist('product_id[]')
+        quantities = request.form.getlist('product_quantity[]')
+        discounts = request.form.getlist('product_discount[]')
+        for pid, q, d in zip(product_ids, quantities, discounts):
+            product = Product.query.get(pid)
+            if not product:
+                continue
+            qty = _to_int(q)
+            percent = _to_float(d)
+            discount_amount = product.price * qty * (percent / 100)
+            items.append({
+                'product_name': product.name,
+                'unit': product.unit,
+                'unit_price': product.price,
+                'quantity': qty,
+                'discount': discount_amount,
+                'category': product.category,
+                'has_itbis': product.has_itbis,
+            })
+        subtotal, itbis, total = calculate_totals(items)
+        quotation.client_id = client.id
+        quotation.subtotal = subtotal
+        quotation.itbis = itbis
+        quotation.total = total
+        for it in items:
+            quotation.items.append(QuotationItem(**it))
+        db.session.commit()
+        flash('Cotización actualizada')
+        return redirect(url_for('list_quotations'))
+    clients = Client.query.all()
+    products = Product.query.all()
+    # prepare items for template (discount percentage)
+    items = []
+    for it in quotation.items:
+        base = it.unit_price * it.quantity
+        percent = (it.discount / base * 100) if base else 0
+        product = Product.query.filter_by(name=it.product_name).first()
+        items.append({'product_id': product.id if product else '', 'quantity': it.quantity,
+                      'discount': percent, 'unit': it.unit,
+                      'price': it.unit_price})
+    return render_template('cotizacion_edit.html', quotation=quotation, clients=clients,
+                           products=products, items=items)
 
 @app.route('/cotizaciones/<int:quotation_id>/pdf')
 def quotation_pdf(quotation_id):
@@ -243,6 +340,7 @@ def quotation_to_order(quotation_id):
             quantity=item.quantity,
             discount=item.discount,
             category=item.category,
+            has_itbis=item.has_itbis,
         )
         db.session.add(o_item)
     db.session.commit()
@@ -274,6 +372,7 @@ def order_to_invoice(order_id):
             quantity=item.quantity,
             discount=item.discount,
             category=item.category,
+            has_itbis=item.has_itbis,
         )
         db.session.add(i_item)
     order.status = 'Entregado'

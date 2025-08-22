@@ -3,14 +3,33 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Productos</h1>
 <form method="post" class="card mb-6 space-y-4">
-  <div class="grid md:grid-cols-4 gap-4">
+  <div class="grid md:grid-cols-5 gap-4 items-center">
     <input name="name" placeholder="Nombre" class="input" required>
-    <input name="unit" placeholder="Unidad" class="input" required>
+    <select name="unit" class="input" required>
+      {% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+    </select>
     <input name="price" placeholder="Precio" class="input" required>
-    <input name="category" placeholder="Categoría" class="input" required>
+    <select name="category" class="input" required>
+      {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    </select>
+    <label class="flex items-center space-x-2">
+      <input type="checkbox" name="has_itbis" checked>
+      <span>ITBIS</span>
+    </label>
   </div>
   <button class="btn-primary">Agregar</button>
 </form>
+
+<form method="get" class="mb-4 flex space-x-2">
+  <select name="cat" class="input">
+    <option value="">Todas las categorías</option>
+    {% for c in categories %}
+    <option value="{{ c }}" {% if current_cat == c %}selected{% endif %}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn-secondary">Filtrar</button>
+</form>
+
 <div class="card">
   <table class="min-w-full">
     <thead class="bg-gray-100">
@@ -19,6 +38,7 @@
         <th class="p-2 text-left">Unidad</th>
         <th class="p-2 text-left">Precio</th>
         <th class="p-2 text-left">Categoría</th>
+        <th class="p-2 text-left">ITBIS</th>
         <th class="p-2 text-left">Acciones</th>
       </tr>
     </thead>
@@ -29,7 +49,11 @@
         <td class="p-2">{{ p.unit }}</td>
         <td class="p-2">{{ '%.2f'|format(p.price) }}</td>
         <td class="p-2">{{ p.category }}</td>
-        <td class="p-2"><a class="text-red-500" href="{{ url_for('delete_product', product_id=p.id) }}">Eliminar</a></td>
+        <td class="p-2">{{ 'Sí' if p.has_itbis else 'No' }}</td>
+        <td class="p-2 space-x-2">
+          <a class="text-blue-500" href="{{ url_for('edit_product', product_id=p.id) }}">Editar</a>
+          <a class="text-red-500" href="{{ url_for('delete_product', product_id=p.id) }}">Eliminar</a>
+        </td>
       </tr>
     {% endfor %}
     </tbody>
