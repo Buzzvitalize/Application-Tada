@@ -1,15 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, jsonify
 from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo
 from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
 from sqlalchemy import func
 import os
+from ai import recommend_products
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.sqlite'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.secret_key = 'secret-key'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev')
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database.sqlite')
 
@@ -523,6 +524,12 @@ def reportes():
         'invoices': total_invoices,
     }
     return render_template('reportes.html', total_sales=total_sales, sales_by_category=sales_by_category, stats=stats)
+
+
+@app.route('/api/recommendations')
+def api_recommendations():
+    """Return top product recommendations based on past orders."""
+    return jsonify({'products': recommend_products()})
 
 if __name__ == '__main__':
     app.run(debug=True)

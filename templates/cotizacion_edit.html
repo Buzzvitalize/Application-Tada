@@ -50,10 +50,17 @@
 <script>
   const clientSelect = document.getElementById('client-select');
   const newClient = document.getElementById('new-client');
+  const productContainer = document.getElementById('productos');
+  const initialClient = clientSelect.value;
+
   clientSelect.addEventListener('change', () => {
     newClient.style.display = clientSelect.value ? 'none' : 'grid';
     const required = clientSelect.value ? false : true;
     newClient.querySelectorAll('input').forEach(i => i.required = required);
+    if (clientSelect.value !== initialClient) {
+      productContainer.innerHTML = '';
+      addProductRow();
+    }
   });
 
   function bindProduct(row) {
@@ -86,12 +93,13 @@
     <input name="product_discount[]" placeholder="Desc. %" class="input">
     <button type="button" class="btn-secondary remove-product">Eliminar</button>`;
 
-  document.getElementById('add-product').addEventListener('click', function() {
-    const container = document.getElementById('productos');
+  function addProductRow() {
     const row = templateRow.cloneNode(true);
-    container.appendChild(row);
+    productContainer.appendChild(row);
     bindProduct(row);
-  });
+  }
+
+  document.getElementById('add-product').addEventListener('click', addProductRow);
 
   document.querySelectorAll('.product-row').forEach(bindProduct);
   clientSelect.dispatchEvent(new Event('change'));
