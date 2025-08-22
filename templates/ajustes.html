@@ -2,7 +2,7 @@
 {% block title %}Ajustes{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Ajustes</h1>
-<form method="post" class="card space-y-4">
+<form method="post" enctype="multipart/form-data" class="card space-y-4">
   <div class="grid md:grid-cols-2 gap-4">
     <input name="name" value="{{ company.name }}" placeholder="Nombre" class="input" required>
     <input name="rnc" value="{{ company.rnc }}" placeholder="RNC" class="input" required>
@@ -11,7 +11,12 @@
     <input name="street" value="{{ company.street }}" placeholder="Calle" class="input" required>
     <input name="sector" value="{{ company.sector }}" placeholder="Sector" class="input" required>
     <input name="province" value="{{ company.province }}" placeholder="Provincia" class="input" required>
-    <input name="logo" value="{{ company.logo }}" placeholder="Logo (ruta)" class="input">
+      <div class="flex items-center space-x-2">
+        <input type="file" name="logo" class="input">
+        {% if company.logo %}
+        <span class="text-sm text-gray-600">{{ company.logo }}</span>
+        {% endif %}
+      </div>
     <input name="ncf_final" value="{{ company.ncf_final }}" placeholder="NCF Consumidor Final" class="input">
     <input name="ncf_fiscal" value="{{ company.ncf_fiscal }}" placeholder="NCF Comprobante Fiscal" class="input">
   </div>

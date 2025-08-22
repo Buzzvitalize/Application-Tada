@@ -1,9 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, session, jsonify
 from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo
 from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
 from sqlalchemy import func
+from werkzeug.utils import secure_filename
+from uuid import uuid4
+import qrcode
 import os
 from ai import recommend_products
 
@@ -80,13 +83,13 @@ def get_company_info():
         'rnc': c.rnc,
         'phone': c.phone,
         'website': c.website,
-        'logo': c.logo,
+        'logo': os.path.join(app.static_folder, c.logo) if c.logo else None,
         'ncf_final': c.ncf_final,
         'ncf_fiscal': c.ncf_fiscal,
     }
 
 
-def generate_pdf(title, company, client, items, subtotal, itbis, total, ncf=None):
+def generate_pdf(title, company, client, items, subtotal, itbis, total, ncf=None, output_path=None, qr_url=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Helvetica', 'B', 16)
@@ -131,10 +134,21 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total, ncf=None
         pdf.cell(20, 8, str(i.quantity), border=1, align='R')
         pdf.cell(25, 8, f"{i.discount:.2f}", border=1, align='R')
         pdf.cell(30, 8, f"{total_line:.2f}", border=1, ln=1, align='R')
+    discount_total = sum(i.discount for i in items)
     pdf.ln(5)
     pdf.cell(0, 6, f"Subtotal: {subtotal:.2f}", ln=1, align='R')
     pdf.cell(0, 6, f"ITBIS ({ITBIS_RATE*100:.0f}%): {itbis:.2f}", ln=1, align='R')
+    pdf.cell(0, 6, f"Descuento: {discount_total:.2f}", ln=1, align='R')
     pdf.cell(0, 6, f"Total: {total:.2f}", ln=1, align='R')
+    if qr_url:
+        os.makedirs(os.path.join(app.static_folder, 'qrcodes'), exist_ok=True)
+        qr_path = os.path.join(app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
+        img = qrcode.make(qr_url)
+        img.save(qr_path)
+        pdf.image(qr_path, x=170, y=260, w=30)
+    if output_path:
+        pdf.output(output_path)
+        return output_path
     output = BytesIO()
     pdf.output(output)
     output.seek(0)
@@ -413,7 +427,14 @@ def settings():
         company.phone = request.form['phone']
         company.rnc = request.form['rnc']
         company.website = request.form.get('website')
-        company.logo = request.form.get('logo')
+        file = request.files.get('logo')
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            upload_dir = os.path.join(app.static_folder, 'uploads')
+            os.makedirs(upload_dir, exist_ok=True)
+            path = os.path.join(upload_dir, filename)
+            file.save(path)
+            company.logo = f'uploads/{filename}'
         company.ncf_final = _to_int(request.form.get('ncf_final')) or company.ncf_final
         company.ncf_fiscal = _to_int(request.form.get('ncf_fiscal')) or company.ncf_fiscal
         db.session.commit()
@@ -425,8 +446,14 @@ def settings():
 def quotation_pdf(quotation_id):
     quotation = Quotation.query.get_or_404(quotation_id)
     company = get_company_info()
-    pdf_file = generate_pdf('Cotización', company, quotation.client, quotation.items, quotation.subtotal, quotation.itbis, quotation.total)
-    return send_file(pdf_file, download_name=f'cotizacion_{quotation_id}.pdf', as_attachment=True)
+    filename = f'cotizacion_{quotation_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    generate_pdf('Cotización', company, quotation.client, quotation.items,
+                 quotation.subtotal, quotation.itbis, quotation.total,
+                 output_path=pdf_path, qr_url=qr_url)
+    return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 @app.route('/cotizaciones/<int:quotation_id>/convertir')
 def quotation_to_order(quotation_id):
@@ -505,8 +532,18 @@ def list_invoices():
 def invoice_pdf(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
     company = get_company_info()
-    pdf_file = generate_pdf('Factura', company, invoice.client, invoice.items, invoice.subtotal, invoice.itbis, invoice.total, ncf=invoice.ncf)
-    return send_file(pdf_file, download_name=f'factura_{invoice_id}.pdf', as_attachment=True)
+    filename = f'factura_{invoice_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    generate_pdf('Factura', company, invoice.client, invoice.items,
+                 invoice.subtotal, invoice.itbis, invoice.total,
+                 ncf=invoice.ncf, output_path=pdf_path, qr_url=qr_url)
+    return send_file(pdf_path, download_name=filename, as_attachment=True)
+
+@app.route('/pdfs/<path:filename>')
+def serve_pdf(filename):
+    return send_from_directory(os.path.join(app.static_folder, 'pdfs'), filename)
 
 @app.route('/reportes')
 def reportes():
@@ -524,6 +561,11 @@ def reportes():
         'invoices': total_invoices,
     }
     return render_template('reportes.html', total_sales=total_sales, sales_by_category=sales_by_category, stats=stats)
+
+
+@app.route('/contabilidad')
+def contabilidad():
+    return render_template('contabilidad.html')
 
 
 @app.route('/api/recommendations')
