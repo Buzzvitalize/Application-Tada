@@ -168,12 +168,13 @@ def require_login():
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
+    company = CompanyInfo.query.first()
     if request.method == 'POST':
         if request.form.get('username') == 'admin' and request.form.get('pin') == '363636':
             session['user'] = 'admin'
             return redirect(url_for('list_quotations'))
         flash('Credenciales inválidas')
-    return render_template('login.html')
+    return render_template('login.html', company=company)
 
 @app.route('/logout')
 def logout():

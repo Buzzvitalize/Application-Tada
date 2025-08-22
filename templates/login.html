@@ -2,21 +2,57 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Login</title>
+  <title>Iniciar Sesión</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
 </head>
-<body class="min-h-screen flex items-center justify-center bg-gray-100">
-  <form method="post" class="card w-80 space-y-4">
-    <h1 class="text-xl font-semibold text-center">Iniciar Sesión</h1>
-    <input name="username" placeholder="Usuario" class="input" required>
-    <input name="pin" placeholder="PIN" class="input" type="password" required>
-    <button class="btn-primary w-full">Entrar</button>
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <div class="text-red-600 text-center">{{ messages[0] }}</div>
+<body class="min-h-screen flex">
+  <!-- Left panel -->
+  <div class="w-full lg:w-1/2 flex flex-col justify-center px-8 lg:px-24 bg-white relative">
+    <div class="absolute top-8 left-8">
+      {% if company and company.logo %}
+        <img src="{{ url_for('static', filename='uploads/' + company.logo) }}" alt="Logo" class="h-8">
+      {% else %}
+        <span class="text-xl font-bold text-blue-600">MiEmpresa</span>
       {% endif %}
-    {% endwith %}
-  </form>
+    </div>
+    <div class="max-w-sm mx-auto w-full">
+      <h2 class="text-2xl font-bold mb-2">Inicia sesión en tu cuenta</h2>
+      <p class="text-sm text-gray-600 mb-6">Usa tus credenciales para continuar.</p>
+      <form method="post" class="space-y-4">
+        <input name="username" placeholder="Usuario" class="input" required>
+        <input name="pin" placeholder="PIN" class="input" type="password" required>
+        <button class="btn-primary w-full transform hover:scale-105 transition">Entrar</button>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="text-red-600 text-center">{{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+      </form>
+      <button id="info-btn" type="button" class="mt-4 text-sm text-blue-600 hover:underline">Más información? Contáctanos</button>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="hidden lg:block w-1/2 bg-gradient-to-br from-blue-400 to-indigo-600 animate-pulse"></div>
+
+  <!-- Contact modal -->
+  <div id="info-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded p-6 space-y-4 text-center max-w-sm">
+      <h3 class="text-lg font-semibold">Contáctanos</h3>
+      <p>Correo: info@empresa.com</p>
+      <p>Tel: 000-000-0000</p>
+      <button id="close-info" class="btn-secondary mx-auto">Cerrar</button>
+    </div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('info-btn');
+    const modal = document.getElementById('info-modal');
+    const close = document.getElementById('close-info');
+    btn.addEventListener('click', () => modal.classList.remove('hidden'));
+    close.addEventListener('click', () => modal.classList.add('hidden'));
+  </script>
 </body>
 </html>
+
