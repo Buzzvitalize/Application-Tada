@@ -53,12 +53,10 @@
   function toggle(){
     if(document.querySelector('input[name="type"]:checked').value==='final'){
       lastField.classList.remove('hidden');
-      lastField.required=true;
       idField.placeholder='RNC';
       idField.required=false;
     }else{
       lastField.classList.add('hidden');
-      lastField.required=false;
       idField.placeholder='RNC *';
       idField.required=true;
     }

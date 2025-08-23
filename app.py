@@ -335,9 +335,6 @@ def clients():
         is_final = request.form.get('type') == 'final'
         identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
         last_name = request.form.get('last_name') if is_final else None
-        if is_final and not last_name:
-            flash('El apellido es obligatorio para consumidor final')
-            return redirect(url_for('clients'))
         if not is_final and not identifier:
             flash('El RNC es obligatorio para empresas')
             return redirect(url_for('clients'))
@@ -375,9 +372,6 @@ def edit_client(client_id):
         is_final = request.form.get('type') == 'final'
         identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
         last_name = request.form.get('last_name') if is_final else None
-        if is_final and not last_name:
-            flash('El apellido es obligatorio para consumidor final')
-            return redirect(url_for('edit_client', client_id=client.id))
         if not is_final and not identifier:
             flash('El RNC es obligatorio para empresas')
             return redirect(url_for('edit_client', client_id=client.id))
