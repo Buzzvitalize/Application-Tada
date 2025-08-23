@@ -612,3 +612,8 @@ def api_recommendations():
     """Return top product recommendations based on past orders."""
     return jsonify({'products': recommend_products()})
 
+def new_func(app):
+    app.run(debug=True)
+
+if __name__ == '__main__':
+    new_func(app)
