@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Editar Cotización{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Editar Cotización</h1>
+<form method="post" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
+  <div class="space-y-2">
+    <select name="client_id" id="client-select" class="input">
+      <option value="">-- Nuevo Cliente --</option>
+      {% for c in clients %}
+      <option value="{{ c.id }}" {% if quotation.client_id == c.id %}selected{% endif %}>{{ c.name }} - {{ c.identifier }}</option>
+      {% endfor %}
+    </select>
+    <div id="new-client" class="grid md:grid-cols-2 gap-4" style="display: {{ 'none' if quotation.client_id else 'grid' }};">
+      <input name="client_name" placeholder="Nombre" class="input">
+      <input name="client_identifier" placeholder="Cédula/RNC" class="input">
+      <input name="client_phone" placeholder="Teléfono" class="input">
+      <input name="client_email" placeholder="Email" class="input">
+      <input name="client_street" placeholder="Calle" class="input">
+      <input name="client_sector" placeholder="Sector" class="input">
+      <input name="client_province" placeholder="Provincia" class="input">
+      <div class="flex space-x-4 col-span-2">
+        <label><input type="radio" name="client_type" value="final" checked> Consumidor Final</label>
+        <label><input type="radio" name="client_type" value="fiscal"> Comprobante Fiscal</label>
+      </div>
+    </div>
+  </div>
+  <div>
+    <h2 class="text-xl font-semibold mb-2">Productos</h2>
+    <div id="productos">
+      {% for it in items %}
+      <div class="grid grid-cols-1 sm:grid-cols-6 gap-2 mb-2 product-row">
+        <select name="product_id[]" class="input product-select">
+          <option value="">Seleccione...</option>
+          {% for p in products %}
+          <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}" {% if it.product_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+        <input class="input unit-field" value="{{ it.unit }}" readonly>
+        <input class="input price-field" value="{{ '%.2f'|format(it.price) }}" readonly>
+        <input name="product_quantity[]" value="{{ it.quantity }}" placeholder="Cantidad" class="input" required>
+        <input name="product_discount[]" value="{{ '%.2f'|format(it.discount) }}" placeholder="Desc. %" class="input">
+        <button type="button" class="btn-secondary remove-product">Eliminar</button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" id="add-product" class="btn-secondary mt-2">Agregar Producto</button>
+  </div>
+  <button class="btn-primary">Guardar</button>
+</form>
+<script>
+  const clientSelect = document.getElementById('client-select');
+  const newClient = document.getElementById('new-client');
+  const productContainer = document.getElementById('productos');
+  let previousClient = clientSelect.value;
+  const clientItems = {};
+  clientItems[previousClient] = productContainer.innerHTML;
+
+  clientSelect.addEventListener('change', () => {
+    newClient.style.display = clientSelect.value ? 'none' : 'grid';
+    const required = clientSelect.value ? false : true;
+    newClient.querySelectorAll('input').forEach(i => i.required = required);
+    clientItems[previousClient] = productContainer.innerHTML;
+    const saved = clientItems[clientSelect.value] || '';
+    productContainer.innerHTML = saved;
+    if (!saved) addProductRow();
+    productContainer.querySelectorAll('.product-row').forEach(bindProduct);
+    previousClient = clientSelect.value;
+  });
+
+  function bindProduct(row) {
+    const select = row.querySelector('.product-select');
+    const unit = row.querySelector('.unit-field');
+    const price = row.querySelector('.price-field');
+    const removeBtn = row.querySelector('.remove-product');
+    select.addEventListener('change', function() {
+      const opt = this.selectedOptions[0];
+      unit.value = opt.dataset.unit || '';
+      price.value = opt.dataset.price || '';
+    });
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+    });
+  }
+
+  const templateRow = document.createElement('div');
+  templateRow.className = 'grid grid-cols-1 sm:grid-cols-6 gap-2 mb-2 product-row';
+  templateRow.innerHTML = `
+    <select name="product_id[]" class="input product-select">
+      <option value="">Seleccione...</option>
+      {% for p in products %}
+      <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}">{{ p.name }}</option>
+      {% endfor %}
+    </select>
+    <input class="input unit-field" readonly>
+    <input class="input price-field" readonly>
+    <input name="product_quantity[]" placeholder="Cantidad" class="input" required>
+    <input name="product_discount[]" placeholder="Desc. %" class="input">
+    <button type="button" class="btn-secondary remove-product">Eliminar</button>`;
+
+  function addProductRow() {
+    const row = templateRow.cloneNode(true);
+    productContainer.appendChild(row);
+    bindProduct(row);
+  }
+
+  document.getElementById('add-product').addEventListener('click', addProductRow);
+
+  document.querySelectorAll('.product-row').forEach(bindProduct);
+  clientSelect.dispatchEvent(new Event('change'));
+</script>
+{% endblock %}
+

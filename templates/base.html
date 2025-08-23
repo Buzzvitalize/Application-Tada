@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+</head>
+<body class="min-h-screen bg-gray-50">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-200 z-50">
+      <div class="p-4 text-xl font-bold border-b border-gray-700">Menú</div>
+      <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
+          <a href="{{ url_for('list_quotations') }}" class="nav-link">Cotizaciones</a>
+          <a href="{{ url_for('list_orders') }}" class="nav-link">Pedidos</a>
+          <a href="{{ url_for('list_invoices') }}" class="nav-link">Facturas</a>
+          <a href="{{ url_for('clients') }}" class="nav-link">Clientes</a>
+          <a href="{{ url_for('products') }}" class="nav-link">Productos</a>
+          <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
+          <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
+          <a href="{{ url_for('settings') }}" class="nav-link">Ajustes</a>
+      </nav>
+      <div class="p-4 border-t border-gray-700"><a href="{{ url_for('logout') }}" class="nav-link">Salir</a></div>
+  </aside>
+  <div id="backdrop" class="fixed inset-0 bg-black bg-opacity-40 hidden md:hidden"></div>
+  <header class="fixed top-0 left-0 right-0 bg-white shadow flex items-center justify-between px-4 h-14 md:ml-64 z-40">
+      <div class="flex items-center">
+        <button id="menu-btn" class="md:hidden mr-2 text-gray-700 focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="font-semibold text-gray-700">{{ company.name if company else 'Sistema' }}</span>
+      </div>
+  </header>
+  <main class="pt-16 md:ml-64 p-4 md:p-6">
+    <div class="max-w-7xl mx-auto">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="mb-4">
+          {% for message in messages %}
+            <div class="bg-green-100 text-green-800 p-2 mb-2">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+    </div>
+  </main>
+  <script>
+    const menuBtn = document.getElementById('menu-btn');
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('backdrop');
+    function toggleMenu(){
+      sidebar.classList.toggle('-translate-x-full');
+      backdrop.classList.toggle('hidden');
+    }
+    menuBtn && menuBtn.addEventListener('click', toggleMenu);
+    backdrop && backdrop.addEventListener('click', toggleMenu);
+  </script>
+</body>
+</html>
+
