@@ -152,11 +152,14 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
             pdf.cell(0, 6, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", ln=1, align='C')
     pdf.ln(5)
     pdf.set_font('Helvetica', '', 12)
-    pdf.cell(0, 6, f"Cliente: {client.name}", ln=1)
+    full_name = f"{client.name} {client.last_name}" if getattr(client, 'last_name', None) else client.name
+    pdf.cell(0, 6, f"Cliente: {full_name.strip()}", ln=1)
     if client.identifier:
         pdf.cell(0, 6, f"Cédula/RNC: {client.identifier}", ln=1)
-    pdf.cell(0, 6, f"Teléfono: {client.phone}", ln=1)
-    pdf.cell(0, 6, f"Dirección: {client.street}, {client.sector}, {client.province}", ln=1)
+    if client.phone:
+        pdf.cell(0, 6, f"Teléfono: {client.phone}", ln=1)
+    if client.street or client.sector or client.province:
+        pdf.cell(0, 6, f"Dirección: {client.street or ''}, {client.sector or ''}, {client.province or ''}", ln=1)
     if client.email:
         pdf.cell(0, 6, f"Email: {client.email}", ln=1)
     pdf.ln(5)
@@ -199,7 +202,7 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
 # Routes
 @app.before_request
 def require_login():
-    allowed = {'login', 'static', 'request_account'}
+    allowed = {'login', 'static', 'request_account', 'logout'}
     if request.endpoint not in allowed and 'user' not in session:
         return redirect(url_for('login'))
     admin_extra = {'admin_companies', 'select_company', 'clear_company',
@@ -234,9 +237,7 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.pop('user', None)
-    session.pop('role', None)
-    session.pop('company_id', None)
+    session.clear()
     return redirect(url_for('login'))
 
 
@@ -333,17 +334,22 @@ def clients():
     if request.method == 'POST':
         is_final = request.form.get('type') == 'final'
         identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
+        last_name = request.form.get('last_name') if is_final else None
+        if is_final and not last_name:
+            flash('El apellido es obligatorio para consumidor final')
+            return redirect(url_for('clients'))
         if not is_final and not identifier:
-            flash('El identificador es obligatorio para comprobante fiscal')
+            flash('El RNC es obligatorio para empresas')
             return redirect(url_for('clients'))
         client = Client(
             name=request.form['name'],
+            last_name=last_name,
             identifier=identifier,
-            phone=request.form['phone'],
+            phone=request.form.get('phone'),
             email=request.form.get('email'),
-            street=request.form['street'],
-            sector=request.form['sector'],
-            province=request.form['province'],
+            street=request.form.get('street'),
+            sector=request.form.get('sector'),
+            province=request.form.get('province'),
             is_final_consumer=is_final,
             company_id=current_company_id()
         )
@@ -368,16 +374,21 @@ def edit_client(client_id):
     if request.method == 'POST':
         is_final = request.form.get('type') == 'final'
         identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
+        last_name = request.form.get('last_name') if is_final else None
+        if is_final and not last_name:
+            flash('El apellido es obligatorio para consumidor final')
+            return redirect(url_for('edit_client', client_id=client.id))
         if not is_final and not identifier:
-            flash('El identificador es obligatorio para comprobante fiscal')
+            flash('El RNC es obligatorio para empresas')
             return redirect(url_for('edit_client', client_id=client.id))
         client.name = request.form['name']
+        client.last_name = last_name
         client.identifier = identifier
-        client.phone = request.form['phone']
+        client.phone = request.form.get('phone')
         client.email = request.form.get('email')
-        client.street = request.form['street']
-        client.sector = request.form['sector']
-        client.province = request.form['province']
+        client.street = request.form.get('street')
+        client.sector = request.form.get('sector')
+        client.province = request.form.get('province')
         client.is_final_consumer = is_final
         db.session.commit()
         flash('Cliente actualizado')

@@ -1,4 +1,4 @@
-# Application Tada
+# Tiendix - Tu negocio, tu control, tu Tiendix
 
 Simple Flask application for managing quotations, orders and invoices.
 
