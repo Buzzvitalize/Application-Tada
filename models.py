@@ -108,3 +108,25 @@ class CompanyInfo(db.Model):
     logo = db.Column(db.String(120))
     ncf_final = db.Column(db.Integer, default=1)
     ncf_fiscal = db.Column(db.Integer, default=1)
+
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+    role = db.Column(db.String(20), default='user')  # 'admin' or 'user'
+
+
+class AccountRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String(120), nullable=False)
+    last_name = db.Column(db.String(120), nullable=False)
+    company = db.Column(db.String(120), nullable=False)
+    rnc = db.Column(db.String(50))
+    phone = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    address = db.Column(db.String(200), nullable=False)
+    website = db.Column(db.String(120))
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

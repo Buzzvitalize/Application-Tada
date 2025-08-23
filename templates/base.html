@@ -19,7 +19,10 @@
             <a href="{{ url_for('products') }}" class="nav-link">Productos</a>
             <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
             <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
+            {% if session.get('role') == 'admin' %}
+            <a href="{{ url_for('admin_requests') }}" class="nav-link">Solicitudes</a>
             <a href="{{ url_for('settings') }}" class="nav-link">Ajustes</a>
+            {% endif %}
         </nav>
         <div class="p-4 border-t border-gray-700"><a href="{{ url_for('logout') }}" class="nav-link">Salir</a></div>
     </aside>

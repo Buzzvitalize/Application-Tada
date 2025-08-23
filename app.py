@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, session, jsonify
-from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo
+from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo, User, AccountRequest
 from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -9,6 +9,7 @@ from uuid import uuid4
 import qrcode
 import os
 from ai import recommend_products
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.sqlite'
@@ -48,6 +49,10 @@ with app.app_context():
         )
         sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios')
         db.session.add_all([sample_client, sample_product])
+        db.session.commit()
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', password='363636', role='admin')
+        db.session.add(admin)
         db.session.commit()
 
 # Utility functions
@@ -173,16 +178,28 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
 # Routes
 @app.before_request
 def require_login():
-    allowed = {'login', 'static'}
+    allowed = {'login', 'static', 'request_account'}
     if request.endpoint not in allowed and 'user' not in session:
         return redirect(url_for('login'))
+
+
+def admin_only(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if session.get('role') != 'admin':
+            flash('Acceso restringido')
+            return redirect(url_for('list_quotations'))
+        return f(*args, **kwargs)
+    return wrapper
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
     company = CompanyInfo.query.first()
     if request.method == 'POST':
-        if request.form.get('username') == 'admin' and request.form.get('pin') == '363636':
-            session['user'] = 'admin'
+        user = User.query.filter_by(username=request.form.get('username')).first()
+        if user and user.password == request.form.get('password'):
+            session['user'] = user.username
+            session['role'] = user.role
             return redirect(url_for('list_quotations'))
         flash('Credenciales inválidas')
     return render_template('login.html', company=company)
@@ -190,7 +207,63 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('user', None)
+    session.pop('role', None)
     return redirect(url_for('login'))
+
+
+@app.route('/solicitar-cuenta', methods=['GET', 'POST'])
+def request_account():
+    if request.method == 'POST':
+        if request.form.get('password') != request.form.get('confirm_password'):
+            flash('Las contraseñas no coinciden')
+            return redirect(url_for('request_account'))
+        req = AccountRequest(
+            first_name=request.form['first_name'],
+            last_name=request.form['last_name'],
+            company=request.form['company'],
+            rnc=request.form.get('rnc'),
+            phone=request.form['phone'],
+            email=request.form['email'],
+            address=request.form['address'],
+            website=request.form.get('website'),
+            username=request.form['username'],
+            password=request.form['password'],
+        )
+        db.session.add(req)
+        db.session.commit()
+        flash('Solicitud enviada, espere aprobación')
+        return redirect(url_for('login'))
+    return render_template('solicitar_cuenta.html')
+
+
+@app.route('/admin/solicitudes')
+@admin_only
+def admin_requests():
+    requests = AccountRequest.query.all()
+    return render_template('admin_solicitudes.html', requests=requests)
+
+
+@app.route('/admin/solicitudes/<int:req_id>/aprobar', methods=['POST'])
+@admin_only
+def approve_request(req_id):
+    req = AccountRequest.query.get_or_404(req_id)
+    role = request.form.get('role', 'user')
+    user = User(username=req.username, password=req.password, role=role)
+    db.session.add(user)
+    db.session.delete(req)
+    db.session.commit()
+    flash('Cuenta aprobada')
+    return redirect(url_for('admin_requests'))
+
+
+@app.route('/admin/solicitudes/<int:req_id>/rechazar', methods=['POST'])
+@admin_only
+def reject_request(req_id):
+    req = AccountRequest.query.get_or_404(req_id)
+    db.session.delete(req)
+    db.session.commit()
+    flash('Solicitud rechazada')
+    return redirect(url_for('admin_requests'))
 
 # Clients CRUD
 @app.route('/clientes', methods=['GET', 'POST'])
@@ -435,6 +508,7 @@ def edit_quotation(quotation_id):
 
 
 @app.route('/ajustes', methods=['GET', 'POST'])
+@admin_only
 def settings():
     company = CompanyInfo.query.first()
     if request.method == 'POST':
