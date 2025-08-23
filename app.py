@@ -120,6 +120,10 @@ def get_company_info():
     }
 
 
+def _fmt_money(value):
+    return f"RD${value:,.2f}"
+
+
 def generate_pdf(title, company, client, items, subtotal, itbis, total,
                  ncf=None, output_path=None, qr_url=None, date=None, valid_until=None):
     pdf = FPDF()
@@ -142,14 +146,13 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.ln(5)
     pdf.set_font('Helvetica', 'B', 14)
     pdf.cell(0, 10, title, ln=1, align='C')
+    pdf.set_font('Helvetica', '', 12)
     if ncf:
-        pdf.set_font('Helvetica', '', 12)
-        pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='C')
+        pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='R')
     if date:
-        pdf.set_font('Helvetica', '', 12)
-        pdf.cell(0, 6, f"Fecha: {date.strftime('%d/%m/%Y %H:%M')}", ln=1, align='C')
+        pdf.cell(0, 6, f"Fecha: {date.strftime('%d/%m/%Y %I:%M %p')}", ln=1, align='R')
         if valid_until:
-            pdf.cell(0, 6, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", ln=1, align='C')
+            pdf.cell(0, 6, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", ln=1, align='R')
     pdf.ln(5)
     pdf.set_font('Helvetica', '', 12)
     full_name = f"{client.name} {client.last_name}" if getattr(client, 'last_name', None) else client.name
@@ -164,6 +167,9 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         pdf.cell(0, 6, f"Email: {client.email}", ln=1)
     pdf.ln(5)
     pdf.set_font('Helvetica', 'B', 12)
+    table_width = 60 + 20 + 25 + 20 + 25 + 30
+    table_x = (pdf.w - table_width) / 2
+    pdf.set_x(table_x)
     pdf.cell(60, 8, 'Producto', border=1)
     pdf.cell(20, 8, 'Unidad', border=1)
     pdf.cell(25, 8, 'Precio', border=1, align='R')
@@ -173,18 +179,23 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.set_font('Helvetica', '', 12)
     for i in items:
         total_line = (i.unit_price * i.quantity) - i.discount
+        pdf.set_x(table_x)
         pdf.cell(60, 8, i.product_name, border=1)
         pdf.cell(20, 8, i.unit, border=1, align='C')
-        pdf.cell(25, 8, f"{i.unit_price:.2f}", border=1, align='R')
+        pdf.cell(25, 8, _fmt_money(i.unit_price), border=1, align='R')
         pdf.cell(20, 8, str(i.quantity), border=1, align='R')
-        pdf.cell(25, 8, f"{i.discount:.2f}", border=1, align='R')
-        pdf.cell(30, 8, f"{total_line:.2f}", border=1, ln=1, align='R')
+        pdf.cell(25, 8, _fmt_money(i.discount), border=1, align='R')
+        pdf.cell(30, 8, _fmt_money(total_line), border=1, ln=1, align='R')
     discount_total = sum(i.discount for i in items)
     pdf.ln(5)
-    pdf.cell(0, 6, f"Subtotal: {subtotal:.2f}", ln=1, align='R')
-    pdf.cell(0, 6, f"ITBIS ({ITBIS_RATE*100:.0f}%): {itbis:.2f}", ln=1, align='R')
-    pdf.cell(0, 6, f"Descuento: {discount_total:.2f}", ln=1, align='R')
-    pdf.cell(0, 6, f"Total: {total:.2f}", ln=1, align='R')
+    pdf.set_x(table_x)
+    pdf.cell(table_width, 6, f"Subtotal: {_fmt_money(subtotal)}", ln=1, align='R')
+    pdf.set_x(table_x)
+    pdf.cell(table_width, 6, f"ITBIS ({ITBIS_RATE*100:.0f}%): {_fmt_money(itbis)}", ln=1, align='R')
+    pdf.set_x(table_x)
+    pdf.cell(table_width, 6, f"Descuento: {_fmt_money(discount_total)}", ln=1, align='R')
+    pdf.set_x(table_x)
+    pdf.cell(table_width, 6, f"Total: {_fmt_money(total)}", ln=1, align='R')
     if qr_url:
         os.makedirs(os.path.join(app.static_folder, 'qrcodes'), exist_ok=True)
         qr_path = os.path.join(app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
