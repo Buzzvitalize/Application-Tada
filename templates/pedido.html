@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Pedidos{% endblock %}
+{% block content %}
+<h1 class="text-2xl mb-4">Pedidos</h1>
+<table class="w-full border">
+  <tr class="bg-gray-100"><th class="border p-2">ID</th><th class="border p-2">Cliente</th><th class="border p-2">Estado</th><th class="border p-2">Total</th><th class="border p-2">Acciones</th></tr>
+  {% for o in orders %}
+  <tr>
+    <td class="border p-2">{{ o.id }}</td>
+    <td class="border p-2">{{ o.client.name }}</td>
+    <td class="border p-2">{{ o.status }}</td>
+    <td class="border p-2">{{ '%.2f'|format(o.total) }}</td>
+    <td class="border p-2"><a class="text-blue-500" href="{{ url_for('order_to_invoice', order_id=o.id) }}">Generar Factura</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

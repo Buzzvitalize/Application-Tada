@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Sistema{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex">
+    <aside class="w-64 bg-gray-800 text-white min-h-screen">
+        <div class="p-4 text-xl font-bold">Menú</div>
+        <nav class="px-2">
+            <a href="{{ url_for('list_quotations') }}" class="block p-2 hover:bg-gray-700">Cotizaciones</a>
+            <a href="{{ url_for('list_orders') }}" class="block p-2 hover:bg-gray-700">Pedidos</a>
+            <a href="{{ url_for('list_invoices') }}" class="block p-2 hover:bg-gray-700">Facturas</a>
+            <a href="{{ url_for('clients') }}" class="block p-2 hover:bg-gray-700">Clientes</a>
+            <a href="{{ url_for('products') }}" class="block p-2 hover:bg-gray-700">Productos</a>
+        </nav>
+    </aside>
+    <main class="flex-1 p-6">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="mb-4">
+              {% for message in messages %}
+                <div class="bg-green-100 text-green-800 p-2 mb-2">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

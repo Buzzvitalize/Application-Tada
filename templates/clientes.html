@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Clientes{% endblock %}
+{% block content %}
+<h1 class="text-2xl mb-4">Clientes</h1>
+<form method="post" class="mb-4 space-y-2">
+  <input name="name" placeholder="Nombre" class="border p-2 w-full" required>
+  <input name="identifier" placeholder="Cédula/RNC" class="border p-2 w-full" required>
+  <input name="phone" placeholder="Teléfono" class="border p-2 w-full" required>
+  <input name="email" placeholder="Email" class="border p-2 w-full">
+  <button class="bg-blue-500 text-white px-4 py-2">Agregar</button>
+</form>
+<table class="w-full border">
+  <tr class="bg-gray-100"><th class="border p-2">Nombre</th><th class="border p-2">Identificador</th><th class="border p-2">Teléfono</th><th class="border p-2">Acciones</th></tr>
+  {% for c in clients %}
+  <tr>
+    <td class="border p-2">{{ c.name }}</td>
+    <td class="border p-2">{{ c.identifier }}</td>
+    <td class="border p-2">{{ c.phone }}</td>
+    <td class="border p-2"><a class="text-red-500" href="{{ url_for('delete_client', client_id=c.id) }}">Eliminar</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
