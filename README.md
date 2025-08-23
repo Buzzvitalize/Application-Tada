@@ -2,6 +2,12 @@
 
 Simple Flask application for managing quotations, orders and invoices.
 
+Key features:
+
+- Company logo upload used across all generated PDFs
+- QR codes on documents linking back to their online copies
+- Responsive TailwindCSS layout with sidebar navigation
+
 ## Configuration
 
 Create a `.env` file in the project root and define:
