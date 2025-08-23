@@ -1,0 +1,8 @@
+database.sqlite
+*.pyc
+__pycache__/
+.venv/
+.env
+static/uploads/
+static/pdfs/
+static/qrcodes/

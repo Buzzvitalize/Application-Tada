@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Clientes{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Clientes</h1>
+<form method="post" class="card mb-6 space-y-4">
+  <div class="grid md:grid-cols-2 gap-4">
+    <input name="name" placeholder="Nombre" class="input" required>
+    <input id="last_name" name="last_name" placeholder="Apellido" class="input">
+    <input name="identifier" placeholder="RNC" class="input">
+    <input name="phone" placeholder="Teléfono" class="input">
+    <input name="email" placeholder="Email" class="input">
+    <input name="street" placeholder="Calle" class="input">
+    <input name="sector" placeholder="Sector" class="input">
+    <input name="province" placeholder="Provincia" class="input">
+  </div>
+  <div class="flex space-x-4">
+    <label><input type="radio" name="type" value="final" checked> Consumidor Final</label>
+    <label><input type="radio" name="type" value="fiscal"> Empresa</label>
+  </div>
+  <button class="btn-primary">Agregar</button>
+</form>
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Nombre</th>
+        <th class="p-2 text-left">Identificador</th>
+        <th class="p-2 text-left">Teléfono</th>
+        <th class="p-2 text-left">Tipo</th>
+        <th class="p-2 text-left">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for c in clients %}
+      <tr class="border-t">
+        <td class="p-2">{{ c.name }}{% if c.last_name %} {{ c.last_name }}{% endif %}</td>
+        <td class="p-2">{{ c.identifier }}</td>
+        <td class="p-2">{{ c.phone }}</td>
+        <td class="p-2">{{ 'Final' if c.is_final_consumer else 'Fiscal' }}</td>
+        <td class="p-2 space-x-2">
+          <a class="text-blue-500" href="{{ url_for('edit_client', client_id=c.id) }}">Editar</a>
+          <a class="text-red-500" href="{{ url_for('delete_client', client_id=c.id) }}">Eliminar</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+  const typeRadios=document.querySelectorAll('input[name="type"]');
+  const idField=document.querySelector('input[name="identifier"]');
+  const lastField=document.getElementById('last_name');
+  function toggle(){
+    if(document.querySelector('input[name="type"]:checked').value==='final'){
+      lastField.classList.remove('hidden');
+      idField.placeholder='RNC';
+      idField.required=false;
+    }else{
+      lastField.classList.add('hidden');
+      idField.placeholder='RNC *';
+      idField.required=true;
+    }
+  }
+  typeRadios.forEach(r=>r.addEventListener('change',toggle));
+  toggle();
+</script>
+{% endblock %}

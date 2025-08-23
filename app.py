@@ -1,0 +1,774 @@
+from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, session, jsonify
+from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo, User, AccountRequest
+from fpdf import FPDF
+from io import BytesIO
+from datetime import datetime, timedelta
+from sqlalchemy import func
+from werkzeug.utils import secure_filename
+from uuid import uuid4
+import qrcode
+import os
+from ai import recommend_products
+from functools import wraps
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.sqlite'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = os.environ.get('SECRET_KEY', 'dev')
+
+DB_PATH = os.path.join(os.path.dirname(__file__), 'database.sqlite')
+
+# Initialize database
+with app.app_context():
+    db.init_app(app)
+    db.create_all()
+    # sample data and company info
+    if not CompanyInfo.query.first():
+        company = CompanyInfo(
+            name='Empresa Demo',
+            street='Calle 1',
+            sector='Centro',
+            province='Santo Domingo',
+            phone='809-000-0000',
+            rnc='101000000',
+            website='',
+            logo='',
+        )
+        db.session.add(company)
+        db.session.commit()
+    company = CompanyInfo.query.first()
+    if not Client.query.first():
+        sample_client = Client(
+            name='Juan Perez',
+            identifier='001-0000000-1',
+            phone='809-000-0000',
+            email='juan@example.com',
+            street='Av. Siempre Viva',
+            sector='Centro',
+            province='Santo Domingo',
+            is_final_consumer=False,
+            company_id=company.id,
+        )
+        sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios', company_id=company.id)
+        db.session.add_all([sample_client, sample_product])
+        db.session.commit()
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', password='363636', role='admin')
+        db.session.add(admin)
+        db.session.commit()
+
+# Utility functions
+ITBIS_RATE = 0.18
+
+
+def current_company_id():
+    return session.get('company_id')
+
+
+def company_query(model):
+    cid = current_company_id()
+    if session.get('role') == 'admin' and cid is None:
+        return model.query
+    return model.query.filter_by(company_id=cid)
+
+
+def company_get(model, object_id):
+    return company_query(model).filter_by(id=object_id).first_or_404()
+
+def _to_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _to_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def calculate_totals(items):
+    subtotal = sum((item['unit_price'] * item['quantity']) - item['discount'] for item in items)
+    itbis = sum(((item['unit_price'] * item['quantity']) - item['discount']) * ITBIS_RATE
+                for item in items if item.get('has_itbis'))
+    total = subtotal + itbis
+    return subtotal, itbis, total
+
+
+@app.context_processor
+def inject_company():
+    cid = current_company_id()
+    company = CompanyInfo.query.get(cid) if cid else None
+    return {'company': company}
+
+
+def get_company_info():
+    c = CompanyInfo.query.get(current_company_id())
+    if not c:
+        return {}
+    return {
+        'name': c.name,
+        'address': f"{c.street}, {c.sector}, {c.province}",
+        'rnc': c.rnc,
+        'phone': c.phone,
+        'website': c.website,
+        'logo': os.path.join(app.static_folder, c.logo) if c.logo else None,
+        'ncf_final': c.ncf_final,
+        'ncf_fiscal': c.ncf_fiscal,
+    }
+
+
+def generate_pdf(title, company, client, items, subtotal, itbis, total,
+                 ncf=None, output_path=None, qr_url=None, date=None, valid_until=None):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Helvetica', 'B', 16)
+    text_x = 10
+    if company.get('logo'):
+        pdf.image(company['logo'], 10, 8, 33)
+        text_x = 50
+    pdf.set_xy(text_x, 10)
+    pdf.cell(0, 10, company['name'], ln=1)
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_x(text_x)
+    pdf.cell(0, 5, company['address'], ln=1)
+    pdf.set_x(text_x)
+    pdf.cell(0, 5, f"RNC: {company['rnc']} Tel: {company['phone']}", ln=1)
+    if company.get('website'):
+        pdf.set_x(text_x)
+        pdf.cell(0, 5, company['website'], ln=1)
+    pdf.ln(5)
+    pdf.set_font('Helvetica', 'B', 14)
+    pdf.cell(0, 10, title, ln=1, align='C')
+    if ncf:
+        pdf.set_font('Helvetica', '', 12)
+        pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='C')
+    if date:
+        pdf.set_font('Helvetica', '', 12)
+        pdf.cell(0, 6, f"Fecha: {date.strftime('%d/%m/%Y %H:%M')}", ln=1, align='C')
+        if valid_until:
+            pdf.cell(0, 6, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", ln=1, align='C')
+    pdf.ln(5)
+    pdf.set_font('Helvetica', '', 12)
+    full_name = f"{client.name} {client.last_name}" if getattr(client, 'last_name', None) else client.name
+    pdf.cell(0, 6, f"Cliente: {full_name.strip()}", ln=1)
+    if client.identifier:
+        pdf.cell(0, 6, f"Cédula/RNC: {client.identifier}", ln=1)
+    if client.phone:
+        pdf.cell(0, 6, f"Teléfono: {client.phone}", ln=1)
+    if client.street or client.sector or client.province:
+        pdf.cell(0, 6, f"Dirección: {client.street or ''}, {client.sector or ''}, {client.province or ''}", ln=1)
+    if client.email:
+        pdf.cell(0, 6, f"Email: {client.email}", ln=1)
+    pdf.ln(5)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.cell(60, 8, 'Producto', border=1)
+    pdf.cell(20, 8, 'Unidad', border=1)
+    pdf.cell(25, 8, 'Precio', border=1, align='R')
+    pdf.cell(20, 8, 'Cant.', border=1, align='R')
+    pdf.cell(25, 8, 'Desc.', border=1, align='R')
+    pdf.cell(30, 8, 'Total', border=1, ln=1, align='R')
+    pdf.set_font('Helvetica', '', 12)
+    for i in items:
+        total_line = (i.unit_price * i.quantity) - i.discount
+        pdf.cell(60, 8, i.product_name, border=1)
+        pdf.cell(20, 8, i.unit, border=1, align='C')
+        pdf.cell(25, 8, f"{i.unit_price:.2f}", border=1, align='R')
+        pdf.cell(20, 8, str(i.quantity), border=1, align='R')
+        pdf.cell(25, 8, f"{i.discount:.2f}", border=1, align='R')
+        pdf.cell(30, 8, f"{total_line:.2f}", border=1, ln=1, align='R')
+    discount_total = sum(i.discount for i in items)
+    pdf.ln(5)
+    pdf.cell(0, 6, f"Subtotal: {subtotal:.2f}", ln=1, align='R')
+    pdf.cell(0, 6, f"ITBIS ({ITBIS_RATE*100:.0f}%): {itbis:.2f}", ln=1, align='R')
+    pdf.cell(0, 6, f"Descuento: {discount_total:.2f}", ln=1, align='R')
+    pdf.cell(0, 6, f"Total: {total:.2f}", ln=1, align='R')
+    if qr_url:
+        os.makedirs(os.path.join(app.static_folder, 'qrcodes'), exist_ok=True)
+        qr_path = os.path.join(app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
+        img = qrcode.make(qr_url)
+        img.save(qr_path)
+        pdf.image(qr_path, x=170, y=260, w=30)
+    if output_path:
+        pdf.output(output_path)
+        return output_path
+    output = BytesIO()
+    pdf.output(output)
+    output.seek(0)
+    return output
+
+# Routes
+@app.before_request
+def require_login():
+    allowed = {'login', 'static', 'request_account', 'logout'}
+    if request.endpoint not in allowed and 'user' not in session:
+        return redirect(url_for('login'))
+    admin_extra = {'admin_companies', 'select_company', 'clear_company',
+                   'admin_requests', 'approve_request', 'reject_request'}
+    if session.get('role') == 'admin' and not session.get('company_id') \
+            and request.endpoint not in allowed.union(admin_extra):
+        return redirect(url_for('admin_companies'))
+
+
+def admin_only(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if session.get('role') != 'admin':
+            flash('Acceso restringido')
+            return redirect(url_for('list_quotations'))
+        return f(*args, **kwargs)
+    return wrapper
+
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = User.query.filter_by(username=request.form.get('username')).first()
+        if user and user.password == request.form.get('password'):
+            session['user'] = user.username
+            session['role'] = user.role
+            session['company_id'] = user.company_id
+            if user.role == 'admin':
+                return redirect(url_for('admin_companies'))
+            return redirect(url_for('list_quotations'))
+        flash('Credenciales inválidas', 'login')
+    return render_template('login.html', company=None)
+
+@app.route('/logout')
+def logout():
+    session.pop('_flashes', None)
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/solicitar-cuenta', methods=['GET', 'POST'])
+def request_account():
+    if request.method == 'POST':
+        if request.form.get('password') != request.form.get('confirm_password'):
+            flash('Las contraseñas no coinciden', 'request')
+            return redirect(url_for('request_account'))
+        req = AccountRequest(
+            first_name=request.form['first_name'],
+            last_name=request.form['last_name'],
+            company=request.form['company'],
+            rnc=request.form.get('rnc'),
+            phone=request.form['phone'],
+            email=request.form['email'],
+            address=request.form['address'],
+            website=request.form.get('website'),
+            username=request.form['username'],
+            password=request.form['password'],
+        )
+        db.session.add(req)
+        db.session.commit()
+        flash('Solicitud enviada, espere aprobación', 'login')
+        return redirect(url_for('login'))
+    return render_template('solicitar_cuenta.html')
+
+
+@app.route('/admin/solicitudes')
+@admin_only
+def admin_requests():
+    requests = AccountRequest.query.all()
+    return render_template('admin_solicitudes.html', requests=requests)
+
+
+@app.route('/admin/companies')
+@admin_only
+def admin_companies():
+    companies = CompanyInfo.query.all()
+    return render_template('admin_companies.html', companies=companies)
+
+
+@app.route('/admin/companies/select/<int:company_id>')
+@admin_only
+def select_company(company_id):
+    session['company_id'] = company_id
+    return redirect(url_for('list_quotations'))
+
+
+@app.route('/admin/companies/clear')
+@admin_only
+def clear_company():
+    session.pop('company_id', None)
+    return redirect(url_for('admin_companies'))
+
+
+@app.route('/admin/solicitudes/<int:req_id>/aprobar', methods=['POST'])
+@admin_only
+def approve_request(req_id):
+    req = AccountRequest.query.get_or_404(req_id)
+    role = request.form.get('role', 'company')
+    company = CompanyInfo(
+        name=req.company,
+        street=req.address,
+        sector='',
+        province='',
+        phone=req.phone,
+        rnc=req.rnc or '',
+        website=req.website,
+        logo='',
+    )
+    db.session.add(company)
+    db.session.flush()
+    user = User(username=req.username, password=req.password, role=role, company_id=company.id)
+    db.session.add(user)
+    db.session.delete(req)
+    db.session.commit()
+    flash('Cuenta aprobada')
+    return redirect(url_for('admin_requests'))
+
+
+@app.route('/admin/solicitudes/<int:req_id>/rechazar', methods=['POST'])
+@admin_only
+def reject_request(req_id):
+    req = AccountRequest.query.get_or_404(req_id)
+    db.session.delete(req)
+    db.session.commit()
+    flash('Solicitud rechazada')
+    return redirect(url_for('admin_requests'))
+
+# Clients CRUD
+@app.route('/clientes', methods=['GET', 'POST'])
+def clients():
+    if request.method == 'POST':
+        is_final = request.form.get('type') == 'final'
+        identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
+        last_name = request.form.get('last_name') if is_final else None
+        if not is_final and not identifier:
+            flash('El RNC es obligatorio para empresas')
+            return redirect(url_for('clients'))
+        client = Client(
+            name=request.form['name'],
+            last_name=last_name,
+            identifier=identifier,
+            phone=request.form.get('phone'),
+            email=request.form.get('email'),
+            street=request.form.get('street'),
+            sector=request.form.get('sector'),
+            province=request.form.get('province'),
+            is_final_consumer=is_final,
+            company_id=current_company_id()
+        )
+        db.session.add(client)
+        db.session.commit()
+        flash('Cliente agregado')
+        return redirect(url_for('clients'))
+    clients = company_query(Client).all()
+    return render_template('clientes.html', clients=clients)
+
+@app.route('/clientes/delete/<int:client_id>')
+def delete_client(client_id):
+    client = company_get(Client, client_id)
+    db.session.delete(client)
+    db.session.commit()
+    flash('Cliente eliminado')
+    return redirect(url_for('clients'))
+
+@app.route('/clientes/edit/<int:client_id>', methods=['GET', 'POST'])
+def edit_client(client_id):
+    client = company_get(Client, client_id)
+    if request.method == 'POST':
+        is_final = request.form.get('type') == 'final'
+        identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
+        last_name = request.form.get('last_name') if is_final else None
+        if not is_final and not identifier:
+            flash('El RNC es obligatorio para empresas')
+            return redirect(url_for('edit_client', client_id=client.id))
+        client.name = request.form['name']
+        client.last_name = last_name
+        client.identifier = identifier
+        client.phone = request.form.get('phone')
+        client.email = request.form.get('email')
+        client.street = request.form.get('street')
+        client.sector = request.form.get('sector')
+        client.province = request.form.get('province')
+        client.is_final_consumer = is_final
+        db.session.commit()
+        flash('Cliente actualizado')
+        return redirect(url_for('clients'))
+    return render_template('cliente_form.html', client=client)
+
+# Products CRUD
+@app.route('/productos', methods=['GET', 'POST'])
+def products():
+    units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
+    categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
+    if request.method == 'POST':
+        product = Product(
+            name=request.form['name'],
+            unit=request.form['unit'],
+            price=_to_float(request.form['price']),
+            category=request.form.get('category'),
+            has_itbis=bool(request.form.get('has_itbis')),
+            company_id=current_company_id()
+        )
+        db.session.add(product)
+        db.session.commit()
+        flash('Producto agregado')
+        return redirect(url_for('products'))
+    cat = request.args.get('cat')
+    query = company_query(Product)
+    if cat:
+        query = query.filter_by(category=cat)
+    products = query.all()
+    return render_template('productos.html', products=products, units=units, categories=categories, current_cat=cat)
+
+@app.route('/productos/delete/<int:product_id>')
+def delete_product(product_id):
+    product = company_get(Product, product_id)
+    db.session.delete(product)
+    db.session.commit()
+    flash('Producto eliminado')
+    return redirect(url_for('products'))
+
+@app.route('/productos/edit/<int:product_id>', methods=['GET', 'POST'])
+def edit_product(product_id):
+    product = company_get(Product, product_id)
+    units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
+    categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
+    if request.method == 'POST':
+        product.name = request.form['name']
+        product.unit = request.form['unit']
+        product.price = _to_float(request.form['price'])
+        product.category = request.form.get('category')
+        product.has_itbis = bool(request.form.get('has_itbis'))
+        db.session.commit()
+        flash('Producto actualizado')
+        return redirect(url_for('products'))
+    return render_template('producto_form.html', product=product, units=units, categories=categories)
+
+# Quotations
+@app.route('/cotizaciones')
+def list_quotations():
+    q = request.args.get('q')
+    query = company_query(Quotation).join(Client)
+    if q:
+        query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
+    quotations = query.order_by(Quotation.date.desc()).all()
+    return render_template('cotizaciones.html', quotations=quotations, q=q,
+                           timedelta=timedelta, now=datetime.utcnow())
+
+@app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
+def new_quotation():
+    if request.method == 'POST':
+        client_id = request.form.get('client_id')
+        if client_id:
+            client = company_get(Client, client_id)
+        else:
+            is_final = request.form.get('client_type') == 'final'
+            identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
+            if not is_final and not identifier:
+                flash('El identificador es obligatorio para comprobante fiscal')
+                return redirect(url_for('new_quotation'))
+            client = Client(
+                name=request.form['client_name'],
+                identifier=identifier,
+                phone=request.form['client_phone'],
+                email=request.form.get('client_email'),
+                street=request.form['client_street'],
+                sector=request.form['client_sector'],
+                province=request.form['client_province'],
+                is_final_consumer=is_final,
+                company_id=current_company_id(),
+            )
+            db.session.add(client)
+            db.session.flush()
+        items = []
+        product_ids = request.form.getlist('product_id[]')
+        quantities = request.form.getlist('product_quantity[]')
+        discounts = request.form.getlist('product_discount[]')
+        for pid, q, d in zip(product_ids, quantities, discounts):
+            if not pid:
+                continue
+            product = company_get(Product, pid)
+            qty = _to_int(q)
+            percent = _to_float(d)
+            discount_amount = product.price * qty * (percent / 100)
+            items.append({
+                'product_name': product.name,
+                'unit': product.unit,
+                'unit_price': product.price,
+                'quantity': qty,
+                'discount': discount_amount,
+                'category': product.category,
+                'has_itbis': product.has_itbis,
+                'company_id': current_company_id(),
+            })
+        subtotal, itbis, total = calculate_totals(items)
+        quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total, company_id=current_company_id())
+        db.session.add(quotation)
+        db.session.flush()
+        for it in items:
+            q_item = QuotationItem(quotation_id=quotation.id, **it)
+            db.session.add(q_item)
+        db.session.commit()
+        flash('Cotización guardada')
+        return redirect(url_for('list_quotations'))
+    clients = company_query(Client).all()
+    products = company_query(Product).all()
+    return render_template('cotizacion.html', clients=clients, products=products)
+
+@app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
+def edit_quotation(quotation_id):
+    quotation = company_get(Quotation, quotation_id)
+    if request.method == 'POST':
+        client_id = request.form.get('client_id')
+        if client_id:
+            client = company_get(Client, client_id)
+        else:
+            client = quotation.client
+            is_final = request.form.get('client_type') == 'final'
+            identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
+            if not is_final and not identifier:
+                flash('El identificador es obligatorio para comprobante fiscal')
+                return redirect(url_for('edit_quotation', quotation_id=quotation.id))
+            client.name = request.form['client_name']
+            client.identifier = identifier
+            client.phone = request.form['client_phone']
+            client.email = request.form.get('client_email')
+            client.street = request.form['client_street']
+            client.sector = request.form['client_sector']
+            client.province = request.form['client_province']
+            client.is_final_consumer = is_final
+        quotation.items.clear()
+        db.session.flush()
+        items = []
+        product_ids = request.form.getlist('product_id[]')
+        quantities = request.form.getlist('product_quantity[]')
+        discounts = request.form.getlist('product_discount[]')
+        for pid, q, d in zip(product_ids, quantities, discounts):
+            if not pid:
+                continue
+            product = company_get(Product, pid)
+            qty = _to_int(q)
+            percent = _to_float(d)
+            discount_amount = product.price * qty * (percent / 100)
+            items.append({
+                'product_name': product.name,
+                'unit': product.unit,
+                'unit_price': product.price,
+                'quantity': qty,
+                'discount': discount_amount,
+                'category': product.category,
+                'has_itbis': product.has_itbis,
+                'company_id': current_company_id(),
+            })
+        subtotal, itbis, total = calculate_totals(items)
+        quotation.client_id = client.id
+        quotation.subtotal = subtotal
+        quotation.itbis = itbis
+        quotation.total = total
+        for it in items:
+            quotation.items.append(QuotationItem(**it))
+        db.session.commit()
+        flash('Cotización actualizada')
+        return redirect(url_for('list_quotations'))
+    clients = company_query(Client).all()
+    products = company_query(Product).all()
+    # prepare items for template (discount percentage)
+    items = []
+    for it in quotation.items:
+        base = it.unit_price * it.quantity
+        percent = (it.discount / base * 100) if base else 0
+        product = company_query(Product).filter_by(name=it.product_name).first()
+        items.append({'product_id': product.id if product else '', 'quantity': it.quantity,
+                      'discount': percent, 'unit': it.unit,
+                      'price': it.unit_price})
+    return render_template('cotizacion_edit.html', quotation=quotation, clients=clients,
+                           products=products, items=items)
+
+
+@app.route('/ajustes', methods=['GET', 'POST'])
+@admin_only
+def settings():
+    company = CompanyInfo.query.get(current_company_id())
+    if not company:
+        flash('Seleccione una empresa')
+        return redirect(url_for('admin_companies'))
+    if request.method == 'POST':
+        company.name = request.form['name']
+        company.street = request.form['street']
+        company.sector = request.form['sector']
+        company.province = request.form['province']
+        company.phone = request.form['phone']
+        company.rnc = request.form['rnc']
+        company.website = request.form.get('website')
+        file = request.files.get('logo')
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            upload_dir = os.path.join(app.static_folder, 'uploads')
+            os.makedirs(upload_dir, exist_ok=True)
+            path = os.path.join(upload_dir, filename)
+            file.save(path)
+            company.logo = f'uploads/{filename}'
+        company.ncf_final = _to_int(request.form.get('ncf_final')) or company.ncf_final
+        company.ncf_fiscal = _to_int(request.form.get('ncf_fiscal')) or company.ncf_fiscal
+        db.session.commit()
+        flash('Ajustes guardados')
+        return redirect(url_for('settings'))
+    return render_template('ajustes.html', company=company)
+
+@app.route('/cotizaciones/<int:quotation_id>/pdf')
+def quotation_pdf(quotation_id):
+    quotation = company_get(Quotation, quotation_id)
+    company = get_company_info()
+    filename = f'cotizacion_{quotation_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    valid_until = quotation.date + timedelta(days=30)
+    generate_pdf('Cotización', company, quotation.client, quotation.items,
+                 quotation.subtotal, quotation.itbis, quotation.total,
+                 output_path=pdf_path, qr_url=qr_url,
+                 date=quotation.date, valid_until=valid_until)
+    return send_file(pdf_path, download_name=filename, as_attachment=True)
+
+@app.route('/cotizaciones/<int:quotation_id>/convertir')
+def quotation_to_order(quotation_id):
+    quotation = company_get(Quotation, quotation_id)
+    if datetime.utcnow() > quotation.date + timedelta(days=30):
+        flash('La cotización ha expirado')
+        return redirect(url_for('list_quotations'))
+    order = Order(
+        client_id=quotation.client_id,
+        quotation_id=quotation.id,
+        subtotal=quotation.subtotal,
+        itbis=quotation.itbis,
+        total=quotation.total,
+        company_id=current_company_id(),
+    )
+    db.session.add(order)
+    db.session.flush()
+    for item in quotation.items:
+        o_item = OrderItem(
+            order_id=order.id,
+            product_name=item.product_name,
+            unit=item.unit,
+            unit_price=item.unit_price,
+            quantity=item.quantity,
+            discount=item.discount,
+            category=item.category,
+            has_itbis=item.has_itbis,
+            company_id=current_company_id(),
+        )
+        db.session.add(o_item)
+    db.session.commit()
+    flash('Pedido creado')
+    return redirect(url_for('list_orders'))
+
+# Orders
+@app.route('/pedidos')
+def list_orders():
+    q = request.args.get('q')
+    query = company_query(Order).join(Client)
+    if q:
+        query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
+    orders = query.order_by(Order.date.desc()).all()
+    return render_template('pedido.html', orders=orders, q=q)
+
+@app.route('/pedidos/<int:order_id>/facturar')
+def order_to_invoice(order_id):
+    order = company_get(Order, order_id)
+    company = CompanyInfo.query.get(current_company_id())
+    if order.client.is_final_consumer:
+        ncf = f"B02{company.ncf_final:08d}"
+        company.ncf_final += 1
+    else:
+        ncf = f"B01{company.ncf_fiscal:08d}"
+        company.ncf_fiscal += 1
+    invoice = Invoice(client_id=order.client_id, order_id=order.id, subtotal=order.subtotal,
+                      itbis=order.itbis, total=order.total, ncf=ncf, company_id=current_company_id())
+    db.session.add(invoice)
+    db.session.flush()
+    for item in order.items:
+        i_item = InvoiceItem(
+            invoice_id=invoice.id,
+            product_name=item.product_name,
+            unit=item.unit,
+            unit_price=item.unit_price,
+            quantity=item.quantity,
+            discount=item.discount,
+            category=item.category,
+            has_itbis=item.has_itbis,
+            company_id=current_company_id(),
+        )
+        db.session.add(i_item)
+    order.status = 'Entregado'
+    db.session.commit()
+    flash('Factura generada')
+    return redirect(url_for('list_invoices'))
+
+@app.route('/pedidos/<int:order_id>/pdf')
+def order_pdf(order_id):
+    order = company_get(Order, order_id)
+    company = get_company_info()
+    filename = f'pedido_{order_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    generate_pdf('Pedido', company, order.client, order.items,
+                 order.subtotal, order.itbis, order.total,
+                 output_path=pdf_path, qr_url=qr_url,
+                 date=order.date)
+    return send_file(pdf_path, download_name=filename, as_attachment=True)
+
+# Invoices
+@app.route('/facturas')
+def list_invoices():
+    q = request.args.get('q')
+    query = company_query(Invoice).join(Client)
+    if q:
+        query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
+    invoices = query.order_by(Invoice.date.desc()).all()
+    return render_template('factura.html', invoices=invoices, q=q)
+
+@app.route('/facturas/<int:invoice_id>/pdf')
+def invoice_pdf(invoice_id):
+    invoice = company_get(Invoice, invoice_id)
+    company = get_company_info()
+    filename = f'factura_{invoice_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    generate_pdf('Factura', company, invoice.client, invoice.items,
+                 invoice.subtotal, invoice.itbis, invoice.total,
+                 ncf=invoice.ncf, output_path=pdf_path, qr_url=qr_url,
+                 date=invoice.date)
+    return send_file(pdf_path, download_name=filename, as_attachment=True)
+
+@app.route('/pdfs/<path:filename>')
+def serve_pdf(filename):
+    return send_from_directory(os.path.join(app.static_folder, 'pdfs'), filename)
+
+@app.route('/reportes')
+def reportes():
+    total_invoices = company_query(Invoice).count()
+    total_sales = company_query(Invoice).with_entities(func.sum(Invoice.total)).scalar() or 0
+    sales_by_category = company_query(InvoiceItem).with_entities(
+        InvoiceItem.category,
+        func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount)
+    ).group_by(InvoiceItem.category).all()
+    stats = {
+        'clients': company_query(Client).count(),
+        'products': company_query(Product).count(),
+        'quotations': company_query(Quotation).count(),
+        'orders': company_query(Order).count(),
+        'invoices': total_invoices,
+    }
+    return render_template('reportes.html', total_sales=total_sales, sales_by_category=sales_by_category, stats=stats)
+
+
+@app.route('/contabilidad')
+def contabilidad():
+    return render_template('contabilidad.html')
+
+
+@app.route('/api/recommendations')
+def api_recommendations():
+    """Return top product recommendations based on past orders."""
+    return jsonify({'products': recommend_products()})
+
+if __name__ == '__main__':
+    app.run(debug=True)

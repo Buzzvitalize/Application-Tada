@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Pedidos{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Pedidos</h1>
+<form method="get" class="mb-4 flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 max-w-4xl mx-auto">
+  <input name="q" value="{{ q or '' }}" placeholder="Buscar..." class="input flex-1">
+  <button class="btn-secondary">Buscar</button>
+</form>
+<div class="card overflow-x-auto max-w-4xl mx-auto">
+  {% if orders %}
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">ID</th>
+        <th class="p-2 text-left">Cliente</th>
+        <th class="p-2 text-left">Estado</th>
+        <th class="p-2 text-left">Fecha</th>
+        <th class="p-2 text-left">Total</th>
+        <th class="p-2 text-left">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for o in orders %}
+      <tr class="border-t">
+        <td class="p-2">{{ o.id }}</td>
+        <td class="p-2">{{ o.client.name }}</td>
+        <td class="p-2">{{ o.status }}</td>
+        <td class="p-2">{{ o.date.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td class="p-2">{{ '%.2f'|format(o.total) }}</td>
+        <td class="p-2 space-x-2">
+          <a class="text-blue-500" href="{{ url_for('order_pdf', order_id=o.id) }}">PDF</a>
+          <a class="text-green-500" href="{{ url_for('order_to_invoice', order_id=o.id) }}">Generar Factura</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="p-2">No se encontraron resultados.</p>
+  {% endif %}
+</div>
+{% endblock %}

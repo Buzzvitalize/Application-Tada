@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Editar Producto{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Editar Producto</h1>
+<form method="post" class="card space-y-4 max-w-4xl mx-auto">
+  <div class="grid md:grid-cols-4 gap-4 items-center">
+    <input name="name" value="{{ product.name }}" placeholder="Nombre" class="input" required>
+    <select name="unit" class="input" required>
+      {% for u in units %}
+      <option value="{{ u }}" {% if product.unit == u %}selected{% endif %}>{{ u }}</option>
+      {% endfor %}
+    </select>
+    <input name="price" value="{{ '%.2f'|format(product.price) }}" placeholder="Precio" class="input" required>
+    <select name="category" class="input" required>
+      {% for c in categories %}
+      <option value="{{ c }}" {% if product.category == c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <label class="flex items-center space-x-2">
+    <input type="checkbox" name="has_itbis" {% if product.has_itbis %}checked{% endif %}>
+    <span>Aplicar ITBIS</span>
+  </label>
+  <button class="btn-primary">Guardar</button>
+</form>
+{% endblock %}
+

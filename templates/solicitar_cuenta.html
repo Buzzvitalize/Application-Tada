@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitar cuenta</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='pos.svg') }}">
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gray-100 p-4 relative">
+  <img src="{{ url_for('static', filename='pos.svg') }}" alt="POS" class="w-12 h-12 absolute top-4 left-1/2 -translate-x-1/2">
+  <div class="bg-white rounded shadow p-6 w-full max-w-lg mt-12">
+    <h2 class="text-xl font-semibold mb-4 text-center">Solicitar cuenta</h2>
+    <form method="post" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input name="first_name" placeholder="Nombre" class="input" required>
+        <input name="last_name" placeholder="Apellido" class="input" required>
+      </div>
+      <input name="company" placeholder="Empresa o Marca" class="input" required>
+      <input name="rnc" placeholder="RNC" class="input">
+      <input name="phone" placeholder="Teléfono" class="input" required>
+      <input type="email" name="email" placeholder="Correo" class="input" required>
+      <input name="address" placeholder="Dirección" class="input" required>
+      <input name="website" placeholder="Página web" class="input">
+      <input name="username" placeholder="Nombre de usuario" class="input" required>
+      <input type="password" name="password" placeholder="Contraseña" class="input" required>
+      <input type="password" name="confirm_password" placeholder="Confirmar contraseña" class="input" required>
+      <button class="btn-primary w-full">Enviar solicitud</button>
+      {% with messages = get_flashed_messages(category_filter=['request']) %}
+        {% if messages %}
+          <div class="text-red-600">{{ messages[0] }}</div>
+        {% endif %}
+      {% endwith %}
+    </form>
+    <a href="{{ url_for('login') }}" class="block text-center text-blue-500 mt-4">Volver al inicio</a>
+  </div>
+</body>
+</html>
