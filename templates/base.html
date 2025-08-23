@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
 </head>
 <body class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-800 text-white flex flex-col transform -translate-x-full md:translate-x-0 md:relative transition-transform duration-200 z-50">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-800 text-white flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-200 z-50">
       <div class="p-4 text-xl font-bold border-b border-gray-700">Menú</div>
       <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
           <a href="{{ url_for('list_quotations') }}" class="block p-2 rounded hover:bg-gray-700">Cotizaciones</a>
