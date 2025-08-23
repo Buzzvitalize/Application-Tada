@@ -35,7 +35,8 @@ with app.app_context():
             logo='',
         )
         db.session.add(company)
-    db.session.commit()
+        db.session.commit()
+    company = CompanyInfo.query.first()
     if not Client.query.first():
         sample_client = Client(
             name='Juan Perez',
@@ -46,8 +47,9 @@ with app.app_context():
             sector='Centro',
             province='Santo Domingo',
             is_final_consumer=False,
+            company_id=company.id,
         )
-        sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios')
+        sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios', company_id=company.id)
         db.session.add_all([sample_client, sample_product])
         db.session.commit()
     if not User.query.filter_by(username='admin').first():
@@ -57,6 +59,21 @@ with app.app_context():
 
 # Utility functions
 ITBIS_RATE = 0.18
+
+
+def current_company_id():
+    return session.get('company_id')
+
+
+def company_query(model):
+    cid = current_company_id()
+    if session.get('role') == 'admin' and cid is None:
+        return model.query
+    return model.query.filter_by(company_id=cid)
+
+
+def company_get(model, object_id):
+    return company_query(model).filter_by(id=object_id).first_or_404()
 
 def _to_float(value):
     try:
@@ -82,11 +99,15 @@ def calculate_totals(items):
 
 @app.context_processor
 def inject_company():
-    return {'company': CompanyInfo.query.first()}
+    cid = current_company_id()
+    company = CompanyInfo.query.get(cid) if cid else None
+    return {'company': company}
 
 
 def get_company_info():
-    c = CompanyInfo.query.first()
+    c = CompanyInfo.query.get(current_company_id())
+    if not c:
+        return {}
     return {
         'name': c.name,
         'address': f"{c.street}, {c.sector}, {c.province}",
@@ -181,6 +202,11 @@ def require_login():
     allowed = {'login', 'static', 'request_account'}
     if request.endpoint not in allowed and 'user' not in session:
         return redirect(url_for('login'))
+    admin_extra = {'admin_companies', 'select_company', 'clear_company',
+                   'admin_requests', 'approve_request', 'reject_request'}
+    if session.get('role') == 'admin' and not session.get('company_id') \
+            and request.endpoint not in allowed.union(admin_extra):
+        return redirect(url_for('admin_companies'))
 
 
 def admin_only(f):
@@ -194,20 +220,23 @@ def admin_only(f):
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
-    company = CompanyInfo.query.first()
     if request.method == 'POST':
         user = User.query.filter_by(username=request.form.get('username')).first()
         if user and user.password == request.form.get('password'):
             session['user'] = user.username
             session['role'] = user.role
+            session['company_id'] = user.company_id
+            if user.role == 'admin':
+                return redirect(url_for('admin_companies'))
             return redirect(url_for('list_quotations'))
         flash('Credenciales inválidas')
-    return render_template('login.html', company=company)
+    return render_template('login.html', company=None)
 
 @app.route('/logout')
 def logout():
     session.pop('user', None)
     session.pop('role', None)
+    session.pop('company_id', None)
     return redirect(url_for('login'))
 
 
@@ -243,12 +272,45 @@ def admin_requests():
     return render_template('admin_solicitudes.html', requests=requests)
 
 
+@app.route('/admin/companies')
+@admin_only
+def admin_companies():
+    companies = CompanyInfo.query.all()
+    return render_template('admin_companies.html', companies=companies)
+
+
+@app.route('/admin/companies/select/<int:company_id>')
+@admin_only
+def select_company(company_id):
+    session['company_id'] = company_id
+    return redirect(url_for('list_quotations'))
+
+
+@app.route('/admin/companies/clear')
+@admin_only
+def clear_company():
+    session.pop('company_id', None)
+    return redirect(url_for('admin_companies'))
+
+
 @app.route('/admin/solicitudes/<int:req_id>/aprobar', methods=['POST'])
 @admin_only
 def approve_request(req_id):
     req = AccountRequest.query.get_or_404(req_id)
-    role = request.form.get('role', 'user')
-    user = User(username=req.username, password=req.password, role=role)
+    role = request.form.get('role', 'company')
+    company = CompanyInfo(
+        name=req.company,
+        street=req.address,
+        sector='',
+        province='',
+        phone=req.phone,
+        rnc=req.rnc or '',
+        website=req.website,
+        logo='',
+    )
+    db.session.add(company)
+    db.session.flush()
+    user = User(username=req.username, password=req.password, role=role, company_id=company.id)
     db.session.add(user)
     db.session.delete(req)
     db.session.commit()
@@ -282,18 +344,19 @@ def clients():
             street=request.form['street'],
             sector=request.form['sector'],
             province=request.form['province'],
-            is_final_consumer=is_final
+            is_final_consumer=is_final,
+            company_id=current_company_id()
         )
         db.session.add(client)
         db.session.commit()
         flash('Cliente agregado')
         return redirect(url_for('clients'))
-    clients = Client.query.all()
+    clients = company_query(Client).all()
     return render_template('clientes.html', clients=clients)
 
 @app.route('/clientes/delete/<int:client_id>')
 def delete_client(client_id):
-    client = Client.query.get_or_404(client_id)
+    client = company_get(Client, client_id)
     db.session.delete(client)
     db.session.commit()
     flash('Cliente eliminado')
@@ -301,7 +364,7 @@ def delete_client(client_id):
 
 @app.route('/clientes/edit/<int:client_id>', methods=['GET', 'POST'])
 def edit_client(client_id):
-    client = Client.query.get_or_404(client_id)
+    client = company_get(Client, client_id)
     if request.method == 'POST':
         is_final = request.form.get('type') == 'final'
         identifier = request.form.get('identifier') if not is_final else request.form.get('identifier') or None
@@ -332,14 +395,15 @@ def products():
             unit=request.form['unit'],
             price=_to_float(request.form['price']),
             category=request.form.get('category'),
-            has_itbis=bool(request.form.get('has_itbis'))
+            has_itbis=bool(request.form.get('has_itbis')),
+            company_id=current_company_id()
         )
         db.session.add(product)
         db.session.commit()
         flash('Producto agregado')
         return redirect(url_for('products'))
     cat = request.args.get('cat')
-    query = Product.query
+    query = company_query(Product)
     if cat:
         query = query.filter_by(category=cat)
     products = query.all()
@@ -347,7 +411,7 @@ def products():
 
 @app.route('/productos/delete/<int:product_id>')
 def delete_product(product_id):
-    product = Product.query.get_or_404(product_id)
+    product = company_get(Product, product_id)
     db.session.delete(product)
     db.session.commit()
     flash('Producto eliminado')
@@ -355,7 +419,7 @@ def delete_product(product_id):
 
 @app.route('/productos/edit/<int:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
-    product = Product.query.get_or_404(product_id)
+    product = company_get(Product, product_id)
     units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
     categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
     if request.method == 'POST':
@@ -373,7 +437,7 @@ def edit_product(product_id):
 @app.route('/cotizaciones')
 def list_quotations():
     q = request.args.get('q')
-    query = Quotation.query.join(Client)
+    query = company_query(Quotation).join(Client)
     if q:
         query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
     quotations = query.order_by(Quotation.date.desc()).all()
@@ -385,7 +449,7 @@ def new_quotation():
     if request.method == 'POST':
         client_id = request.form.get('client_id')
         if client_id:
-            client = Client.query.get_or_404(client_id)
+            client = company_get(Client, client_id)
         else:
             is_final = request.form.get('client_type') == 'final'
             identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
@@ -401,6 +465,7 @@ def new_quotation():
                 sector=request.form['client_sector'],
                 province=request.form['client_province'],
                 is_final_consumer=is_final,
+                company_id=current_company_id(),
             )
             db.session.add(client)
             db.session.flush()
@@ -409,9 +474,9 @@ def new_quotation():
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
         for pid, q, d in zip(product_ids, quantities, discounts):
-            product = Product.query.get(pid)
-            if not product:
+            if not pid:
                 continue
+            product = company_get(Product, pid)
             qty = _to_int(q)
             percent = _to_float(d)
             discount_amount = product.price * qty * (percent / 100)
@@ -423,9 +488,10 @@ def new_quotation():
                 'discount': discount_amount,
                 'category': product.category,
                 'has_itbis': product.has_itbis,
+                'company_id': current_company_id(),
             })
         subtotal, itbis, total = calculate_totals(items)
-        quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total)
+        quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total, company_id=current_company_id())
         db.session.add(quotation)
         db.session.flush()
         for it in items:
@@ -434,17 +500,17 @@ def new_quotation():
         db.session.commit()
         flash('Cotización guardada')
         return redirect(url_for('list_quotations'))
-    clients = Client.query.all()
-    products = Product.query.all()
+    clients = company_query(Client).all()
+    products = company_query(Product).all()
     return render_template('cotizacion.html', clients=clients, products=products)
 
 @app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
 def edit_quotation(quotation_id):
-    quotation = Quotation.query.get_or_404(quotation_id)
+    quotation = company_get(Quotation, quotation_id)
     if request.method == 'POST':
         client_id = request.form.get('client_id')
         if client_id:
-            client = Client.query.get_or_404(client_id)
+            client = company_get(Client, client_id)
         else:
             client = quotation.client
             is_final = request.form.get('client_type') == 'final'
@@ -467,9 +533,9 @@ def edit_quotation(quotation_id):
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
         for pid, q, d in zip(product_ids, quantities, discounts):
-            product = Product.query.get(pid)
-            if not product:
+            if not pid:
                 continue
+            product = company_get(Product, pid)
             qty = _to_int(q)
             percent = _to_float(d)
             discount_amount = product.price * qty * (percent / 100)
@@ -481,6 +547,7 @@ def edit_quotation(quotation_id):
                 'discount': discount_amount,
                 'category': product.category,
                 'has_itbis': product.has_itbis,
+                'company_id': current_company_id(),
             })
         subtotal, itbis, total = calculate_totals(items)
         quotation.client_id = client.id
@@ -492,14 +559,14 @@ def edit_quotation(quotation_id):
         db.session.commit()
         flash('Cotización actualizada')
         return redirect(url_for('list_quotations'))
-    clients = Client.query.all()
-    products = Product.query.all()
+    clients = company_query(Client).all()
+    products = company_query(Product).all()
     # prepare items for template (discount percentage)
     items = []
     for it in quotation.items:
         base = it.unit_price * it.quantity
         percent = (it.discount / base * 100) if base else 0
-        product = Product.query.filter_by(name=it.product_name).first()
+        product = company_query(Product).filter_by(name=it.product_name).first()
         items.append({'product_id': product.id if product else '', 'quantity': it.quantity,
                       'discount': percent, 'unit': it.unit,
                       'price': it.unit_price})
@@ -510,7 +577,10 @@ def edit_quotation(quotation_id):
 @app.route('/ajustes', methods=['GET', 'POST'])
 @admin_only
 def settings():
-    company = CompanyInfo.query.first()
+    company = CompanyInfo.query.get(current_company_id())
+    if not company:
+        flash('Seleccione una empresa')
+        return redirect(url_for('admin_companies'))
     if request.method == 'POST':
         company.name = request.form['name']
         company.street = request.form['street']
@@ -536,7 +606,7 @@ def settings():
 
 @app.route('/cotizaciones/<int:quotation_id>/pdf')
 def quotation_pdf(quotation_id):
-    quotation = Quotation.query.get_or_404(quotation_id)
+    quotation = company_get(Quotation, quotation_id)
     company = get_company_info()
     filename = f'cotizacion_{quotation_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
@@ -551,7 +621,7 @@ def quotation_pdf(quotation_id):
 
 @app.route('/cotizaciones/<int:quotation_id>/convertir')
 def quotation_to_order(quotation_id):
-    quotation = Quotation.query.get_or_404(quotation_id)
+    quotation = company_get(Quotation, quotation_id)
     if datetime.utcnow() > quotation.date + timedelta(days=30):
         flash('La cotización ha expirado')
         return redirect(url_for('list_quotations'))
@@ -561,6 +631,7 @@ def quotation_to_order(quotation_id):
         subtotal=quotation.subtotal,
         itbis=quotation.itbis,
         total=quotation.total,
+        company_id=current_company_id(),
     )
     db.session.add(order)
     db.session.flush()
@@ -574,6 +645,7 @@ def quotation_to_order(quotation_id):
             discount=item.discount,
             category=item.category,
             has_itbis=item.has_itbis,
+            company_id=current_company_id(),
         )
         db.session.add(o_item)
     db.session.commit()
@@ -584,7 +656,7 @@ def quotation_to_order(quotation_id):
 @app.route('/pedidos')
 def list_orders():
     q = request.args.get('q')
-    query = Order.query.join(Client)
+    query = company_query(Order).join(Client)
     if q:
         query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
     orders = query.order_by(Order.date.desc()).all()
@@ -592,8 +664,8 @@ def list_orders():
 
 @app.route('/pedidos/<int:order_id>/facturar')
 def order_to_invoice(order_id):
-    order = Order.query.get_or_404(order_id)
-    company = CompanyInfo.query.first()
+    order = company_get(Order, order_id)
+    company = CompanyInfo.query.get(current_company_id())
     if order.client.is_final_consumer:
         ncf = f"B02{company.ncf_final:08d}"
         company.ncf_final += 1
@@ -601,7 +673,7 @@ def order_to_invoice(order_id):
         ncf = f"B01{company.ncf_fiscal:08d}"
         company.ncf_fiscal += 1
     invoice = Invoice(client_id=order.client_id, order_id=order.id, subtotal=order.subtotal,
-                      itbis=order.itbis, total=order.total, ncf=ncf)
+                      itbis=order.itbis, total=order.total, ncf=ncf, company_id=current_company_id())
     db.session.add(invoice)
     db.session.flush()
     for item in order.items:
@@ -614,6 +686,7 @@ def order_to_invoice(order_id):
             discount=item.discount,
             category=item.category,
             has_itbis=item.has_itbis,
+            company_id=current_company_id(),
         )
         db.session.add(i_item)
     order.status = 'Entregado'
@@ -623,7 +696,7 @@ def order_to_invoice(order_id):
 
 @app.route('/pedidos/<int:order_id>/pdf')
 def order_pdf(order_id):
-    order = Order.query.get_or_404(order_id)
+    order = company_get(Order, order_id)
     company = get_company_info()
     filename = f'pedido_{order_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
@@ -639,7 +712,7 @@ def order_pdf(order_id):
 @app.route('/facturas')
 def list_invoices():
     q = request.args.get('q')
-    query = Invoice.query.join(Client)
+    query = company_query(Invoice).join(Client)
     if q:
         query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
     invoices = query.order_by(Invoice.date.desc()).all()
@@ -647,7 +720,7 @@ def list_invoices():
 
 @app.route('/facturas/<int:invoice_id>/pdf')
 def invoice_pdf(invoice_id):
-    invoice = Invoice.query.get_or_404(invoice_id)
+    invoice = company_get(Invoice, invoice_id)
     company = get_company_info()
     filename = f'factura_{invoice_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
@@ -665,17 +738,17 @@ def serve_pdf(filename):
 
 @app.route('/reportes')
 def reportes():
-    total_invoices = db.session.query(func.count(Invoice.id)).scalar() or 0
-    total_sales = db.session.query(func.sum(Invoice.total)).scalar() or 0
-    sales_by_category = db.session.query(
+    total_invoices = company_query(Invoice).count()
+    total_sales = company_query(Invoice).with_entities(func.sum(Invoice.total)).scalar() or 0
+    sales_by_category = company_query(InvoiceItem).with_entities(
         InvoiceItem.category,
         func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount)
     ).group_by(InvoiceItem.category).all()
     stats = {
-        'clients': Client.query.count(),
-        'products': Product.query.count(),
-        'quotations': Quotation.query.count(),
-        'orders': Order.query.count(),
+        'clients': company_query(Client).count(),
+        'products': company_query(Product).count(),
+        'quotations': company_query(Quotation).count(),
+        'orders': company_query(Order).count(),
         'invoices': total_invoices,
     }
     return render_template('reportes.html', total_sales=total_sales, sales_by_category=sales_by_category, stats=stats)

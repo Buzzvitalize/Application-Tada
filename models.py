@@ -15,6 +15,7 @@ class Client(db.Model):
     sector = db.Column(db.String(120), nullable=False)
     province = db.Column(db.String(120), nullable=False)
     is_final_consumer = db.Column(db.Boolean, default=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -23,6 +24,7 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
 class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -31,6 +33,7 @@ class Quotation(db.Model):
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
     items = db.relationship('QuotationItem', cascade='all, delete-orphan')
@@ -45,6 +48,7 @@ class QuotationItem(db.Model):
     discount = db.Column(db.Float, default=0.0)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -56,6 +60,7 @@ class Order(db.Model):
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
     items = db.relationship('OrderItem', cascade='all, delete-orphan')
@@ -70,6 +75,7 @@ class OrderItem(db.Model):
     discount = db.Column(db.Float, default=0.0)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
 class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -80,6 +86,7 @@ class Invoice(db.Model):
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
     ncf = db.Column(db.String(20), unique=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
     items = db.relationship('InvoiceItem', cascade='all, delete-orphan')
@@ -94,6 +101,7 @@ class InvoiceItem(db.Model):
     discount = db.Column(db.Float, default=0.0)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
 
 class CompanyInfo(db.Model):
@@ -114,7 +122,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
-    role = db.Column(db.String(20), default='user')  # 'admin' or 'user'
+    role = db.Column(db.String(20), default='company')  # 'admin' or 'company'
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'))
 
 
 class AccountRequest(db.Model):
