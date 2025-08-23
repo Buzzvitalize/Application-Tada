@@ -97,6 +97,13 @@ def calculate_totals(items):
     return subtotal, itbis, total
 
 
+@app.route('/api/rnc/<rnc>')
+def rnc_lookup(rnc):
+    clean = rnc.replace('-', '')
+    client = Client.query.filter(func.replace(Client.identifier, '-', '') == clean).first()
+    return jsonify({'name': client.name if client else ''})
+
+
 @app.context_processor
 def inject_company():
     cid = current_company_id()

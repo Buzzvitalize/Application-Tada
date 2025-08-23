@@ -64,6 +64,30 @@
     }
     menuBtn && menuBtn.addEventListener('click', toggleMenu);
     backdrop && backdrop.addEventListener('click', toggleMenu);
+
+    function formatPhone(v){
+      const digits=v.replace(/\D/g,'').slice(0,10);
+      return digits.replace(/(\d{3})(\d{3})(\d{0,4})/, function(_,a,b,c){ return c?`${a}-${b}-${c}`:`${a}-${b}`; }).trim().replace(/-$/, '');
+    }
+    function formatRnc(v){
+      const digits=v.replace(/\D/g,'').slice(0,9);
+      return digits.replace(/(\d{3})(\d{3})(\d{0,3})/, function(_,a,b,c){ return c?`${a}-${b}-${c}`:`${a}-${b}`; }).trim().replace(/-$/, '');
+    }
+    document.querySelectorAll('.phone-mask').forEach(el=>{
+      el.value = formatPhone(el.value);
+      el.addEventListener('input', e=>{ e.target.value = formatPhone(e.target.value); });
+    });
+    document.querySelectorAll('.rnc-mask').forEach(el=>{
+      el.value = formatRnc(el.value);
+      el.addEventListener('input', e=>{ e.target.value = formatRnc(e.target.value); });
+      el.addEventListener('blur', e=>{
+        const r=e.target.value.replace(/-/g,'');
+        fetch(`/api/rnc/${r}`).then(r=>r.json()).then(data=>{
+          const nameField=document.getElementById('client-name');
+          if(data.name && nameField && !nameField.value){ nameField.value=data.name; }
+        });
+      });
+    });
   </script>
 </body>
 </html>

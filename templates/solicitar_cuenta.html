@@ -17,9 +17,9 @@
         <input name="first_name" placeholder="Nombre" class="input" required>
         <input name="last_name" placeholder="Apellido" class="input" required>
       </div>
-      <input name="company" placeholder="Empresa o Marca" class="input" required>
-      <input name="rnc" placeholder="RNC" class="input">
-      <input name="phone" placeholder="Teléfono" class="input" required>
+      <input id="company-name" name="company" placeholder="Empresa o Marca" class="input" required>
+      <input name="rnc" placeholder="RNC" class="input rnc-mask">
+      <input name="phone" placeholder="Teléfono" class="input phone-mask" required>
       <input type="email" name="email" placeholder="Correo" class="input" required>
       <input name="address" placeholder="Dirección" class="input" required>
       <input name="website" placeholder="Página web" class="input">
@@ -35,5 +35,30 @@
     </form>
     <a href="{{ url_for('login') }}" class="block text-center text-blue-500 mt-4">Volver al inicio</a>
   </div>
+<script>
+  function formatPhone(v){
+    const digits=v.replace(/\D/g,'').slice(0,10);
+    return digits.replace(/(\d{3})(\d{3})(\d{0,4})/, (_,a,b,c)=> c?`${a}-${b}-${c}`:`${a}-${b}`).trim().replace(/-$/, '');
+  }
+  function formatRnc(v){
+    const digits=v.replace(/\D/g,'').slice(0,9);
+    return digits.replace(/(\d{3})(\d{3})(\d{0,3})/, (_,a,b,c)=> c?`${a}-${b}-${c}`:`${a}-${b}`).trim().replace(/-$/, '');
+  }
+  document.querySelectorAll('.phone-mask').forEach(el=>{
+    el.value=formatPhone(el.value);
+    el.addEventListener('input',e=>{ e.target.value=formatPhone(e.target.value); });
+  });
+  document.querySelectorAll('.rnc-mask').forEach(el=>{
+    el.value=formatRnc(el.value);
+    el.addEventListener('input',e=>{ e.target.value=formatRnc(e.target.value); });
+    el.addEventListener('blur',e=>{
+      const r=e.target.value.replace(/-/g,'');
+      fetch(`/api/rnc/${r}`).then(r=>r.json()).then(data=>{
+        const field=document.getElementById('company-name');
+        if(data.name && field && !field.value){ field.value=data.name; }
+      });
+    });
+  });
+</script>
 </body>
 </html>
