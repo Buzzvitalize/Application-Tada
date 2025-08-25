@@ -1,4 +1,4 @@
 Flask
 Flask-SQLAlchemy
-fpdf2
 qrcode
+reportlab

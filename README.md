@@ -9,7 +9,7 @@ Key features:
 - Responsive TailwindCSS layout with sidebar navigation
 - Multi-tenant architecture isolating data per company
 - Local RNC catalogue (`data/DGII_RNC.TXT`) auto-completes company names when entering tax IDs
-- Modern PDF template with colored header and summary boxes for quotations, orders and invoices
+ - PDFs rendered with ReportLab using a modern 2025 template and summary boxes for quotations, orders and invoices
 - Optional document notes stored with quotations and carried over to orders and invoices, appearing on generated PDFs
 - PDF exports display document numbers and invoice type (Consumidor Final o Crédito Fiscal)
 

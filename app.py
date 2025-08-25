@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, session, jsonify
 from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo, User, AccountRequest
-from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -10,6 +9,7 @@ import qrcode
 import os
 import re
 from ai import recommend_products
+from pdf_utils import generate_pdf
 from functools import wraps
 # Load RNC data for company name lookup
 RNC_DATA = {}
@@ -165,11 +165,11 @@ def _fmt_money(value):
     return f"RD${value:,.2f}"
 
 
-def generate_pdf(title, company, client, items, subtotal, itbis, total,
-                 ncf=None, seller=None, payment_method=None, bank=None,
-                 order_number=None, doc_number=None, invoice_type=None,
-                 note=None, output_path=None, qr_url=None,
-                 date=None, valid_until=None):
+def legacy_generate_pdf(title, company, client, items, subtotal, itbis, total,
+                        ncf=None, seller=None, payment_method=None, bank=None,
+                        order_number=None, doc_number=None, invoice_type=None,
+                        note=None, output_path=None, qr_url=None,
+                        date=None, valid_until=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
