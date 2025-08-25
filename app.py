@@ -161,7 +161,16 @@ def build_items(product_ids, quantities, discounts):
     ids = [int(pid) for pid in product_ids if pid]
     products = (
         company_query(Product)
-        .options(load_only('id', 'code', 'reference', 'name', 'unit', 'price', 'category', 'has_itbis'))
+        .options(load_only(
+            Product.id,
+            Product.code,
+            Product.reference,
+            Product.name,
+            Product.unit,
+            Product.price,
+            Product.category,
+            Product.has_itbis,
+        ))
         .filter(Product.id.in_(ids))
         .all()
     )
@@ -532,8 +541,8 @@ def new_quotation():
         db.session.commit()
         flash('Cotización guardada')
         return redirect(url_for('list_quotations'))
-    clients = company_query(Client).options(load_only('id', 'name', 'identifier')).all()
-    products = company_query(Product).options(load_only('id', 'code', 'name', 'unit', 'price')).all()
+    clients = company_query(Client).options(load_only(Client.id, Client.name, Client.identifier)).all()
+    products = company_query(Product).options(load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)).all()
     return render_template('cotizacion.html', clients=clients, products=products)
 
 @app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
@@ -581,8 +590,8 @@ def edit_quotation(quotation_id):
         db.session.commit()
         flash('Cotización actualizada')
         return redirect(url_for('list_quotations'))
-    clients = company_query(Client).options(load_only('id', 'name', 'identifier')).all()
-    products = company_query(Product).options(load_only('id', 'code', 'name', 'unit', 'price')).all()
+    clients = company_query(Client).options(load_only(Client.id, Client.name, Client.identifier)).all()
+    products = company_query(Product).options(load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)).all()
     product_map = {p.name: p.id for p in products}
     # prepare items for template (discount percentage)
     items = []
