@@ -1,9 +1,12 @@
 from io import BytesIO
 from fpdf import FPDF
 from uuid import uuid4
-import qrcode
 import os
 from flask import current_app
+try:
+    import qrcode
+except ModuleNotFoundError:  # pragma: no cover
+    qrcode = None
 
 ITBIS_RATE = 0.18
 
@@ -159,7 +162,7 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         pdf.ln(5)
         pdf.multi_cell(0, 6, f"Nota: {note}")
 
-    if qr_url:
+    if qr_url and qrcode:
         os.makedirs(os.path.join(current_app.static_folder, 'qrcodes'), exist_ok=True)
         qr_path = os.path.join(current_app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
         img = qrcode.make(qr_url)

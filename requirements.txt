@@ -1,4 +1,7 @@
 Flask
 Flask-SQLAlchemy
+Flask-Migrate
+Flask-WTF
+python-dotenv
 qrcode
 fpdf2

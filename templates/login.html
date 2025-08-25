@@ -37,18 +37,19 @@
       </div>
       <h3 class="text-2xl font-semibold mb-2 text-center md:text-left">Inicia sesión</h3>
       <form method="post" class="space-y-4" autocomplete="off">
+        {{ form.hidden_tag() }}
         <div class="flex items-center border border-gray-300 rounded-md px-3">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A4 4 0 016 16h12a4 4 0 01.879 1.804M9 7a3 3 0 116 0 3 3 0 01-6 0z" /></svg>
-          <input name="username" placeholder="Usuario" class="flex-1 p-2 outline-none" required>
+          {{ form.username(class_='flex-1 p-2 outline-none', placeholder='Usuario') }}
         </div>
         <div class="flex items-center border border-gray-300 rounded-md px-3">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c1.657 0 3-1.343 3-3V6a3 3 0 10-6 0v2c0 1.657 1.343 3 3 3z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 11h14v10H5z" /></svg>
-          <input id="password" name="password" placeholder="Contraseña" class="flex-1 p-2 outline-none" type="password" required>
+          {{ form.password(class_='flex-1 p-2 outline-none', id='password', placeholder='Contraseña') }}
           <button type="button" id="toggle-pin" class="text-gray-500 focus:outline-none">
             <svg id="eye" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
           </button>
         </div>
-        <button class="btn-primary w-full">Entrar</button>
+        {{ form.submit(class_='btn-primary w-full') }}
         {% with messages = get_flashed_messages(category_filter=['login']) %}
           {% if messages %}
             <div class="text-red-600 text-center">{{ messages[0] }}</div>

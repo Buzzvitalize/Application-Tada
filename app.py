@@ -11,6 +11,21 @@ from flask import (
     jsonify,
     g,
 )
+try:
+    from flask_migrate import Migrate
+except ModuleNotFoundError:  # pragma: no cover
+    Migrate = lambda app, db: None
+try:
+    from flask_wtf import CSRFProtect
+except ModuleNotFoundError:  # pragma: no cover
+    class CSRFProtect:
+        def __init__(self, app=None):
+            if app:
+                self.init_app(app)
+        def init_app(self, app):
+            pass
+        def exempt(self, view):
+            return view
 from models import (
     db,
     Client,
@@ -31,11 +46,21 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import load_only
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash
 import os
 import re
 from ai import recommend_products
 from pdf_utils import generate_pdf
 from functools import wraps
+from auth import auth_bp
+from config import DevelopmentConfig
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover
+    def load_dotenv():
+        pass
+
+load_dotenv()
 # Load RNC data for company name lookup
 RNC_DATA = {}
 DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'DGII_RNC.TXT')
@@ -50,50 +75,12 @@ if os.path.exists(DATA_PATH):
                     RNC_DATA[rnc] = name
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.sqlite'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.secret_key = os.environ.get('SECRET_KEY', 'dev')
+app.config.from_object(DevelopmentConfig)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'database.sqlite')
-
-# Initialize database
-with app.app_context():
-    db.init_app(app)
-    db.create_all()
-    # sample data and company info
-    if not CompanyInfo.query.first():
-        company = CompanyInfo(
-            name='Empresa Demo',
-            street='Calle 1',
-            sector='Centro',
-            province='Santo Domingo',
-            phone='809-000-0000',
-            rnc='101000000',
-            website='',
-            logo='',
-        )
-        db.session.add(company)
-        db.session.commit()
-    company = CompanyInfo.query.first()
-    if not Client.query.first():
-        sample_client = Client(
-            name='Juan Perez',
-            identifier='001-0000000-1',
-            phone='809-000-0000',
-            email='juan@example.com',
-            street='Av. Siempre Viva',
-            sector='Centro',
-            province='Santo Domingo',
-            is_final_consumer=False,
-            company_id=company.id,
-        )
-        sample_product = Product(code='P001', reference='REF001', name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios', company_id=company.id)
-        db.session.add_all([sample_client, sample_product])
-        db.session.commit()
-    if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', password='363636', role='admin')
-        db.session.add(admin)
-        db.session.commit()
+db.init_app(app)
+migrate = Migrate(app, db)
+csrf = CSRFProtect(app)
+app.register_blueprint(auth_bp)
 
 # Utility constants
 ITBIS_RATE = 0.18
@@ -246,9 +233,9 @@ app.jinja_env.filters['money'] = _fmt_money
 # Routes
 @app.before_request
 def require_login():
-    allowed = {'login', 'static', 'request_account', 'logout'}
-    if request.endpoint not in allowed and 'user' not in session:
-        return redirect(url_for('login'))
+    allowed = {'auth.login', 'static', 'request_account', 'auth.logout'}
+    if request.endpoint not in allowed and 'user_id' not in session:
+        return redirect(url_for('auth.login'))
     admin_extra = {'admin_companies', 'select_company', 'clear_company',
                    'admin_requests', 'approve_request', 'reject_request'}
     if session.get('role') == 'admin' and not session.get('company_id') \
@@ -265,28 +252,15 @@ def admin_only(f):
         return f(*args, **kwargs)
     return wrapper
 
-@app.route('/', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(username=request.form.get('username')).first()
-        if user and user.password == request.form.get('password'):
-            session['user'] = user.username
-            session['role'] = user.role
-            session['company_id'] = user.company_id
-            if user.role == 'admin':
-                return redirect(url_for('admin_companies'))
-            return redirect(url_for('list_quotations'))
-        flash('Credenciales inválidas', 'login')
-    return render_template('login.html', company=None)
-
-@app.route('/logout')
-def logout():
-    session.pop('_flashes', None)
-    session.clear()
-    return redirect(url_for('login'))
+@app.route('/')
+def index():
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
+    return redirect(url_for('list_quotations'))
 
 
 @app.route('/solicitar-cuenta', methods=['GET', 'POST'])
+@csrf.exempt
 def request_account():
     if request.method == 'POST':
         if request.form.get('password') != request.form.get('confirm_password'):
@@ -308,12 +282,12 @@ def request_account():
             address=request.form.get('address'),
             website=request.form.get('website'),
             username=request.form['username'],
-            password=request.form['password'],
+            password=generate_password_hash(request.form['password']),
         )
         db.session.add(req)
         db.session.commit()
         flash('Solicitud enviada, espere aprobación', 'login')
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     return render_template('solicitar_cuenta.html')
 
 
