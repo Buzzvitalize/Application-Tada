@@ -39,6 +39,7 @@ class Quotation(db.Model):
     seller = db.Column(db.String(120))
     payment_method = db.Column(db.String(20))
     bank = db.Column(db.String(50))
+    note = db.Column(db.Text)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
@@ -69,6 +70,7 @@ class Order(db.Model):
     seller = db.Column(db.String(120))
     payment_method = db.Column(db.String(20))
     bank = db.Column(db.String(50))
+    note = db.Column(db.Text)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
@@ -98,6 +100,8 @@ class Invoice(db.Model):
     seller = db.Column(db.String(120))
     payment_method = db.Column(db.String(20))
     bank = db.Column(db.String(50))
+    invoice_type = db.Column(db.String(20))
+    note = db.Column(db.Text)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')

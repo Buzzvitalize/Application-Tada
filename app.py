@@ -167,7 +167,8 @@ def _fmt_money(value):
 
 def generate_pdf(title, company, client, items, subtotal, itbis, total,
                  ncf=None, seller=None, payment_method=None, bank=None,
-                 order_number=None, output_path=None, qr_url=None,
+                 order_number=None, doc_number=None, invoice_type=None,
+                 note=None, output_path=None, qr_url=None,
                  date=None, valid_until=None):
     pdf = FPDF()
     pdf.add_page()
@@ -198,10 +199,13 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
 
     # Título del documento
     pdf.set_font('Helvetica', 'B', 14)
-    pdf.cell(0, 10, title, ln=1, align='C')
+    title_text = f"{title} #{doc_number:04d}" if doc_number is not None else title
+    pdf.cell(0, 10, title_text, ln=1, align='C')
     pdf.set_font('Helvetica', '', 12)
     if ncf:
         pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='R')
+    if invoice_type:
+        pdf.cell(0, 6, f"Tipo: {invoice_type}", ln=1, align='R')
     if order_number is not None:
         pdf.cell(0, 6, f"Orden del pedido n#{order_number:04d}", ln=1, align='R')
     if date:
@@ -273,6 +277,9 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(table_width - 40, 8, 'Total', border='LB', align='R')
     pdf.cell(40, 8, _fmt_money(total), border='RB', ln=1, align='R')
+    if note:
+        pdf.ln(5)
+        pdf.multi_cell(0, 6, f"Nota: {note}")
     if qr_url:
         os.makedirs(os.path.join(app.static_folder, 'qrcodes'), exist_ok=True)
         qr_path = os.path.join(app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
@@ -600,7 +607,8 @@ def new_quotation():
         bank = request.form.get('bank') if payment_method == 'Transferencia' else None
         quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total,
                                seller=request.form.get('seller'), payment_method=payment_method,
-                               bank=bank, company_id=current_company_id())
+                               bank=bank, note=request.form.get('note'),
+                               company_id=current_company_id())
         db.session.add(quotation)
         db.session.flush()
         for it in items:
@@ -669,6 +677,7 @@ def edit_quotation(quotation_id):
         quotation.seller = request.form.get('seller')
         quotation.payment_method = payment_method
         quotation.bank = bank
+        quotation.note = request.form.get('note')
         for it in items:
             quotation.items.append(QuotationItem(**it))
         db.session.commit()
@@ -731,7 +740,8 @@ def quotation_pdf(quotation_id):
     generate_pdf('Cotización', company, quotation.client, quotation.items,
                  quotation.subtotal, quotation.itbis, quotation.total,
                  seller=quotation.seller, payment_method=quotation.payment_method,
-                 bank=quotation.bank, output_path=pdf_path, qr_url=qr_url,
+                 bank=quotation.bank, doc_number=quotation.id, note=quotation.note,
+                 output_path=pdf_path, qr_url=qr_url,
                  date=quotation.date, valid_until=valid_until)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
@@ -750,6 +760,7 @@ def quotation_to_order(quotation_id):
         seller=quotation.seller,
         payment_method=quotation.payment_method,
         bank=quotation.bank,
+        note=quotation.note,
         company_id=current_company_id(),
     )
     db.session.add(order)
@@ -794,7 +805,9 @@ def order_to_invoice(order_id):
     invoice = Invoice(client_id=order.client_id, order_id=order.id, subtotal=order.subtotal,
                       itbis=order.itbis, total=order.total, ncf=ncf,
                       seller=order.seller, payment_method=order.payment_method,
-                      bank=order.bank, company_id=current_company_id())
+                      bank=order.bank, note=order.note,
+                      invoice_type=('Consumidor Final' if order.client.is_final_consumer else 'Crédito Fiscal'),
+                      company_id=current_company_id())
     db.session.add(invoice)
     db.session.flush()
     for item in order.items:
@@ -826,7 +839,8 @@ def order_pdf(order_id):
     generate_pdf('Pedido', company, order.client, order.items,
                  order.subtotal, order.itbis, order.total,
                  seller=order.seller, payment_method=order.payment_method,
-                 bank=order.bank, output_path=pdf_path, qr_url=qr_url,
+                 bank=order.bank, doc_number=order.id, note=order.note,
+                 output_path=pdf_path, qr_url=qr_url,
                  date=order.date)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
@@ -852,8 +866,9 @@ def invoice_pdf(invoice_id):
                  invoice.subtotal, invoice.itbis, invoice.total,
                  ncf=invoice.ncf, seller=invoice.seller,
                  payment_method=invoice.payment_method, bank=invoice.bank,
-                 order_number=invoice.order_id, output_path=pdf_path,
-                 qr_url=qr_url, date=invoice.date)
+                 order_number=invoice.order_id, doc_number=invoice.id,
+                 invoice_type=invoice.invoice_type, note=invoice.note,
+                 output_path=pdf_path, qr_url=qr_url, date=invoice.date)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 @app.route('/pdfs/<path:filename>')
