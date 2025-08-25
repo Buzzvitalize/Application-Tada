@@ -9,6 +9,7 @@ Key features:
 - Responsive TailwindCSS layout with sidebar navigation
 - Multi-tenant architecture isolating data per company
 - Local RNC catalogue (`data/DGII_RNC.TXT`) auto-completes company names when entering tax IDs
+- Modern PDF template with colored header and summary boxes for quotations, orders and invoices
 
 ## Configuration
 
