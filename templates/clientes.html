@@ -46,7 +46,11 @@
     </tbody>
   </table>
 </div>
+{% endblock %}
+
+{% block scripts %}
 <script>
+window.addEventListener('load', () => {
   const typeRadios=document.querySelectorAll('input[name="type"]');
   const idField=document.getElementById('identifier');
   const lastField=document.getElementById('last_name');
@@ -68,5 +72,6 @@
   }
   typeRadios.forEach(r=>r.addEventListener('change',toggle));
   toggle();
+});
 </script>
 {% endblock %}

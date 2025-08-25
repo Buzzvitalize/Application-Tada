@@ -50,8 +50,8 @@
           <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}" {% if it.product_id == p.id %}selected{% endif %}>{{ p.code }} - {{ p.name }}</option>
           {% endfor %}
         </select>
-        <input class="input unit-field" value="{{ it.unit }}" readonly>
-        <input class="input price-field" value="{{ '%.2f'|format(it.price) }}" readonly>
+        <input class="input unit-field" value="{{ it.unit }}" placeholder="Unidad" readonly>
+        <input class="input price-field" value="{{ '%.2f'|format(it.price) }}" placeholder="Precio" readonly>
         <input name="product_quantity[]" value="{{ it.quantity }}" placeholder="Cantidad" class="input" required>
         <input name="product_discount[]" value="{{ '%.2f'|format(it.discount) }}" placeholder="Desc. %" class="input">
         <button type="button" class="btn-secondary remove-product">Eliminar</button>
@@ -62,7 +62,11 @@
   </div>
   <button class="btn-primary">Guardar</button>
 </form>
+{% endblock %}
+
+{% block scripts %}
 <script>
+window.addEventListener('load', () => {
   const clientSelect = document.getElementById('client-select');
   const newClient = document.getElementById('new-client');
   const productContainer = document.getElementById('productos');
@@ -118,7 +122,7 @@
     select.addEventListener('change', function() {
       const opt = this.selectedOptions[0];
       unit.value = opt.dataset.unit || '';
-      price.value = opt.dataset.price || '';
+      price.value = opt.dataset.price ? parseFloat(opt.dataset.price).toFixed(2) : '';
     });
     removeBtn.addEventListener('click', () => {
       row.remove();
@@ -134,8 +138,8 @@
       <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}">{{ p.code }} - {{ p.name }}</option>
       {% endfor %}
     </select>
-    <input class="input unit-field" readonly>
-    <input class="input price-field" readonly>
+    <input class="input unit-field" placeholder="Unidad" readonly>
+    <input class="input price-field" placeholder="Precio" readonly>
     <input name="product_quantity[]" placeholder="Cantidad" class="input" required>
     <input name="product_discount[]" placeholder="Desc. %" class="input">
     <button type="button" class="btn-secondary remove-product">Eliminar</button>`;
@@ -150,6 +154,7 @@
 
   document.querySelectorAll('.product-row').forEach(bindProduct);
   clientSelect.dispatchEvent(new Event('change'));
+});
 </script>
 {% endblock %}
 

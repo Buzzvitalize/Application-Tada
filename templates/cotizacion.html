@@ -49,8 +49,8 @@
           <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}">{{ p.code }} - {{ p.name }}</option>
           {% endfor %}
         </select>
-        <input class="input unit-field" readonly>
-        <input class="input price-field" readonly>
+        <input class="input unit-field" placeholder="Unidad" readonly>
+        <input class="input price-field" placeholder="Precio" readonly>
         <input name="product_quantity[]" placeholder="Cantidad" class="input" required>
         <input name="product_discount[]" placeholder="Desc. %" class="input">
         <button type="button" class="btn-secondary remove-product">Eliminar</button>
@@ -60,7 +60,11 @@
   </div>
   <button class="btn-primary">Guardar</button>
 </form>
+{% endblock %}
+
+{% block scripts %}
 <script>
+window.addEventListener('load', () => {
   const clientSelect = document.getElementById('client-select');
   const newClient = document.getElementById('new-client');
   clientSelect.addEventListener('change', () => {
@@ -105,7 +109,7 @@
     select.addEventListener('change', function() {
       const opt = this.selectedOptions[0];
       unit.value = opt.dataset.unit || '';
-      price.value = opt.dataset.price || '';
+      price.value = opt.dataset.price ? parseFloat(opt.dataset.price).toFixed(2) : '';
     });
     removeBtn.addEventListener('click', () => {
       row.remove();
@@ -123,5 +127,6 @@
   });
 
   document.querySelectorAll('.product-row').forEach(bindProduct);
+});
 </script>
 {% endblock %}
