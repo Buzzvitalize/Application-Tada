@@ -29,7 +29,14 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
                  note=None, output_path=None, qr_url=None,
                  date=None, valid_until=None):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=LETTER)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=LETTER,
+        leftMargin=0.5 * inch,
+        rightMargin=0.5 * inch,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
+    )
     elements = []
     styles = getSampleStyleSheet()
     primary = colors.HexColor('#1e3a8a')
@@ -59,7 +66,7 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
     ]))
     elements.append(header)
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 20))
 
     full_name = f"{client.name} {getattr(client, 'last_name', '')}".strip()
     cli_info = f"<b>Cliente:</b> {full_name}<br/>"
@@ -87,7 +94,19 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
             _fmt_money(i.discount),
             _fmt_money(total_line),
         ])
-    table = Table(data, colWidths=[55, 50, 150, 50, 60, 40, 60, 60])
+    table = Table(
+        data,
+        colWidths=[
+            doc.width * 0.1,
+            doc.width * 0.1,
+            doc.width * 0.3,
+            doc.width * 0.1,
+            doc.width * 0.12,
+            doc.width * 0.08,
+            doc.width * 0.09,
+            doc.width * 0.11,
+        ],
+    )
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), primary),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -95,6 +114,10 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
     elements.append(table)
 
@@ -105,13 +128,20 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         ['Descuento', _fmt_money(discount_total)],
         ['Total', _fmt_money(total)],
     ]
-    totals_table = Table(totals, colWidths=[395, 80])
+    totals_table = Table(
+        totals,
+        colWidths=[doc.width * 0.73, doc.width * 0.27],
+    )
     totals_table.setStyle(TableStyle([
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('TEXTCOLOR', (0, -1), (-1, -1), primary),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 20))
     elements.append(totals_table)
 
     extras = []
@@ -132,8 +162,10 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         os.makedirs(os.path.join(current_app.static_folder, 'qrcodes'), exist_ok=True)
         qr_path = os.path.join(current_app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
         qrcode.make(qr_url).save(qr_path)
-        elements.append(Spacer(1, 12))
-        elements.append(Image(qr_path, width=1.2 * inch, height=1.2 * inch))
+        elements.append(Spacer(1, 20))
+        qr_img = Image(qr_path, width=1.2 * inch, height=1.2 * inch)
+        qr_img.hAlign = 'RIGHT'
+        elements.append(qr_img)
 
     doc.build(elements)
     pdf_bytes = buffer.getvalue()
