@@ -1,8 +1,34 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, session, jsonify
-from models import db, Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem, CompanyInfo, User, AccountRequest
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    send_file,
+    send_from_directory,
+    flash,
+    session,
+    jsonify,
+    g,
+)
+from models import (
+    db,
+    Client,
+    Product,
+    Quotation,
+    QuotationItem,
+    Order,
+    OrderItem,
+    Invoice,
+    InvoiceItem,
+    CompanyInfo,
+    User,
+    AccountRequest,
+)
 from io import BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from sqlalchemy.orm import load_only
 from werkzeug.utils import secure_filename
 import os
 import re
@@ -68,8 +94,10 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
-# Utility functions
+# Utility constants
 ITBIS_RATE = 0.18
+UNITS = ('Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro')
+CATEGORIES = ('Servicios', 'Consumo', 'Liquido', 'Otros')
 
 
 def current_company_id():
@@ -119,11 +147,46 @@ def fmt_id(value):
 
 
 def calculate_totals(items):
-    subtotal = sum((item['unit_price'] * item['quantity']) - item['discount'] for item in items)
-    itbis = sum(((item['unit_price'] * item['quantity']) - item['discount']) * ITBIS_RATE
-                for item in items if item.get('has_itbis'))
-    total = subtotal + itbis
-    return subtotal, itbis, total
+    subtotal = 0
+    itbis = 0
+    for item in items:
+        line = (item['unit_price'] * item['quantity']) - item['discount']
+        subtotal += line
+        if item.get('has_itbis'):
+            itbis += line * ITBIS_RATE
+    return subtotal, itbis, subtotal + itbis
+
+
+def build_items(product_ids, quantities, discounts):
+    ids = [int(pid) for pid in product_ids if pid]
+    products = (
+        company_query(Product)
+        .options(load_only('id', 'code', 'reference', 'name', 'unit', 'price', 'category', 'has_itbis'))
+        .filter(Product.id.in_(ids))
+        .all()
+    )
+    prod_map = {str(p.id): p for p in products}
+    items = []
+    for pid, q, d in zip(product_ids, quantities, discounts):
+        product = prod_map.get(pid)
+        if not product:
+            continue
+        qty = _to_int(q)
+        percent = _to_float(d)
+        discount_amount = product.price * qty * (percent / 100)
+        items.append({
+            'code': product.code,
+            'reference': product.reference,
+            'product_name': product.name,
+            'unit': product.unit,
+            'unit_price': product.price,
+            'quantity': qty,
+            'discount': discount_amount,
+            'category': product.category,
+            'has_itbis': product.has_itbis,
+            'company_id': current_company_id(),
+        })
+    return items
 
 
 @app.route('/api/rnc/<rnc>')
@@ -136,11 +199,15 @@ def rnc_lookup(rnc):
     return jsonify({'name': name})
 
 
+@app.before_request
+def load_company():
+    cid = current_company_id()
+    g.company = CompanyInfo.query.get(cid) if cid else None
+
+
 @app.context_processor
 def inject_company():
-    cid = current_company_id()
-    company = CompanyInfo.query.get(cid) if cid else None
-    return {'company': company}
+    return {'company': getattr(g, 'company', None)}
 
 
 def get_company_info():
@@ -363,8 +430,6 @@ def edit_client(client_id):
 # Products CRUD
 @app.route('/productos', methods=['GET', 'POST'])
 def products():
-    units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
-    categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
     if request.method == 'POST':
         product = Product(
             code=request.form['code'],
@@ -385,7 +450,7 @@ def products():
     if cat:
         query = query.filter_by(category=cat)
     products = query.all()
-    return render_template('productos.html', products=products, units=units, categories=categories, current_cat=cat)
+    return render_template('productos.html', products=products, units=UNITS, categories=CATEGORIES, current_cat=cat)
 
 @app.route('/productos/delete/<int:product_id>')
 def delete_product(product_id):
@@ -398,8 +463,6 @@ def delete_product(product_id):
 @app.route('/productos/edit/<int:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
     product = company_get(Product, product_id)
-    units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
-    categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
     if request.method == 'POST':
         product.code = request.form['code']
         product.reference = request.form.get('reference')
@@ -411,7 +474,7 @@ def edit_product(product_id):
         db.session.commit()
         flash('Producto actualizado')
         return redirect(url_for('products'))
-    return render_template('producto_form.html', product=product, units=units, categories=categories)
+    return render_template('producto_form.html', product=product, units=UNITS, categories=CATEGORIES)
 
 # Quotations
 @app.route('/cotizaciones')
@@ -450,29 +513,10 @@ def new_quotation():
             )
             db.session.add(client)
             db.session.flush()
-        items = []
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
-        for pid, q, d in zip(product_ids, quantities, discounts):
-            if not pid:
-                continue
-            product = company_get(Product, pid)
-            qty = _to_int(q)
-            percent = _to_float(d)
-            discount_amount = product.price * qty * (percent / 100)
-            items.append({
-                'code': product.code,
-                'reference': product.reference,
-                'product_name': product.name,
-                'unit': product.unit,
-                'unit_price': product.price,
-                'quantity': qty,
-                'discount': discount_amount,
-                'category': product.category,
-                'has_itbis': product.has_itbis,
-                'company_id': current_company_id(),
-            })
+        items = build_items(product_ids, quantities, discounts)
         subtotal, itbis, total = calculate_totals(items)
         payment_method = request.form.get('payment_method')
         bank = request.form.get('bank') if payment_method == 'Transferencia' else None
@@ -488,8 +532,8 @@ def new_quotation():
         db.session.commit()
         flash('Cotización guardada')
         return redirect(url_for('list_quotations'))
-    clients = company_query(Client).all()
-    products = company_query(Product).all()
+    clients = company_query(Client).options(load_only('id', 'name', 'identifier')).all()
+    products = company_query(Product).options(load_only('id', 'code', 'name', 'unit', 'price')).all()
     return render_template('cotizacion.html', clients=clients, products=products)
 
 @app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
@@ -517,29 +561,10 @@ def edit_quotation(quotation_id):
             client.is_final_consumer = is_final
         quotation.items.clear()
         db.session.flush()
-        items = []
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
-        for pid, q, d in zip(product_ids, quantities, discounts):
-            if not pid:
-                continue
-            product = company_get(Product, pid)
-            qty = _to_int(q)
-            percent = _to_float(d)
-            discount_amount = product.price * qty * (percent / 100)
-            items.append({
-                'code': product.code,
-                'reference': product.reference,
-                'product_name': product.name,
-                'unit': product.unit,
-                'unit_price': product.price,
-                'quantity': qty,
-                'discount': discount_amount,
-                'category': product.category,
-                'has_itbis': product.has_itbis,
-                'company_id': current_company_id(),
-            })
+        items = build_items(product_ids, quantities, discounts)
         subtotal, itbis, total = calculate_totals(items)
         payment_method = request.form.get('payment_method')
         bank = request.form.get('bank') if payment_method == 'Transferencia' else None
@@ -556,19 +581,28 @@ def edit_quotation(quotation_id):
         db.session.commit()
         flash('Cotización actualizada')
         return redirect(url_for('list_quotations'))
-    clients = company_query(Client).all()
-    products = company_query(Product).all()
+    clients = company_query(Client).options(load_only('id', 'name', 'identifier')).all()
+    products = company_query(Product).options(load_only('id', 'code', 'name', 'unit', 'price')).all()
+    product_map = {p.name: p.id for p in products}
     # prepare items for template (discount percentage)
     items = []
     for it in quotation.items:
         base = it.unit_price * it.quantity
         percent = (it.discount / base * 100) if base else 0
-        product = company_query(Product).filter_by(name=it.product_name).first()
-        items.append({'product_id': product.id if product else '', 'quantity': it.quantity,
-                      'discount': percent, 'unit': it.unit,
-                      'price': it.unit_price})
-    return render_template('cotizacion_edit.html', quotation=quotation, clients=clients,
-                           products=products, items=items)
+        items.append({
+            'product_id': product_map.get(it.product_name, ''),
+            'quantity': it.quantity,
+            'discount': percent,
+            'unit': it.unit,
+            'price': it.unit_price,
+        })
+    return render_template(
+        'cotizacion_edit.html',
+        quotation=quotation,
+        clients=clients,
+        products=products,
+        items=items,
+    )
 
 
 @app.route('/ajustes', methods=['GET', 'POST'])
