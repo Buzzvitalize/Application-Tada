@@ -296,14 +296,20 @@ def request_account():
         if request.form.get('password') != request.form.get('confirm_password'):
             flash('Las contraseñas no coinciden', 'request')
             return redirect(url_for('request_account'))
+        account_type = request.form['account_type']
+        identifier = request.form.get('identifier')
+        if not identifier:
+            flash('Debe ingresar RNC o Cédula', 'request')
+            return redirect(url_for('request_account'))
         req = AccountRequest(
+            account_type=account_type,
             first_name=request.form['first_name'],
             last_name=request.form['last_name'],
             company=request.form['company'],
-            rnc=request.form.get('rnc'),
+            identifier=identifier,
             phone=request.form['phone'],
             email=request.form['email'],
-            address=request.form['address'],
+            address=request.form.get('address'),
             website=request.form.get('website'),
             username=request.form['username'],
             password=request.form['password'],
@@ -350,11 +356,11 @@ def approve_request(req_id):
     role = request.form.get('role', 'company')
     company = CompanyInfo(
         name=req.company,
-        street=req.address,
+        street=req.address or '',
         sector='',
         province='',
         phone=req.phone,
-        rnc=req.rnc or '',
+        rnc=req.identifier or '',
         website=req.website,
         logo='',
     )

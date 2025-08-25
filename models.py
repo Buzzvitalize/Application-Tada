@@ -140,13 +140,14 @@ class User(db.Model):
 
 class AccountRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    account_type = db.Column(db.String(20), nullable=False)  # personal o empresarial
     first_name = db.Column(db.String(120), nullable=False)
     last_name = db.Column(db.String(120), nullable=False)
     company = db.Column(db.String(120), nullable=False)
-    rnc = db.Column(db.String(50))
+    identifier = db.Column(db.String(50), nullable=False)  # RNC o Cédula
     phone = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120), nullable=False)
-    address = db.Column(db.String(200), nullable=False)
+    address = db.Column(db.String(200))
     website = db.Column(db.String(120))
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)

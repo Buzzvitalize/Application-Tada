@@ -13,17 +13,27 @@
   <div class="bg-white rounded shadow p-6 w-full max-w-lg mt-12">
     <h2 class="text-xl font-semibold mb-4 text-center">Solicitar cuenta</h2>
     <form method="post" class="space-y-4">
+      <div class="flex space-x-4 justify-center">
+        <label class="flex items-center space-x-1">
+          <input type="radio" name="account_type" value="personal" checked>
+          <span>Personal</span>
+        </label>
+        <label class="flex items-center space-x-1">
+          <input type="radio" name="account_type" value="empresarial">
+          <span>Empresarial</span>
+        </label>
+      </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input name="first_name" placeholder="Nombre" class="input" required>
         <input name="last_name" placeholder="Apellido" class="input" required>
       </div>
-      <input id="company-name" name="company" placeholder="Empresa o Marca" class="input" required>
-      <input name="rnc" placeholder="RNC" class="input rnc-mask">
       <input name="phone" placeholder="Teléfono" class="input phone-mask" required>
-      <input type="email" name="email" placeholder="Correo" class="input" required>
-      <input name="address" placeholder="Dirección" class="input" required>
+      <input id="company-name" name="company" placeholder="Nombre de la empresa o marca" class="input" required>
+      <input id="identifier" name="identifier" placeholder="Cédula" class="input rnc-mask" required>
+      <input name="address" placeholder="Dirección de la empresa" class="input">
       <input name="website" placeholder="Página web" class="input">
       <input name="username" placeholder="Nombre de usuario" class="input" required>
+      <input type="email" name="email" placeholder="Correo" class="input" required>
       <input type="password" name="password" placeholder="Contraseña" class="input" required>
       <input type="password" name="confirm_password" placeholder="Confirmar contraseña" class="input" required>
       <button class="btn-primary w-full">Enviar solicitud</button>
@@ -48,17 +58,30 @@
     el.value=formatPhone(el.value);
     el.addEventListener('input',e=>{ e.target.value=formatPhone(e.target.value); });
   });
-  document.querySelectorAll('.rnc-mask').forEach(el=>{
-    el.value=formatRnc(el.value);
-    el.addEventListener('input',e=>{ e.target.value=formatRnc(e.target.value); });
-    el.addEventListener('blur',e=>{
-      const r=e.target.value.replace(/-/g,'');
-      fetch(`/api/rnc/${r}`).then(r=>r.json()).then(data=>{
-        const field=document.getElementById('company-name');
-        if(data.name && field && !field.value){ field.value=data.name; }
-      });
+  const idField=document.getElementById('identifier');
+  function applyIdMask(){ idField.value=formatRnc(idField.value); }
+  idField.addEventListener('input',applyIdMask);
+  function lookupRnc(){
+    const r=idField.value.replace(/-/g,'');
+    fetch(`/api/rnc/${r}`).then(r=>r.json()).then(data=>{
+      const field=document.getElementById('company-name');
+      if(data.name && field && !field.value){ field.value=data.name; }
+    });
+  }
+  idField.addEventListener('blur',()=>{
+    if(document.querySelector('input[name="account_type"]:checked').value==='empresarial'){
+      lookupRnc();
+    }
+  });
+  document.querySelectorAll('input[name="account_type"]').forEach(el=>{
+    el.addEventListener('change',()=>{
+      const type=el.value;
+      const placeholder = type==='personal'? 'Cédula' : 'RNC o Cédula';
+      idField.placeholder = placeholder;
+      applyIdMask();
     });
   });
+  applyIdMask();
 </script>
 </body>
 </html>

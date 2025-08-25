@@ -8,10 +8,11 @@
     <div class="card">
       <p><strong>Nombre:</strong> {{ req.first_name }} {{ req.last_name }}</p>
       <p><strong>Empresa:</strong> {{ req.company }}</p>
-      <p><strong>RNC:</strong> {{ req.rnc or 'N/A' }}</p>
+      <p><strong>Tipo:</strong> {{ req.account_type.capitalize() }}</p>
+      <p><strong>RNC/Cédula:</strong> {{ req.identifier }}</p>
       <p><strong>Teléfono:</strong> {{ req.phone }}</p>
       <p><strong>Correo:</strong> {{ req.email }}</p>
-      <p><strong>Dirección:</strong> {{ req.address }}</p>
+      {% if req.address %}<p><strong>Dirección:</strong> {{ req.address }}</p>{% endif %}
       <p><strong>Web:</strong> {{ req.website or 'N/A' }}</p>
       <p><strong>Usuario:</strong> {{ req.username }}</p>
       <form method="post" action="{{ url_for('approve_request', req_id=req.id) }}" class="mt-2 flex items-center space-x-2">
