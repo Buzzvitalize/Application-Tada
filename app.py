@@ -238,17 +238,28 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         pdf.cell(0, 6, f"Email: {client.email}", ln=1)
     pdf.ln(5)
     pdf.set_font('Helvetica', 'B', 12)
-    table_width = 60 + 20 + 25 + 20 + 25 + 30
+    col_code = 20
+    col_ref = 20
+    col_name = 45
+    col_unit = 15
+    col_price = 25
+    col_qty = 15
+    col_discount = 25
+    col_total = 30
+    table_width = (col_code + col_ref + col_name + col_unit + col_price +
+                   col_qty + col_discount + col_total)
     table_x = (pdf.w - table_width) / 2
     pdf.set_fill_color(*primary)
     pdf.set_text_color(255, 255, 255)
     pdf.set_x(table_x)
-    pdf.cell(60, 8, 'Producto', border=1, align='C', fill=True)
-    pdf.cell(20, 8, 'Unidad', border=1, align='C', fill=True)
-    pdf.cell(25, 8, 'Precio', border=1, align='R', fill=True)
-    pdf.cell(20, 8, 'Cant.', border=1, align='R', fill=True)
-    pdf.cell(25, 8, 'Desc.', border=1, align='R', fill=True)
-    pdf.cell(30, 8, 'Total', border=1, ln=1, align='R', fill=True)
+    pdf.cell(col_code, 8, 'Código', border=1, align='C', fill=True)
+    pdf.cell(col_ref, 8, 'Ref.', border=1, align='C', fill=True)
+    pdf.cell(col_name, 8, 'Producto', border=1, align='C', fill=True)
+    pdf.cell(col_unit, 8, 'Unidad', border=1, align='C', fill=True)
+    pdf.cell(col_price, 8, 'Precio', border=1, align='R', fill=True)
+    pdf.cell(col_qty, 8, 'Cant.', border=1, align='R', fill=True)
+    pdf.cell(col_discount, 8, 'Desc.', border=1, align='R', fill=True)
+    pdf.cell(col_total, 8, 'Total', border=1, ln=1, align='R', fill=True)
     pdf.set_font('Helvetica', '', 12)
     pdf.set_text_color(0, 0, 0)
     fill = False
@@ -259,12 +270,14 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
             pdf.set_fill_color(249, 250, 251)
         else:
             pdf.set_fill_color(255, 255, 255)
-        pdf.cell(60, 8, i.product_name, border=1, fill=True)
-        pdf.cell(20, 8, i.unit, border=1, align='C', fill=True)
-        pdf.cell(25, 8, _fmt_money(i.unit_price), border=1, align='R', fill=True)
-        pdf.cell(20, 8, str(i.quantity), border=1, align='R', fill=True)
-        pdf.cell(25, 8, _fmt_money(i.discount), border=1, align='R', fill=True)
-        pdf.cell(30, 8, _fmt_money(total_line), border=1, ln=1, align='R', fill=True)
+        pdf.cell(col_code, 8, getattr(i, 'code', '') or '', border=1, fill=True)
+        pdf.cell(col_ref, 8, getattr(i, 'reference', '') or '', border=1, fill=True)
+        pdf.cell(col_name, 8, i.product_name, border=1, fill=True)
+        pdf.cell(col_unit, 8, i.unit, border=1, align='C', fill=True)
+        pdf.cell(col_price, 8, _fmt_money(i.unit_price), border=1, align='R', fill=True)
+        pdf.cell(col_qty, 8, str(i.quantity), border=1, align='R', fill=True)
+        pdf.cell(col_discount, 8, _fmt_money(i.discount), border=1, align='R', fill=True)
+        pdf.cell(col_total, 8, _fmt_money(total_line), border=1, ln=1, align='R', fill=True)
         fill = not fill
     discount_total = sum(i.discount for i in items)
     pdf.ln(5)
@@ -272,18 +285,19 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.set_draw_color(200, 200, 200)
     pdf.set_fill_color(255, 255, 255)
     pdf.set_font('Helvetica', '', 12)
-    pdf.cell(table_width - 40, 8, 'Subtotal', border='LT', align='R')
-    pdf.cell(40, 8, _fmt_money(subtotal), border='TR', ln=1, align='R')
+    last_col = col_total
+    pdf.cell(table_width - last_col, 8, 'Subtotal', border='LT', align='R')
+    pdf.cell(last_col, 8, _fmt_money(subtotal), border='TR', ln=1, align='R')
     pdf.set_x(table_x)
-    pdf.cell(table_width - 40, 8, f"ITBIS ({ITBIS_RATE*100:.0f}%)", border='L', align='R')
-    pdf.cell(40, 8, _fmt_money(itbis), border='R', ln=1, align='R')
+    pdf.cell(table_width - last_col, 8, f"ITBIS ({ITBIS_RATE*100:.0f}%)", border='L', align='R')
+    pdf.cell(last_col, 8, _fmt_money(itbis), border='R', ln=1, align='R')
     pdf.set_x(table_x)
-    pdf.cell(table_width - 40, 8, 'Descuento', border='L', align='R')
-    pdf.cell(40, 8, _fmt_money(discount_total), border='R', ln=1, align='R')
+    pdf.cell(table_width - last_col, 8, 'Descuento', border='L', align='R')
+    pdf.cell(last_col, 8, _fmt_money(discount_total), border='R', ln=1, align='R')
     pdf.set_x(table_x)
     pdf.set_font('Helvetica', 'B', 12)
-    pdf.cell(table_width - 40, 8, 'Total', border='LB', align='R')
-    pdf.cell(40, 8, _fmt_money(total), border='RB', ln=1, align='R')
+    pdf.cell(table_width - last_col, 8, 'Total', border='LB', align='R')
+    pdf.cell(last_col, 8, _fmt_money(total), border='RB', ln=1, align='R')
     if seller or payment_method:
         pdf.ln(5)
         if seller:
@@ -609,6 +623,8 @@ def new_quotation():
             percent = _to_float(d)
             discount_amount = product.price * qty * (percent / 100)
             items.append({
+                'code': product.code,
+                'reference': product.reference,
                 'product_name': product.name,
                 'unit': product.unit,
                 'unit_price': product.price,
@@ -674,6 +690,8 @@ def edit_quotation(quotation_id):
             percent = _to_float(d)
             discount_amount = product.price * qty * (percent / 100)
             items.append({
+                'code': product.code,
+                'reference': product.reference,
                 'product_name': product.name,
                 'unit': product.unit,
                 'unit_price': product.price,
@@ -784,6 +802,8 @@ def quotation_to_order(quotation_id):
     for item in quotation.items:
         o_item = OrderItem(
             order_id=order.id,
+            code=item.code,
+            reference=item.reference,
             product_name=item.product_name,
             unit=item.unit,
             unit_price=item.unit_price,
@@ -829,6 +849,8 @@ def order_to_invoice(order_id):
     for item in order.items:
         i_item = InvoiceItem(
             invoice_id=invoice.id,
+            code=item.code,
+            reference=item.reference,
             product_name=item.product_name,
             unit=item.unit,
             unit_price=item.unit_price,
