@@ -1,7 +1,10 @@
 import os
 
+
 class BaseConfig:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev')
+    SECRET_KEY = os.environ.get("SECRET_KEY")
+    if not SECRET_KEY:
+        raise RuntimeError("SECRET_KEY environment variable not set")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 class DevelopmentConfig(BaseConfig):

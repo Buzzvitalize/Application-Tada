@@ -15,13 +15,13 @@ Key features:
 
 ## Configuration
 
-Create a `.env` file in the project root and define:
+Copy `.env.example` to `.env` and define a random secret key:
 
 ```
 SECRET_KEY=replace_with_random_string
 ```
 
-This value secures Flask sessions.
+This value secures Flask sessions and is required for the application to start.
 
 ## Multi-tenant usage
 
@@ -37,6 +37,7 @@ An experimental endpoint `/api/recommendations` returns the top-selling products
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pytest
 python app.py
 ```
 
