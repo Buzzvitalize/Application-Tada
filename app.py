@@ -11,6 +11,7 @@ import re
 from ai import recommend_products
 from pdf_utils import generate_pdf
 from functools import wraps
+from fpdf import FPDF
 # Load RNC data for company name lookup
 RNC_DATA = {}
 DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'DGII_RNC.TXT')
