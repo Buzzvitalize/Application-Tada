@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solicitar cuenta</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='pos.svg') }}">
 </head>
-<body class="min-h-screen flex items-center justify-center bg-gray-100 p-4 relative">
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 p-4 relative">
   <img src="{{ url_for('static', filename='pos.svg') }}" alt="POS" class="w-12 h-12 absolute top-4 left-1/2 -translate-x-1/2">
-  <div class="bg-white rounded shadow p-6 w-full max-w-lg mt-12">
-    <h2 class="text-xl font-semibold mb-4 text-center">Solicitar cuenta</h2>
+  <div class="bg-white rounded-lg shadow-xl hover:shadow-2xl transition-shadow w-full max-w-lg mt-12 p-6">
+    <h2 class="text-xl font-semibold mb-4 text-center text-gray-700">Solicitar cuenta</h2>
     <form method="post" class="space-y-4">
       <div class="flex space-x-4 justify-center">
         <label class="flex items-center space-x-1">

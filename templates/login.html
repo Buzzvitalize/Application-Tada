@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tiendix - Tu negocio, tu control, tu Tiendix</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='pos.svg') }}">
 </head>
 <body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 p-4 relative">
   <img src="{{ url_for('static', filename='pos.svg') }}" alt="POS" class="w-12 h-12 absolute top-4 left-1/2 -translate-x-1/2">
-  <div class="bg-white rounded-lg shadow-xl flex flex-col md:flex-row w-full max-w-4xl overflow-hidden">
+  <div class="bg-white rounded-lg shadow-xl hover:shadow-2xl transition-shadow flex flex-col md:flex-row w-full max-w-4xl overflow-hidden">
     <!-- Illustration / logo pane -->
     <div class="hidden md:flex md:w-1/2 bg-blue-600 text-white items-center justify-center p-8 relative">
       <div class="absolute top-4 left-4">

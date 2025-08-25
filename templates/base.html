@@ -5,40 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Tiendix - Tu negocio, tu control, tu Tiendix{% endblock %}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css">
-  <style>
-    .btn-primary{background-color:#2563eb;color:#fff;padding:.5rem 1rem;border-radius:.375rem;font-weight:600;transition:background-color .2s,transform .2s}
-    .btn-primary:hover{background-color:#1d4ed8;transform:scale(1.03)}
-    .btn-primary:focus{outline:none;box-shadow:0 0 0 2px #2563eb}
-    .btn-secondary{background-color:#6b7280;color:#fff;padding:.25rem .75rem;border-radius:.375rem}
-    .btn-secondary:hover{background-color:#4b5563}
-    .card{background-color:#fff;border-radius:.5rem;padding:1.5rem;box-shadow:0 1px 2px rgba(0,0,0,.05)}
-    .nav-link{display:block;padding:.5rem .75rem;border-radius:.375rem;transition:background-color .2s}
-    .nav-link:hover{background-color:#374151}
-    .input{border:1px solid #d1d5db;border-radius:.375rem;padding:.5rem .75rem;width:100%;transition:border-color .2s,box-shadow .2s}
-    .input:focus{outline:none;box-shadow:0 0 0 2px #2563eb;border-color:#2563eb}
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='pos.svg') }}">
 </head>
 <body class="bg-gray-50">
-  <div class="flex min-h-screen">
-    <aside class="w-64 bg-gray-900 text-white flex flex-col">
-      <div class="p-4 text-xl font-bold border-b border-gray-700">Menú</div>
-      <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
-        <a href="{{ url_for('list_quotations') }}" class="nav-link">Cotizaciones</a>
-        <a href="{{ url_for('list_orders') }}" class="nav-link">Pedidos</a>
-        <a href="{{ url_for('list_invoices') }}" class="nav-link">Facturas</a>
-        <a href="{{ url_for('clients') }}" class="nav-link">Clientes</a>
-        <a href="{{ url_for('products') }}" class="nav-link">Productos</a>
-        <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
-        <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
-        {% if session.get('role') == 'admin' %}
-        <a href="{{ url_for('admin_companies') }}" class="nav-link">Empresas</a>
-        <a href="{{ url_for('admin_requests') }}" class="nav-link">Solicitudes</a>
-        <a href="{{ url_for('settings') }}" class="nav-link">Ajustes</a>
-        {% endif %}
-      </nav>
-      <div class="p-4 border-t border-gray-700"><a href="{{ url_for('logout') }}" class="nav-link">Salir</a></div>
-    </aside>
+  <div id="overlay" class="fixed inset-0 bg-black/50 hidden z-30 md:hidden"></div>
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full transition-transform duration-200 z-40 flex flex-col md:translate-x-0 md:static md:inset-0">
+    <div class="p-4 text-xl font-bold border-b border-gray-700 flex justify-between items-center">
+      Menú
+      <button class="md:hidden" onclick="closeSidebar()">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
+      <a href="{{ url_for('list_quotations') }}" class="nav-link">Cotizaciones</a>
+      <a href="{{ url_for('list_orders') }}" class="nav-link">Pedidos</a>
+      <a href="{{ url_for('list_invoices') }}" class="nav-link">Facturas</a>
+      <a href="{{ url_for('clients') }}" class="nav-link">Clientes</a>
+      <a href="{{ url_for('products') }}" class="nav-link">Productos</a>
+      <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
+      <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
+      {% if session.get('role') == 'admin' %}
+      <a href="{{ url_for('admin_companies') }}" class="nav-link">Empresas</a>
+      <a href="{{ url_for('admin_requests') }}" class="nav-link">Solicitudes</a>
+      <a href="{{ url_for('settings') }}" class="nav-link">Ajustes</a>
+      {% endif %}
+    </nav>
+    <div class="p-4 border-t border-gray-700"><a href="{{ url_for('logout') }}" class="nav-link">Salir</a></div>
+  </aside>
+
+  <div class="flex-1 flex flex-col md:pl-64">
+    <header class="bg-gray-900 text-white p-2 flex items-center md:hidden">
+      <button onclick="openSidebar()" class="p-2 focus:outline-none">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+      </button>
+      <span class="ml-2 font-semibold">Tiendix</span>
+    </header>
     <main class="flex-1 p-4 md:p-6 overflow-y-auto">
       <div class="max-w-7xl mx-auto">
         {% with messages = get_flashed_messages() %}
@@ -54,7 +56,17 @@
       </div>
     </main>
   </div>
+
   <script>
+    function openSidebar(){
+      document.getElementById('sidebar').classList.remove('-translate-x-full');
+      document.getElementById('overlay').classList.remove('hidden');
+    }
+    function closeSidebar(){
+      document.getElementById('sidebar').classList.add('-translate-x-full');
+      document.getElementById('overlay').classList.add('hidden');
+    }
+    document.getElementById('overlay').addEventListener('click', closeSidebar);
     function formatPhone(v){
       const digits=v.replace(/\D/g,'').slice(0,10);
       return digits.replace(/(\d{3})(\d{3})(\d{0,4})/, function(_,a,b,c){ return c?`${a}-${b}-${c}`:`${a}-${b}`; }).trim().replace(/-$/,'');
