@@ -62,8 +62,15 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     meta_para = Paragraph(meta, styles['Normal'])
     header = Table([[logo, comp_para, meta_para]], colWidths=[1.5 * inch, 3.5 * inch, 2.5 * inch])
     header.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), primary),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))
     elements.append(header)
     elements.append(Spacer(1, 20))
@@ -78,7 +85,22 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         cli_info += f"<b>Dirección:</b> {client.street or ''}, {client.sector or ''}, {client.province or ''}<br/>"
     if client.email:
         cli_info += f"<b>Email:</b> {client.email}<br/>"
-    elements.append(Paragraph(cli_info, styles['Normal']))
+    seller_info = ""
+    if seller:
+        seller_info += f"<b>Vendedor:</b> {seller}<br/>"
+    if payment_method:
+        method = payment_method
+        if payment_method.lower().startswith('transfer') and bank:
+            method += f" - {bank}"
+        seller_info += f"<b>Método:</b> {method}<br/>"
+    info_table = Table(
+        [[Paragraph(cli_info, styles['Normal']), Paragraph(seller_info, styles['Normal'])]],
+        colWidths=[doc.width / 2, doc.width / 2],
+    )
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(info_table)
     elements.append(Spacer(1, 12))
 
     data = [['Código', 'Ref.', 'Producto', 'Unidad', 'Precio', 'Cant.', 'Desc.', 'Total']]
@@ -107,7 +129,7 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
             doc.width * 0.11,
         ],
     )
-    table.setStyle(TableStyle([
+    table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), primary),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (4, 1), (-1, -1), 'RIGHT'),
@@ -118,7 +140,11 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
+    ])
+    for row in range(1, len(data)):
+        if row % 2 == 1:
+            table_style.add('BACKGROUND', (0, row), (-1, row), colors.whitesmoke)
+    table.setStyle(table_style)
     elements.append(table)
 
     discount_total = sum(i.discount for i in items)
@@ -135,6 +161,7 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     totals_table.setStyle(TableStyle([
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, -1), (-1, -1), 12),
         ('TEXTCOLOR', (0, -1), (-1, -1), primary),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),
@@ -144,19 +171,9 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     elements.append(Spacer(1, 20))
     elements.append(totals_table)
 
-    extras = []
-    if seller:
-        extras.append(f"Vendedor: {seller}")
-    if payment_method:
-        method = payment_method
-        if payment_method.lower().startswith('transfer') and bank:
-            method += f" - {bank}"
-        extras.append(f"Método de pago: {method}")
     if note:
-        extras.append(f"Nota: {note}")
-    for line in extras:
         elements.append(Spacer(1, 6))
-        elements.append(Paragraph(line, styles['Normal']))
+        elements.append(Paragraph(f"Nota: {note}", styles['Normal']))
 
     if qr_url:
         os.makedirs(os.path.join(current_app.static_folder, 'qrcodes'), exist_ok=True)
@@ -166,6 +183,9 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
         qr_img = Image(qr_path, width=1.2 * inch, height=1.2 * inch)
         qr_img.hAlign = 'RIGHT'
         elements.append(qr_img)
+
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph('Gracias por su compra', styles['Normal']))
 
     doc.build(elements)
     pdf_bytes = buffer.getvalue()
