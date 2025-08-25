@@ -42,7 +42,7 @@
   <div>
     <h2 class="text-xl font-semibold mb-2">Productos</h2>
     <div id="productos">
-      <div class="grid grid-cols-1 sm:grid-cols-6 gap-2 mb-2 product-row">
+      <div class="grid grid-cols-1 sm:grid-cols-7 gap-2 mb-2 product-row">
         <select name="product_id[]" class="input product-select">
           <option value="">Seleccione...</option>
           {% for p in products %}
@@ -51,8 +51,9 @@
         </select>
         <input class="input unit-field" placeholder="Unidad" readonly>
         <input class="input price-field" placeholder="Precio" readonly>
-        <input name="product_quantity[]" placeholder="Cantidad" class="input" required>
-        <input name="product_discount[]" placeholder="Desc. %" class="input">
+        <input name="product_quantity[]" placeholder="Cantidad" class="input qty-field" required>
+        <input name="product_discount[]" placeholder="Desc. %" class="input disc-field">
+        <input class="input total-field" placeholder="Total" readonly>
         <button type="button" class="btn-secondary remove-product">Eliminar</button>
       </div>
     </div>
@@ -106,12 +107,24 @@ window.addEventListener('load', () => {
     const select = row.querySelector('.product-select');
     const unit = row.querySelector('.unit-field');
     const price = row.querySelector('.price-field');
+    const qty = row.querySelector('.qty-field');
+    const disc = row.querySelector('.disc-field');
+    const total = row.querySelector('.total-field');
     const removeBtn = row.querySelector('.remove-product');
+    function calc(){
+      const p=parseFloat(price.value)||0;
+      const q=parseFloat(qty.value)||0;
+      const d=parseFloat(disc.value)||0;
+      total.value=(p*q*(1-d/100)).toFixed(2);
+    }
     select.addEventListener('change', function() {
       const opt = this.selectedOptions[0];
       unit.value = opt.dataset.unit || '';
       price.value = opt.dataset.price ? parseFloat(opt.dataset.price).toFixed(2) : '';
+      calc();
     });
+    qty.addEventListener('input', calc);
+    disc.addEventListener('input', calc);
     removeBtn.addEventListener('click', () => {
       row.remove();
     });

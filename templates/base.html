@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Tiendix - Tu negocio, tu control, tu Tiendix{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css">
+    <style>.btn-primary{background-color:#2563eb;color:#fff;padding:.5rem 1rem;border-radius:.375rem;font-weight:600;transition:background-color .2s,transform .2s}.btn-primary:hover{background-color:#1d4ed8;transform:scale(1.03)}.btn-primary:focus{outline:none;box-shadow:0 0 0 2px #2563eb}.btn-secondary{background-color:#6b7280;color:#fff;padding:.25rem .75rem;border-radius:.375rem}.btn-secondary:hover{background-color:#4b5563}.card{background-color:#fff;border-radius:.5rem;padding:1.5rem;box-shadow:0 1px 2px rgba(0,0,0,.05)}.nav-link{display:block;padding:.5rem .75rem;border-radius:.375rem;transition:background-color .2s}.nav-link:hover{background-color:#374151}.input{border:1px solid #d1d5db;border-radius:.375rem;padding:.5rem .75rem;width:100%;transition:border-color .2s,box-shadow .2s}.input:focus{outline:none;box-shadow:0 0 0 2px #2563eb;border-color:#2563eb}</style>
     <link rel="icon" href="{{ url_for('static', filename='pos.svg') }}">
 </head>
 <body class="bg-gray-50">
-  <div class="flex min-h-screen">
+  <div class="min-h-screen md:grid md:grid-cols-[16rem,1fr]">
     <aside id="sidebar" class="bg-gray-900 text-white w-64 flex flex-col transform -translate-x-full md:translate-x-0 md:relative fixed inset-y-0 left-0 transition-transform duration-200 z-50">
         <div class="p-4 text-xl font-bold border-b border-gray-700">Menú</div>
         <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
@@ -28,7 +28,7 @@
         </nav>
         <div class="p-4 border-t border-gray-700"><a href="{{ url_for('logout') }}" class="nav-link">Salir</a></div>
     </aside>
-    <div class="flex-1 flex flex-col">
+    <div class="flex flex-col">
       <header class="bg-white shadow flex items-center justify-between px-4 h-14 sticky top-0 z-40">
           <div class="flex items-center">
             <button id="menu-btn" class="md:hidden mr-2 text-gray-700 focus:outline-none">
