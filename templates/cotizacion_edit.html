@@ -3,26 +3,18 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Editar Cotización</h1>
 <form method="post" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
-  <div class="space-y-2">
-    <select name="client_id" id="client-select" class="input">
-      <option value="">-- Nuevo Cliente --</option>
-      {% for c in clients %}
-      <option value="{{ c.id }}" {% if quotation.client_id == c.id %}selected{% endif %}>{{ c.name }} - {{ c.identifier }}</option>
-      {% endfor %}
-    </select>
-    <div id="new-client" class="grid md:grid-cols-2 gap-4" style="display: {{ 'none' if quotation.client_id else 'grid' }};">
-      <input name="client_name" placeholder="Nombre" class="input" id="client-name">
-      <input id="client-last" name="client_last_name" placeholder="Apellido" class="input">
-      <input name="client_identifier" placeholder="Cédula" class="input id-mask" id="client-identifier" data-doc-type="cedula">
-      <input name="client_phone" placeholder="Teléfono" class="input phone-mask">
-      <input name="client_email" placeholder="Email" class="input">
-      <input name="client_street" placeholder="Calle" class="input">
-      <input name="client_sector" placeholder="Sector" class="input">
-      <input name="client_province" placeholder="Provincia" class="input">
-      <div class="flex space-x-4 col-span-2">
-        <label><input type="radio" name="client_type" value="final" checked> Consumidor Final</label>
-        <label><input type="radio" name="client_type" value="fiscal"> Comprobante Fiscal</label>
-      </div>
+  <div id="new-client" class="grid md:grid-cols-2 gap-4">
+    <input name="client_name" value="{{ quotation.client.name }}" placeholder="Nombre" class="input" id="client-name" required>
+    <input id="client-last" name="client_last_name" value="{{ quotation.client.last_name }}" placeholder="Apellido" class="input {{ '' if quotation.client.is_final_consumer else 'hidden' }}">
+    <input name="client_identifier" value="{{ quotation.client.identifier }}" placeholder="{{ 'Cédula' if quotation.client.is_final_consumer else 'RNC *' }}" class="input id-mask" id="client-identifier" data-doc-type="{{ 'cedula' if quotation.client.is_final_consumer else 'rnc' }}" {% if not quotation.client.is_final_consumer %}required{% endif %}>
+    <input name="client_phone" value="{{ quotation.client.phone }}" placeholder="Teléfono" class="input phone-mask" required>
+    <input name="client_email" value="{{ quotation.client.email }}" placeholder="Email" class="input">
+    <input name="client_street" value="{{ quotation.client.street }}" placeholder="Calle" class="input" required>
+    <input name="client_sector" value="{{ quotation.client.sector }}" placeholder="Sector" class="input" required>
+    <input name="client_province" value="{{ quotation.client.province }}" placeholder="Provincia" class="input" required>
+    <div class="flex space-x-4 col-span-2">
+      <label><input type="radio" name="client_type" value="final" {% if quotation.client.is_final_consumer %}checked{% endif %}> Consumidor Final</label>
+      <label><input type="radio" name="client_type" value="fiscal" {% if not quotation.client.is_final_consumer %}checked{% endif %}> Comprobante Fiscal</label>
     </div>
   </div>
   <div class="grid md:grid-cols-3 gap-4">
@@ -68,25 +60,7 @@
 {% block scripts %}
 <script>
 window.addEventListener('load', () => {
-  const clientSelect = document.getElementById('client-select');
-  const newClient = document.getElementById('new-client');
   const productContainer = document.getElementById('productos');
-  let previousClient = clientSelect.value;
-  const clientItems = {};
-  clientItems[previousClient] = productContainer.innerHTML;
-
-  clientSelect.addEventListener('change', () => {
-    newClient.style.display = clientSelect.value ? 'none' : 'grid';
-    const required = clientSelect.value ? false : true;
-    newClient.querySelectorAll('input').forEach(i => i.required = required);
-    clientItems[previousClient] = productContainer.innerHTML;
-    const saved = clientItems[clientSelect.value] || '';
-    productContainer.innerHTML = saved;
-    if (!saved) addProductRow();
-    productContainer.querySelectorAll('.product-row').forEach(bindProduct);
-    previousClient = clientSelect.value;
-  });
-
   const typeRadios=document.querySelectorAll('input[name="client_type"]');
   const idField=document.getElementById('client-identifier');
   const lastField=document.getElementById('client-last');
@@ -154,7 +128,7 @@ window.addEventListener('load', () => {
   document.getElementById('add-product').addEventListener('click', addProductRow);
 
   document.querySelectorAll('.product-row').forEach(bindProduct);
-  clientSelect.dispatchEvent(new Event('change'));
+  toggleType();
 });
 </script>
 {% endblock %}

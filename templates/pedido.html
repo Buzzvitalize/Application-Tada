@@ -25,8 +25,8 @@
         <td class="p-2">{{ o.id }}</td>
         <td class="p-2">{{ o.client.name }}</td>
         <td class="p-2">{{ o.status }}</td>
-        <td class="p-2">{{ o.date.strftime('%d/%m/%Y %H:%M') }}</td>
-        <td class="p-2">{{ '%.2f'|format(o.total) }}</td>
+        <td class="p-2">{{ o.date.strftime('%d/%m/%Y %I:%M %p') }}</td>
+        <td class="p-2">{{ o.total | money }}</td>
         <td class="p-2 space-x-2">
           <a class="text-blue-500" href="{{ url_for('order_pdf', order_id=o.id) }}">PDF</a>
           <a class="text-green-500" href="{{ url_for('order_to_invoice', order_id=o.id) }}">Generar Factura</a>

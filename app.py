@@ -24,6 +24,7 @@ from models import (
     CompanyInfo,
     User,
     AccountRequest,
+    dom_now,
 )
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -237,6 +238,9 @@ def get_company_info():
 
 def _fmt_money(value):
     return f"RD${value:,.2f}"
+
+
+app.jinja_env.filters['money'] = _fmt_money
 
 
 # Routes
@@ -494,7 +498,7 @@ def list_quotations():
         query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
     quotations = query.order_by(Quotation.date.desc()).all()
     return render_template('cotizaciones.html', quotations=quotations, q=q,
-                           timedelta=timedelta, now=datetime.utcnow())
+                           timedelta=timedelta, now=dom_now())
 
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 def new_quotation():
@@ -549,25 +553,21 @@ def new_quotation():
 def edit_quotation(quotation_id):
     quotation = company_get(Quotation, quotation_id)
     if request.method == 'POST':
-        client_id = request.form.get('client_id')
-        if client_id:
-            client = company_get(Client, client_id)
-        else:
-            client = quotation.client
-            is_final = request.form.get('client_type') == 'final'
-            identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
-            if not is_final and not identifier:
-                flash('El identificador es obligatorio para comprobante fiscal')
-                return redirect(url_for('edit_quotation', quotation_id=quotation.id))
-            client.name = request.form['client_name']
-            client.last_name = request.form.get('client_last_name') if is_final else None
-            client.identifier = identifier
-            client.phone = request.form['client_phone']
-            client.email = request.form.get('client_email')
-            client.street = request.form['client_street']
-            client.sector = request.form['client_sector']
-            client.province = request.form['client_province']
-            client.is_final_consumer = is_final
+        client = quotation.client
+        is_final = request.form.get('client_type') == 'final'
+        identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
+        if not is_final and not identifier:
+            flash('El identificador es obligatorio para comprobante fiscal')
+            return redirect(url_for('edit_quotation', quotation_id=quotation.id))
+        client.name = request.form['client_name']
+        client.last_name = request.form.get('client_last_name') if is_final else None
+        client.identifier = identifier
+        client.phone = request.form['client_phone']
+        client.email = request.form.get('client_email')
+        client.street = request.form['client_street']
+        client.sector = request.form['client_sector']
+        client.province = request.form['client_province']
+        client.is_final_consumer = is_final
         quotation.items.clear()
         db.session.flush()
         product_ids = request.form.getlist('product_id[]')
@@ -590,10 +590,8 @@ def edit_quotation(quotation_id):
         db.session.commit()
         flash('Cotización actualizada')
         return redirect(url_for('list_quotations'))
-    clients = company_query(Client).options(load_only(Client.id, Client.name, Client.identifier)).all()
     products = company_query(Product).options(load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)).all()
     product_map = {p.name: p.id for p in products}
-    # prepare items for template (discount percentage)
     items = []
     for it in quotation.items:
         base = it.unit_price * it.quantity
@@ -608,7 +606,6 @@ def edit_quotation(quotation_id):
     return render_template(
         'cotizacion_edit.html',
         quotation=quotation,
-        clients=clients,
         products=products,
         items=items,
     )
@@ -664,7 +661,7 @@ def quotation_pdf(quotation_id):
 @app.route('/cotizaciones/<int:quotation_id>/convertir')
 def quotation_to_order(quotation_id):
     quotation = company_get(Quotation, quotation_id)
-    if datetime.utcnow() > quotation.date + timedelta(days=30):
+    if dom_now() > quotation.date + timedelta(days=30):
         flash('La cotización ha expirado')
         return redirect(url_for('list_quotations'))
     order = Order(

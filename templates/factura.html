@@ -25,8 +25,8 @@
         <td class="p-2">{{ f.id }}</td>
         <td class="p-2">{{ f.ncf }}</td>
         <td class="p-2">{{ f.client.name }}</td>
-        <td class="p-2">{{ f.date.strftime('%d/%m/%Y %H:%M') }}</td>
-        <td class="p-2">{{ '%.2f'|format(f.total) }}</td>
+        <td class="p-2">{{ f.date.strftime('%d/%m/%Y %I:%M %p') }}</td>
+        <td class="p-2">{{ f.total | money }}</td>
         <td class="p-2"><a class="text-blue-500" href="{{ url_for('invoice_pdf', invoice_id=f.id) }}">PDF</a></td>
       </tr>
     {% endfor %}

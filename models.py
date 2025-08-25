@@ -1,9 +1,15 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # Initialize SQLAlchemy without app; will be initialized in app.py
 
 db = SQLAlchemy()
+
+
+def dom_now():
+    """Return current datetime in Dominican Republic timezone (naive)."""
+    return datetime.now(ZoneInfo("America/Santo_Domingo")).replace(tzinfo=None)
 
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -32,7 +38,7 @@ class Product(db.Model):
 class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    date = db.Column(db.DateTime, default=datetime.utcnow)
+    date = db.Column(db.DateTime, default=dom_now)
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
@@ -63,7 +69,7 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     quotation_id = db.Column(db.Integer, db.ForeignKey('quotation.id'))
-    date = db.Column(db.DateTime, default=datetime.utcnow)
+    date = db.Column(db.DateTime, default=dom_now)
     status = db.Column(db.String(20), default='Pendiente')
     delivery_date = db.Column(db.DateTime)
     subtotal = db.Column(db.Float, nullable=False)
@@ -96,7 +102,7 @@ class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
-    date = db.Column(db.DateTime, default=datetime.utcnow)
+    date = db.Column(db.DateTime, default=dom_now)
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
@@ -161,4 +167,4 @@ class AccountRequest(db.Model):
     website = db.Column(db.String(120))
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=dom_now)
