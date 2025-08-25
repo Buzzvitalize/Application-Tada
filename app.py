@@ -174,52 +174,57 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # Encabezado moderno con barra azul
-    pdf.set_fill_color(37, 99, 235)  # azul estilo 2025
-    pdf.rect(0, 0, 210, 30, 'F')
-    if company.get('logo'):
-        pdf.image(company['logo'], 10, 5, 20)
-        text_x = 35
-    else:
-        text_x = 10
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_xy(text_x, 8)
-    pdf.set_font('Helvetica', 'B', 16)
-    pdf.cell(0, 8, company['name'], ln=1)
-    pdf.set_font('Helvetica', '', 10)
-    pdf.set_x(text_x)
-    pdf.cell(0, 5, company['address'], ln=1)
-    pdf.set_x(text_x)
-    pdf.cell(0, 5, f"RNC: {company['rnc']} Tel: {company['phone']}", ln=1)
-    if company.get('website'):
-        pdf.set_x(text_x)
-        pdf.cell(0, 5, company['website'], ln=1)
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(10)
+    primary = (30, 58, 138)  # azul oscuro moderno
 
-    # Título del documento
+    # Encabezado claro con logo y datos de la empresa
+    if company.get('logo'):
+        pdf.image(company['logo'], 10, 10, 25)
+        info_x = 40
+    else:
+        info_x = 10
+
+    pdf.set_xy(info_x, 10)
+    pdf.set_text_color(*primary)
     pdf.set_font('Helvetica', 'B', 14)
-    title_text = f"{title} #{doc_number:04d}" if doc_number is not None else title
-    pdf.cell(0, 10, title_text, ln=1, align='C')
-    pdf.set_font('Helvetica', '', 12)
-    if ncf:
-        pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='R')
-    if invoice_type:
-        pdf.cell(0, 6, f"Tipo: {invoice_type}", ln=1, align='R')
-    if order_number is not None:
-        pdf.cell(0, 6, f"Orden del pedido n#{order_number:04d}", ln=1, align='R')
+    pdf.cell(100, 6, company['name'], ln=1)
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_x(info_x)
+    pdf.cell(100, 5, company['address'], ln=1)
+    pdf.set_x(info_x)
+    pdf.cell(100, 5, f"RNC: {company['rnc']} Tel: {company['phone']}", ln=1)
+    if company.get('website'):
+        pdf.set_x(info_x)
+        pdf.cell(100, 5, company['website'], ln=1)
+
+    # Datos del documento en la esquina superior derecha
+    header_x = 150
+    pdf.set_xy(header_x, 10)
+    pdf.set_text_color(*primary)
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.cell(50, 8, title.upper(), align='R', ln=1)
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_text_color(0, 0, 0)
+    if doc_number is not None:
+        pdf.set_xy(header_x, 18)
+        pdf.cell(50, 5, f"No.: {doc_number:04d}", align='R', ln=1)
     if date:
-        pdf.cell(0, 6, f"Fecha: {date.strftime('%d/%m/%Y %I:%M %p')}", ln=1, align='R')
-        if valid_until:
-            pdf.cell(0, 6, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", ln=1, align='R')
-    if seller:
-        pdf.cell(0, 6, f"Vendedor: {seller}", ln=1)
-    if payment_method:
-        method = payment_method
-        if payment_method.lower().startswith('transfer') and bank:
-            method += f" - {bank}"
-        pdf.cell(0, 6, f"Método: {method}", ln=1)
-    pdf.ln(5)
+        pdf.set_xy(header_x, 24)
+        pdf.cell(50, 5, date.strftime('%d/%m/%Y %I:%M %p'), align='R', ln=1)
+    if valid_until:
+        pdf.set_xy(header_x, 30)
+        pdf.cell(50, 5, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", align='R', ln=1)
+    if ncf:
+        pdf.set_xy(header_x, 36)
+        pdf.cell(50, 5, f"NCF: {ncf}", align='R', ln=1)
+    if invoice_type:
+        pdf.set_xy(header_x, 42)
+        pdf.cell(50, 5, f"Tipo: {invoice_type}", align='R', ln=1)
+    if order_number is not None:
+        pdf.set_xy(header_x, 48)
+        pdf.cell(50, 5, f"Pedido #{order_number:04d}", align='R', ln=1)
+
+    pdf.set_y(60)
     pdf.set_font('Helvetica', '', 12)
     full_name = f"{client.name} {client.last_name}" if getattr(client, 'last_name', None) else client.name
     pdf.cell(0, 6, f"Cliente: {full_name.strip()}", ln=1)
@@ -235,7 +240,8 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.set_font('Helvetica', 'B', 12)
     table_width = 60 + 20 + 25 + 20 + 25 + 30
     table_x = (pdf.w - table_width) / 2
-    pdf.set_fill_color(243, 244, 246)  # gris claro
+    pdf.set_fill_color(*primary)
+    pdf.set_text_color(255, 255, 255)
     pdf.set_x(table_x)
     pdf.cell(60, 8, 'Producto', border=1, align='C', fill=True)
     pdf.cell(20, 8, 'Unidad', border=1, align='C', fill=True)
@@ -244,6 +250,7 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.cell(25, 8, 'Desc.', border=1, align='R', fill=True)
     pdf.cell(30, 8, 'Total', border=1, ln=1, align='R', fill=True)
     pdf.set_font('Helvetica', '', 12)
+    pdf.set_text_color(0, 0, 0)
     fill = False
     for i in items:
         total_line = (i.unit_price * i.quantity) - i.discount
@@ -277,6 +284,15 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(table_width - 40, 8, 'Total', border='LB', align='R')
     pdf.cell(40, 8, _fmt_money(total), border='RB', ln=1, align='R')
+    if seller or payment_method:
+        pdf.ln(5)
+        if seller:
+            pdf.cell(0, 6, f"Vendedor: {seller}", ln=1)
+        if payment_method:
+            method = payment_method
+            if payment_method.lower().startswith('transfer') and bank:
+                method += f" - {bank}"
+            pdf.cell(0, 6, f"Método de pago: {method}", ln=1)
     if note:
         pdf.ln(5)
         pdf.multi_cell(0, 6, f"Nota: {note}")
