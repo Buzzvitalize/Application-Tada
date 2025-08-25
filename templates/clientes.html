@@ -6,7 +6,7 @@
   <div class="grid md:grid-cols-2 gap-4">
     <input name="name" placeholder="Nombre" class="input" required>
     <input id="last_name" name="last_name" placeholder="Apellido" class="input">
-    <input name="identifier" placeholder="Cédula" class="input rnc-mask" id="identifier">
+    <input name="identifier" placeholder="Cédula" class="input id-mask" id="identifier" data-doc-type="cedula">
     <input name="phone" placeholder="Teléfono" class="input phone-mask">
     <input name="email" placeholder="Email" class="input">
     <input name="street" placeholder="Calle" class="input">
@@ -56,12 +56,15 @@
       lastField.required=true;
       idField.placeholder='Cédula';
       idField.required=false;
+      idField.dataset.docType='cedula';
     }else{
       lastField.classList.add('hidden');
       lastField.required=false;
       idField.placeholder='RNC *';
       idField.required=true;
+      idField.dataset.docType='rnc';
     }
+    applyDocMask(idField);
   }
   typeRadios.forEach(r=>r.addEventListener('change',toggle));
   toggle();

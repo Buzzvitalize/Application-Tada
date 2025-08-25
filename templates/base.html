@@ -71,23 +71,34 @@
     }
     function formatRnc(v){
       const digits=v.replace(/\D/g,'').slice(0,9);
-      return digits.replace(/(\d{3})(\d{3})(\d{0,3})/, function(_,a,b,c){ return c?`${a}-${b}-${c}`:`${a}-${b}`; }).trim().replace(/-$/, '');
+      return digits.replace(/(\d{3})(\d{5})(\d{0,1})/, function(_,a,b,c){ return c?`${a}-${b}-${c}`:`${a}-${b}`; }).trim().replace(/-$/, '');
+    }
+    function formatCedula(v){
+      const digits=v.replace(/\D/g,'').slice(0,11);
+      return digits.replace(/(\d{3})(\d{7})(\d{0,1})/, function(_,a,b,c){ return c?`${a}-${b}-${c}`:`${a}-${b}`; }).trim().replace(/-$/, '');
+    }
+    function applyDocMask(el){
+      const type = el.dataset.docType || 'cedula';
+      el.value = type==='rnc' ? formatRnc(el.value) : formatCedula(el.value);
     }
     document.querySelectorAll('.phone-mask').forEach(el=>{
       el.value = formatPhone(el.value);
       el.addEventListener('input', e=>{ e.target.value = formatPhone(e.target.value); });
     });
-    document.querySelectorAll('.rnc-mask').forEach(el=>{
-      el.value = formatRnc(el.value);
-      el.addEventListener('input', e=>{ e.target.value = formatRnc(e.target.value); });
+    document.querySelectorAll('.id-mask').forEach(el=>{
+      applyDocMask(el);
+      el.addEventListener('input', e=>{ applyDocMask(e.target); });
       el.addEventListener('blur', e=>{
-        const r=e.target.value.replace(/-/g,'');
-        fetch(`/api/rnc/${r}`).then(r=>r.json()).then(data=>{
-          const nameField=document.getElementById('client-name');
-          if(data.name && nameField && !nameField.value){ nameField.value=data.name; }
-        });
+        if(e.target.dataset.docType==='rnc'){
+          const r=e.target.value.replace(/-/g,'');
+          fetch(`/api/rnc/${r}`).then(r=>r.json()).then(data=>{
+            const nameField=document.getElementById('client-name');
+            if(data.name && nameField && !nameField.value){ nameField.value=data.name; }
+          });
+        }
       });
     });
+    window.applyDocMask = applyDocMask;
   </script>
 </body>
 </html>

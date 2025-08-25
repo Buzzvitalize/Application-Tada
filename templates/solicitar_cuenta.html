@@ -29,7 +29,7 @@
       </div>
       <input name="phone" placeholder="Teléfono" class="input phone-mask" required>
       <input id="company-name" name="company" placeholder="Nombre de la empresa o marca" class="input" required>
-      <input id="identifier" name="identifier" placeholder="Cédula" class="input rnc-mask" required>
+      <input id="identifier" name="identifier" placeholder="Cédula" class="input" required>
       <input name="address" placeholder="Dirección de la empresa" class="input">
       <input name="website" placeholder="Página web" class="input">
       <input name="username" placeholder="Nombre de usuario" class="input" required>
@@ -52,14 +52,21 @@
   }
   function formatRnc(v){
     const digits=v.replace(/\D/g,'').slice(0,9);
-    return digits.replace(/(\d{3})(\d{3})(\d{0,3})/, (_,a,b,c)=> c?`${a}-${b}-${c}`:`${a}-${b}`).trim().replace(/-$/, '');
+    return digits.replace(/(\d{3})(\d{5})(\d{0,1})/, (_,a,b,c)=> c?`${a}-${b}-${c}`:`${a}-${b}`).trim().replace(/-$/, '');
+  }
+  function formatCedula(v){
+    const digits=v.replace(/\D/g,'').slice(0,11);
+    return digits.replace(/(\d{3})(\d{7})(\d{0,1})/, (_,a,b,c)=> c?`${a}-${b}-${c}`:`${a}-${b}`).trim().replace(/-$/, '');
   }
   document.querySelectorAll('.phone-mask').forEach(el=>{
     el.value=formatPhone(el.value);
     el.addEventListener('input',e=>{ e.target.value=formatPhone(e.target.value); });
   });
   const idField=document.getElementById('identifier');
-  function applyIdMask(){ idField.value=formatRnc(idField.value); }
+  function applyIdMask(){
+    const type=document.querySelector('input[name="account_type"]:checked').value;
+    idField.value = type==='empresarial' ? formatRnc(idField.value) : formatCedula(idField.value);
+  }
   idField.addEventListener('input',applyIdMask);
   function lookupRnc(){
     const r=idField.value.replace(/-/g,'');

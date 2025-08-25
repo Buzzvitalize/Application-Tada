@@ -5,7 +5,7 @@
 <form method="post" enctype="multipart/form-data" class="card space-y-4 max-w-4xl mx-auto">
   <div class="grid md:grid-cols-2 gap-4">
     <input name="name" value="{{ company.name }}" placeholder="Nombre" class="input" required>
-    <input name="rnc" value="{{ company.rnc }}" placeholder="RNC" class="input rnc-mask" required>
+    <input name="rnc" value="{{ company.rnc }}" placeholder="RNC" class="input id-mask" data-doc-type="rnc" required>
     <input name="phone" value="{{ company.phone }}" placeholder="Teléfono" class="input phone-mask" required>
     <input name="website" value="{{ company.website }}" placeholder="Sitio Web" class="input">
     <input name="street" value="{{ company.street }}" placeholder="Calle" class="input" required>

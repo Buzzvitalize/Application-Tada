@@ -6,7 +6,7 @@
   <div class="grid md:grid-cols-2 gap-4">
     <input id="client-name" name="name" value="{{ client.name }}" placeholder="Nombre" class="input" required>
     <input id="last_name" name="last_name" value="{{ client.last_name }}" placeholder="Apellido" class="input">
-    <input id="identifier" name="identifier" value="{{ client.identifier }}" placeholder="Cédula" class="input rnc-mask">
+    <input id="identifier" name="identifier" value="{{ client.identifier }}" placeholder="Cédula" class="input id-mask" data-doc-type="cedula">
     <input name="phone" value="{{ client.phone }}" placeholder="Teléfono" class="input phone-mask">
     <input name="email" value="{{ client.email }}" placeholder="Email" class="input">
     <input name="street" value="{{ client.street }}" placeholder="Calle" class="input">
@@ -29,12 +29,15 @@
       lastField.required=true;
       idField.placeholder='Cédula';
       idField.required=false;
+      idField.dataset.docType='cedula';
     }else{
       lastField.classList.add('hidden');
       lastField.required=false;
       idField.placeholder='RNC *';
       idField.required=true;
+      idField.dataset.docType='rnc';
     }
+    applyDocMask(idField);
   }
   typeRadios.forEach(r=>r.addEventListener('change',toggle));
   toggle();

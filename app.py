@@ -11,6 +11,18 @@ import os
 import re
 from ai import recommend_products
 from functools import wraps
+# Load RNC data for company name lookup
+RNC_DATA = {}
+DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'DGII_RNC.TXT')
+if os.path.exists(DATA_PATH):
+    with open(DATA_PATH, encoding='utf-8') as f:
+        for row in f:
+            parts = row.strip().split('|')
+            if len(parts) >= 2:
+                rnc = re.sub(r'\D', '', parts[0])
+                name = parts[1].strip()
+                if rnc:
+                    RNC_DATA[rnc] = name
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.sqlite'
@@ -102,7 +114,7 @@ def fmt_phone(value):
 def fmt_id(value):
     digits = re.sub(r'\D', '', value or '')
     if len(digits) == 9:
-        return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+        return f"{digits[:3]}-{digits[3:8]}-{digits[8:]}"
     if len(digits) == 11:
         return f"{digits[:3]}-{digits[3:10]}-{digits[10:]}"
     return value or ''
@@ -119,8 +131,11 @@ def calculate_totals(items):
 @app.route('/api/rnc/<rnc>')
 def rnc_lookup(rnc):
     clean = rnc.replace('-', '')
-    client = Client.query.filter(func.replace(Client.identifier, '-', '') == clean).first()
-    return jsonify({'name': client.name if client else ''})
+    name = RNC_DATA.get(clean)
+    if not name:
+        client = Client.query.filter(func.replace(Client.identifier, '-', '') == clean).first()
+        name = client.name if client else ''
+    return jsonify({'name': name})
 
 
 @app.context_processor

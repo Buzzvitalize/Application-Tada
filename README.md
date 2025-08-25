@@ -8,6 +8,7 @@ Key features:
 - QR codes on documents linking back to their online copies
 - Responsive TailwindCSS layout with sidebar navigation
 - Multi-tenant architecture isolating data per company
+- Local RNC catalogue (`data/DGII_RNC.TXT`) auto-completes company names when entering tax IDs
 
 ## Configuration
 
@@ -35,3 +36,5 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python app.py
 ```
+
+For company name auto-completion, download the latest `DGII_RNC.TXT` from the DGII and place it under `data/`.
