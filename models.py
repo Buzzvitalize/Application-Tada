@@ -20,6 +20,8 @@ class Client(db.Model):
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    reference = db.Column(db.String(50))
     name = db.Column(db.String(120), nullable=False)
     unit = db.Column(db.String(20), nullable=False)
     price = db.Column(db.Float, nullable=False)
@@ -34,6 +36,9 @@ class Quotation(db.Model):
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
+    seller = db.Column(db.String(120))
+    payment_method = db.Column(db.String(20))
+    bank = db.Column(db.String(50))
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
@@ -61,6 +66,9 @@ class Order(db.Model):
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
+    seller = db.Column(db.String(120))
+    payment_method = db.Column(db.String(20))
+    bank = db.Column(db.String(50))
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
@@ -87,6 +95,9 @@ class Invoice(db.Model):
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
     ncf = db.Column(db.String(20), unique=True)
+    seller = db.Column(db.String(120))
+    payment_method = db.Column(db.String(20))
+    bank = db.Column(db.String(50))
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')

@@ -11,9 +11,10 @@
       {% endfor %}
     </select>
     <div id="new-client" class="grid md:grid-cols-2 gap-4">
-      <input name="client_name" placeholder="Nombre" class="input">
-      <input name="client_identifier" placeholder="Cédula/RNC" class="input">
-      <input name="client_phone" placeholder="Teléfono" class="input">
+      <input name="client_name" placeholder="Nombre" class="input" id="client-name">
+      <input id="client-last" name="client_last_name" placeholder="Apellido" class="input">
+      <input name="client_identifier" placeholder="Cédula" class="input rnc-mask" id="client-identifier">
+      <input name="client_phone" placeholder="Teléfono" class="input phone-mask">
       <input name="client_email" placeholder="Email" class="input">
       <input name="client_street" placeholder="Calle" class="input">
       <input name="client_sector" placeholder="Sector" class="input">
@@ -24,6 +25,20 @@
       </div>
     </div>
   </div>
+  <div class="grid md:grid-cols-3 gap-4">
+    <input name="seller" placeholder="Vendedor" class="input" required>
+    <select name="payment_method" id="payment-method" class="input">
+      <option value="Efectivo">Efectivo</option>
+      <option value="Transferencia">Transferencia bancaria</option>
+    </select>
+    <select name="bank" id="bank-select" class="input hidden">
+      <option value="">Seleccione banco</option>
+      <option>Banco Popular</option>
+      <option>Banco BHD</option>
+      <option>Banco Banreservas</option>
+      <option>Banesco</option>
+    </select>
+  </div>
   <div>
     <h2 class="text-xl font-semibold mb-2">Productos</h2>
     <div id="productos">
@@ -31,7 +46,7 @@
         <select name="product_id[]" class="input product-select">
           <option value="">Seleccione...</option>
           {% for p in products %}
-          <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}">{{ p.name }}</option>
+          <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}">{{ p.code }} - {{ p.name }}</option>
           {% endfor %}
         </select>
         <input class="input unit-field" readonly>
@@ -52,6 +67,31 @@
     newClient.style.display = clientSelect.value ? 'none' : 'grid';
     const required = clientSelect.value ? false : true;
     newClient.querySelectorAll('input').forEach(i => i.required = required);
+  });
+
+  const typeRadios=document.querySelectorAll('input[name="client_type"]');
+  const idField=document.getElementById('client-identifier');
+  const lastField=document.getElementById('client-last');
+  function toggleType(){
+    if(document.querySelector('input[name="client_type"]:checked').value==='final'){
+      lastField.classList.remove('hidden');
+      lastField.required=true;
+      idField.placeholder='Cédula';
+      idField.required=false;
+    }else{
+      lastField.classList.add('hidden');
+      lastField.required=false;
+      idField.placeholder='RNC *';
+      idField.required=true;
+    }
+  }
+  typeRadios.forEach(r=>r.addEventListener('change',toggleType));
+  toggleType();
+
+  const paySelect=document.getElementById('payment-method');
+  const bankSelect=document.getElementById('bank-select');
+  paySelect.addEventListener('change',()=>{
+    bankSelect.classList.toggle('hidden', paySelect.value!=='Transferencia');
   });
 
   function bindProduct(row) {

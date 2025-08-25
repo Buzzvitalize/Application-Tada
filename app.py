@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 from uuid import uuid4
 import qrcode
 import os
+import re
 from ai import recommend_products
 from functools import wraps
 
@@ -49,7 +50,7 @@ with app.app_context():
             is_final_consumer=False,
             company_id=company.id,
         )
-        sample_product = Product(name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios', company_id=company.id)
+        sample_product = Product(code='P001', reference='REF001', name='Producto Ejemplo', unit='Unidad', price=100.0, category='Servicios', company_id=company.id)
         db.session.add_all([sample_client, sample_product])
         db.session.commit()
     if not User.query.filter_by(username='admin').first():
@@ -87,6 +88,24 @@ def _to_int(value):
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+@app.template_filter('phone')
+def fmt_phone(value):
+    digits = re.sub(r'\D', '', value or '')
+    if len(digits) == 10:
+        return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+    return value or ''
+
+
+@app.template_filter('id_doc')
+def fmt_id(value):
+    digits = re.sub(r'\D', '', value or '')
+    if len(digits) == 9:
+        return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+    if len(digits) == 11:
+        return f"{digits[:3]}-{digits[3:10]}-{digits[10:]}"
+    return value or ''
 
 
 def calculate_totals(items):
@@ -132,7 +151,9 @@ def _fmt_money(value):
 
 
 def generate_pdf(title, company, client, items, subtotal, itbis, total,
-                 ncf=None, output_path=None, qr_url=None, date=None, valid_until=None):
+                 ncf=None, seller=None, payment_method=None, bank=None,
+                 order_number=None, output_path=None, qr_url=None,
+                 date=None, valid_until=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Helvetica', 'B', 16)
@@ -156,10 +177,19 @@ def generate_pdf(title, company, client, items, subtotal, itbis, total,
     pdf.set_font('Helvetica', '', 12)
     if ncf:
         pdf.cell(0, 6, f"NCF: {ncf}", ln=1, align='R')
+    if order_number is not None:
+        pdf.cell(0, 6, f"Orden del pedido n#{order_number:04d}", ln=1, align='R')
     if date:
         pdf.cell(0, 6, f"Fecha: {date.strftime('%d/%m/%Y %I:%M %p')}", ln=1, align='R')
         if valid_until:
             pdf.cell(0, 6, f"Válida hasta: {valid_until.strftime('%d/%m/%Y')}", ln=1, align='R')
+    if seller:
+        pdf.cell(0, 6, f"Vendedor: {seller}", ln=1)
+    if payment_method:
+        method = payment_method
+        if payment_method.lower().startswith('transfer') and bank:
+            method += f" - {bank}"
+        pdf.cell(0, 6, f"Método: {method}", ln=1)
     pdf.ln(5)
     pdf.set_font('Helvetica', '', 12)
     full_name = f"{client.name} {client.last_name}" if getattr(client, 'last_name', None) else client.name
@@ -415,6 +445,8 @@ def products():
     categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
     if request.method == 'POST':
         product = Product(
+            code=request.form['code'],
+            reference=request.form.get('reference'),
             name=request.form['name'],
             unit=request.form['unit'],
             price=_to_float(request.form['price']),
@@ -447,6 +479,8 @@ def edit_product(product_id):
     units = ['Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro']
     categories = ['Servicios', 'Consumo', 'Liquido', 'Otros']
     if request.method == 'POST':
+        product.code = request.form['code']
+        product.reference = request.form.get('reference')
         product.name = request.form['name']
         product.unit = request.form['unit']
         product.price = _to_float(request.form['price'])
@@ -482,6 +516,7 @@ def new_quotation():
                 return redirect(url_for('new_quotation'))
             client = Client(
                 name=request.form['client_name'],
+                last_name=request.form.get('client_last_name') if is_final else None,
                 identifier=identifier,
                 phone=request.form['client_phone'],
                 email=request.form.get('client_email'),
@@ -515,7 +550,11 @@ def new_quotation():
                 'company_id': current_company_id(),
             })
         subtotal, itbis, total = calculate_totals(items)
-        quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total, company_id=current_company_id())
+        payment_method = request.form.get('payment_method')
+        bank = request.form.get('bank') if payment_method == 'Transferencia' else None
+        quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total,
+                               seller=request.form.get('seller'), payment_method=payment_method,
+                               bank=bank, company_id=current_company_id())
         db.session.add(quotation)
         db.session.flush()
         for it in items:
@@ -543,6 +582,7 @@ def edit_quotation(quotation_id):
                 flash('El identificador es obligatorio para comprobante fiscal')
                 return redirect(url_for('edit_quotation', quotation_id=quotation.id))
             client.name = request.form['client_name']
+            client.last_name = request.form.get('client_last_name') if is_final else None
             client.identifier = identifier
             client.phone = request.form['client_phone']
             client.email = request.form.get('client_email')
@@ -574,10 +614,15 @@ def edit_quotation(quotation_id):
                 'company_id': current_company_id(),
             })
         subtotal, itbis, total = calculate_totals(items)
+        payment_method = request.form.get('payment_method')
+        bank = request.form.get('bank') if payment_method == 'Transferencia' else None
         quotation.client_id = client.id
         quotation.subtotal = subtotal
         quotation.itbis = itbis
         quotation.total = total
+        quotation.seller = request.form.get('seller')
+        quotation.payment_method = payment_method
+        quotation.bank = bank
         for it in items:
             quotation.items.append(QuotationItem(**it))
         db.session.commit()
@@ -639,7 +684,8 @@ def quotation_pdf(quotation_id):
     valid_until = quotation.date + timedelta(days=30)
     generate_pdf('Cotización', company, quotation.client, quotation.items,
                  quotation.subtotal, quotation.itbis, quotation.total,
-                 output_path=pdf_path, qr_url=qr_url,
+                 seller=quotation.seller, payment_method=quotation.payment_method,
+                 bank=quotation.bank, output_path=pdf_path, qr_url=qr_url,
                  date=quotation.date, valid_until=valid_until)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
@@ -655,6 +701,9 @@ def quotation_to_order(quotation_id):
         subtotal=quotation.subtotal,
         itbis=quotation.itbis,
         total=quotation.total,
+        seller=quotation.seller,
+        payment_method=quotation.payment_method,
+        bank=quotation.bank,
         company_id=current_company_id(),
     )
     db.session.add(order)
@@ -697,7 +746,9 @@ def order_to_invoice(order_id):
         ncf = f"B01{company.ncf_fiscal:08d}"
         company.ncf_fiscal += 1
     invoice = Invoice(client_id=order.client_id, order_id=order.id, subtotal=order.subtotal,
-                      itbis=order.itbis, total=order.total, ncf=ncf, company_id=current_company_id())
+                      itbis=order.itbis, total=order.total, ncf=ncf,
+                      seller=order.seller, payment_method=order.payment_method,
+                      bank=order.bank, company_id=current_company_id())
     db.session.add(invoice)
     db.session.flush()
     for item in order.items:
@@ -728,7 +779,8 @@ def order_pdf(order_id):
     qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
     generate_pdf('Pedido', company, order.client, order.items,
                  order.subtotal, order.itbis, order.total,
-                 output_path=pdf_path, qr_url=qr_url,
+                 seller=order.seller, payment_method=order.payment_method,
+                 bank=order.bank, output_path=pdf_path, qr_url=qr_url,
                  date=order.date)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
@@ -752,8 +804,10 @@ def invoice_pdf(invoice_id):
     qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
     generate_pdf('Factura', company, invoice.client, invoice.items,
                  invoice.subtotal, invoice.itbis, invoice.total,
-                 ncf=invoice.ncf, output_path=pdf_path, qr_url=qr_url,
-                 date=invoice.date)
+                 ncf=invoice.ncf, seller=invoice.seller,
+                 payment_method=invoice.payment_method, bank=invoice.bank,
+                 order_number=invoice.order_id, output_path=pdf_path,
+                 qr_url=qr_url, date=invoice.date)
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 @app.route('/pdfs/<path:filename>')
