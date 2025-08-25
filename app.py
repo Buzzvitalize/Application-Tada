@@ -809,6 +809,56 @@ def contabilidad():
     return render_template('contabilidad.html')
 
 
+@app.route('/contabilidad/catalogo')
+def contab_catalogo():
+    return render_template('contabilidad_catalogo.html')
+
+
+@app.route('/contabilidad/entradas')
+def contab_entradas():
+    return render_template('contabilidad_entradas.html')
+
+
+@app.route('/contabilidad/estados')
+def contab_estados():
+    return render_template('contabilidad_estados.html')
+
+
+@app.route('/contabilidad/libro-mayor')
+def contab_libro_mayor():
+    return render_template('contabilidad_libro_mayor.html')
+
+
+@app.route('/contabilidad/impuestos')
+def contab_impuestos():
+    return render_template('contabilidad_impuestos.html')
+
+
+@app.route('/contabilidad/balanza')
+def contab_balanza():
+    return render_template('contabilidad_balanza.html')
+
+
+@app.route('/contabilidad/asignacion')
+def contab_asignacion():
+    return render_template('contabilidad_asignacion.html')
+
+
+@app.route('/contabilidad/centro-costo')
+def contab_centro_costo():
+    return render_template('contabilidad_centro_costo.html')
+
+
+@app.route('/contabilidad/reportes')
+def contab_reportes():
+    return render_template('contabilidad_reportes.html')
+
+
+@app.route('/contabilidad/dgii')
+def contab_dgii():
+    return render_template('contabilidad_dgii.html')
+
+
 @app.route('/api/recommendations')
 def api_recommendations():
     """Return top product recommendations based on past orders."""

@@ -2,5 +2,16 @@
 {% block title %}Contabilidad{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Contabilidad</h1>
-<p>Próximamente se agregarán herramientas de contabilidad.</p>
+<ul class="grid md:grid-cols-2 gap-4">
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_catalogo') }}">Catálogo de cuentas</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_entradas') }}">Entradas de diario</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_estados') }}">Estados financieros</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_libro_mayor') }}">Libro mayor</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_impuestos') }}">Definición de impuestos</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_balanza') }}">Balanza de comprobación</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_asignacion') }}">Asignación de cuentas de mayor</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_centro_costo') }}">Contabilización por Centro de Costo y Proyecto</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_reportes') }}">Reportes contables y de impuestos</a></li>
+  <li><a class="block bg-white shadow rounded p-4 hover:bg-gray-50" href="{{ url_for('contab_dgii') }}">Generación de Formulario DGII-606 y 607</a></li>
+</ul>
 {% endblock %}
