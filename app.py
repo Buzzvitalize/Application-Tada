@@ -43,7 +43,7 @@ from models import (
 )
 from io import BytesIO
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import func, inspect
 from sqlalchemy.orm import load_only
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
@@ -91,9 +91,34 @@ if 'csrf_token' not in app.jinja_env.globals:
     app.jinja_env.globals['csrf_token'] = lambda: ''
 app.register_blueprint(auth_bp)
 
+def _migrate_legacy_schema():
+    """Add missing columns to older SQLite databases.
+
+    Early versions of the project lacked fields such as ``Product.category``.
+    Users with an old ``database.sqlite`` would see errors like
+    "no such column: product.category" when creating cotizaciones.  This helper
+    checks for expected columns and adds them on the fly so the application can
+    continue running without manual intervention.
+    """
+    inspector = inspect(db.engine)
+    existing = {c['name'] for c in inspector.get_columns('product')}
+    statements = []
+    if 'category' not in existing:
+        statements.append("ALTER TABLE product ADD COLUMN category VARCHAR(50)")
+    if 'unit' not in existing:
+        statements.append("ALTER TABLE product ADD COLUMN unit VARCHAR(20) DEFAULT 'Unidad'")
+    if 'has_itbis' not in existing:
+        statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
+    for stmt in statements:
+        db.session.execute(db.text(stmt))
+    if statements:
+        db.session.commit()
+
+
 def ensure_admin():  # pragma: no cover - optional helper for deployments
     with app.app_context():
         db.create_all()
+        _migrate_legacy_schema()
         if not User.query.filter_by(username='admin').first():
             admin = User(username='admin', role='admin')
             admin.set_password(os.environ.get('ADMIN_PASSWORD', '363636'))
