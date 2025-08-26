@@ -50,7 +50,7 @@ from werkzeug.security import generate_password_hash
 import os
 import re
 from ai import recommend_products
-from pdf_utils import generate_pdf
+from weasy_pdf import generate_pdf
 from functools import wraps
 from auth import auth_bp
 from config import DevelopmentConfig
@@ -522,6 +522,9 @@ def new_quotation():
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
         items = build_items(product_ids, quantities, discounts)
+        if not items:
+            flash('Debe agregar al menos un producto')
+            return redirect(url_for('new_quotation'))
         subtotal, itbis, total = calculate_totals(items)
         payment_method = request.form.get('payment_method')
         bank = request.form.get('bank') if payment_method == 'Transferencia' else None

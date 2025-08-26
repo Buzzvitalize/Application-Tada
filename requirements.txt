@@ -4,5 +4,4 @@ Flask-Migrate
 Flask-WTF
 python-dotenv
 qrcode
-fpdf2
 WeasyPrint
