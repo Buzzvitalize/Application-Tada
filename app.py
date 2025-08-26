@@ -911,4 +911,6 @@ def api_recommendations():
     return jsonify({'products': recommend_products()})
 
 if __name__ == '__main__':
+    with app.app_context():
+        ensure_admin()
     app.run(debug=True)
