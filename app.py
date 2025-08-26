@@ -11,10 +11,7 @@ from flask import (
     jsonify,
     g,
 )
-try:
-    from flask_migrate import Migrate
-except ModuleNotFoundError:  # pragma: no cover
-    Migrate = lambda app, db: None
+from flask_migrate import Migrate
 try:
     from flask_wtf import CSRFProtect
 except ModuleNotFoundError:  # pragma: no cover
@@ -28,6 +25,7 @@ except ModuleNotFoundError:  # pragma: no cover
             return view
 from models import (
     db,
+    migrate,
     Client,
     Product,
     Quotation,
@@ -85,11 +83,15 @@ def _fmt_money(value):
 app.jinja_env.filters['money'] = _fmt_money
 
 db.init_app(app)
-migrate = Migrate(app, db)
+migrate.init_app(app, db)
 csrf = CSRFProtect(app)
 if 'csrf_token' not in app.jinja_env.globals:
     app.jinja_env.globals['csrf_token'] = lambda: ''
 app.register_blueprint(auth_bp)
+
+# Ensure tables exist when running without explicit migrations
+with app.app_context():
+    db.create_all()
 
 def _migrate_legacy_schema():
     """Add missing columns to older SQLite databases.
