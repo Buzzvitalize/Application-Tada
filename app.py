@@ -549,6 +549,7 @@ def list_quotations():
     return render_template('cotizaciones.html', quotations=quotations, q=q,
                            timedelta=timedelta, now=dom_now())
 
+@csrf.exempt
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 def new_quotation():
     if request.method == 'POST':
@@ -578,7 +579,7 @@ def new_quotation():
             db.session.add(q_item)
         db.session.commit()
         flash('Cotización guardada')
-        return redirect(url_for('list_quotations'))
+        return redirect(url_for('quotation_pdf', quotation_id=quotation.id))
     clients = company_query(Client).options(
         load_only(Client.id, Client.name, Client.identifier)
     ).all()
