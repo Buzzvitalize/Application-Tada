@@ -36,8 +36,9 @@ body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
 .totals td {{ padding:4px 6px; }}
 .totals tr:last-child td {{ font-size:16px; font-weight:bold; color:{BLUE}; border-top:2px solid {BLUE}; }}
 .notes {{ margin-top:30px; font-size:12px; }}
-.qr {{ position:absolute; bottom:30px; right:30px; width:80px; }}
-.footer {{ position:absolute; bottom:30px; left:30px; font-size:10px; }}
+.seller-pay {{ display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; }}
+.qr {{ position:absolute; bottom:30px; left:30px; width:120px; }}
+.footer {{ position:absolute; bottom:30px; right:30px; font-size:12px; }}
 """
 
 def _fmt_money(value: float) -> str:
@@ -106,7 +107,8 @@ def build_html(title: str, company: dict, client: dict, items: list,
     seller_html = f"<div>Vendedor: {meta['seller']}</div>" if meta.get('seller') else ""
     pay_html = ""
     if meta.get('payment_method'):
-        pay_html = f"<div>Pago: {meta['payment_method']}{' - '+meta['bank'] if meta.get('bank') else ''}</div>"
+        pay_html = f"<div>Método de pago: {meta['payment_method']}{' - '+meta['bank'] if meta.get('bank') else ''}</div>"
+    seller_block = f"<div class='seller-pay'>{seller_html}{pay_html}</div>" if (seller_html or pay_html) else ""
     qr_html = f"<img src='{meta['qr_path']}' class='qr'>" if meta.get('qr_path') else ""
     footer_html = f"<div class='footer'>{meta['footer']}</div>" if meta.get('footer') else ""
     email_line = f"Correo: {client.get('email','')}<br>" if client.get('email') else ""
@@ -134,6 +136,7 @@ def build_html(title: str, company: dict, client: dict, items: list,
   Teléfono: {client.get('phone','')}<br>
   {email_line}
 </div>
+{seller_block}
 <table class='items'>
   <thead>
     <tr><th>Código</th><th>Ref</th><th>Producto</th><th>Unidad</th><th>Precio</th><th>Cant.</th><th>Desc.</th><th>Total</th></tr>
@@ -144,9 +147,9 @@ def build_html(title: str, company: dict, client: dict, items: list,
   <tr><td>Subtotal</td><td style='text-align:right'>{_fmt_money(subtotal)}</td></tr>
   <tr><td>Descuento</td><td style='text-align:right'>{_fmt_money(discount)}</td></tr>
   <tr><td>ITBIS (18%)</td><td style='text-align:right'>{_fmt_money(itbis)}</td></tr>
-  <tr><td>Total</td><td style='text-align:right'>{_fmt_money(total)}</td></tr>
+<tr><td>Total</td><td style='text-align:right'>{_fmt_money(total)}</td></tr>
 </table>
-{seller_html}{pay_html}{note_html}{qr_html}{footer_html}
+{note_html}{qr_html}{footer_html}
 </body>
 </html>
 """
