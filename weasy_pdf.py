@@ -54,6 +54,23 @@ def _item_to_dict(item) -> dict:
     }
 
 
+def _client_to_dict(client) -> dict:
+    """Return a dict with the fields used in PDFs."""
+    if isinstance(client, dict):
+        return client
+    address = ", ".join(
+        filter(None, [getattr(client, 'street', None), getattr(client, 'sector', None), getattr(client, 'province', None)])
+    )
+    name = getattr(client, 'name', '')
+    last = getattr(client, 'last_name', '')
+    full_name = f"{name} {last}".strip()
+    return {
+        'name': full_name,
+        'address': address,
+        'phone': getattr(client, 'phone', '') or '',
+    }
+
+
 def build_html(title: str, company: dict, client: dict, items: list, subtotal: float,
                itbis: float, total: float, meta: dict) -> str:
     rows = "".join(
@@ -140,7 +157,8 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
         qrcode.make(qr_url).save(qr_path)
         meta['qr_path'] = qr_path
     item_dicts = [_item_to_dict(i) for i in items]
-    html = build_html(title, company, client, item_dicts, subtotal, itbis, total, meta)
+    client_dict = _client_to_dict(client)
+    html = build_html(title, company, client_dict, item_dicts, subtotal, itbis, total, meta)
     output_path = Path(output_path or 'document.pdf')
     HTML(string=html, base_url='.').write_pdf(output_path)
     return str(output_path)
