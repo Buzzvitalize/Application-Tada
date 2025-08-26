@@ -12,6 +12,7 @@ Key features:
 - PDFs generated with FPDF using a simple modern template for quotations, orders and invoices
 - Optional document notes stored with quotations and carried over to orders and invoices, appearing on generated PDFs
 - PDF exports display document numbers and invoice type (Consumidor Final o Crédito Fiscal)
+- Quotation form reuses existing clients and products via auto-complete fields
 
 ## Configuration
 
@@ -37,6 +38,9 @@ An experimental endpoint `/api/recommendations` returns the top-selling products
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+flask db init  # first run only
+flask db migrate -m "initial"
+flask db upgrade
 pytest
 python app.py
 ```

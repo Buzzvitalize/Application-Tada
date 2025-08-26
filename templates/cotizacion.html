@@ -4,12 +4,13 @@
 <h1 class="text-2xl font-semibold mb-4">Nueva Cotización</h1>
 <form method="post" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
   <div class="space-y-2">
-    <select name="client_id" id="client-select" class="input">
-      <option value="">-- Nuevo Cliente --</option>
+    <input id="client-search" class="input" list="client-options" placeholder="Seleccione cliente">
+    <datalist id="client-options">
       {% for c in clients %}
-      <option value="{{ c.id }}">{{ c.name }} - {{ c.identifier }}</option>
+      <option data-id="{{ c.id }}" value="{{ c.name }} - {{ c.identifier }}"></option>
       {% endfor %}
-    </select>
+    </datalist>
+    <input type="hidden" name="client_id" id="client-id">
     <div id="new-client" class="grid md:grid-cols-2 gap-4">
       <input name="client_name" placeholder="Nombre" class="input" id="client-name">
       <input id="client-last" name="client_last_name" placeholder="Apellido" class="input">
@@ -41,14 +42,15 @@
   </div>
   <div>
     <h2 class="text-xl font-semibold mb-2">Productos</h2>
+    <datalist id="product-options">
+      {% for p in products %}
+      <option data-id="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}" value="{{ p.code }} - {{ p.name }}"></option>
+      {% endfor %}
+    </datalist>
     <div id="productos">
       <div class="grid grid-cols-1 sm:grid-cols-7 gap-2 mb-2 product-row">
-        <select name="product_id[]" class="input product-select">
-          <option value="">Seleccione...</option>
-          {% for p in products %}
-          <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}">{{ p.code }} - {{ p.name }}</option>
-          {% endfor %}
-        </select>
+        <input class="input product-input" list="product-options" placeholder="Producto">
+        <input type="hidden" name="product_id[]" class="product-id">
         <input class="input unit-field" placeholder="Unidad" readonly>
         <input class="input price-field" placeholder="Precio" readonly>
         <input name="product_quantity[]" placeholder="Cantidad" class="input qty-field" required>
@@ -67,13 +69,18 @@
 {% block scripts %}
 <script>
 window.addEventListener('load', () => {
-  const clientSelect = document.getElementById('client-select');
+  const clientInput = document.getElementById('client-search');
+  const clientIdField = document.getElementById('client-id');
   const newClient = document.getElementById('new-client');
-  clientSelect.addEventListener('change', () => {
-    newClient.style.display = clientSelect.value ? 'none' : 'grid';
-    const required = clientSelect.value ? false : true;
-    newClient.querySelectorAll('input').forEach(i => i.required = required);
-  });
+  function toggleClient(){
+    const opt = document.querySelector(`#client-options option[value="${clientInput.value}"]`);
+    clientIdField.value = opt ? opt.dataset.id : '';
+    const isNew = !opt;
+    newClient.style.display = isNew ? 'grid' : 'none';
+    newClient.querySelectorAll('input').forEach(i => i.required = isNew);
+  }
+  clientInput.addEventListener('input', toggleClient);
+  toggleClient();
 
   const typeRadios=document.querySelectorAll('input[name="client_type"]');
   const idField=document.getElementById('client-identifier');
@@ -104,7 +111,8 @@ window.addEventListener('load', () => {
   });
 
   function bindProduct(row) {
-    const select = row.querySelector('.product-select');
+    const input = row.querySelector('.product-input');
+    const idField = row.querySelector('.product-id');
     const unit = row.querySelector('.unit-field');
     const price = row.querySelector('.price-field');
     const qty = row.querySelector('.qty-field');
@@ -117,10 +125,17 @@ window.addEventListener('load', () => {
       const d=parseFloat(disc.value)||0;
       total.value=(p*q*(1-d/100)).toFixed(2);
     }
-    select.addEventListener('change', function() {
-      const opt = this.selectedOptions[0];
-      unit.value = opt.dataset.unit || '';
-      price.value = opt.dataset.price ? parseFloat(opt.dataset.price).toFixed(2) : '';
+    input.addEventListener('input', function() {
+      const opt = document.querySelector(`#product-options option[value="${input.value}"]`);
+      if(opt){
+        idField.value = opt.dataset.id;
+        unit.value = opt.dataset.unit || '';
+        price.value = opt.dataset.price ? parseFloat(opt.dataset.price).toFixed(2) : '';
+      }else{
+        idField.value='';
+        unit.value='';
+        price.value='';
+      }
       calc();
     });
     qty.addEventListener('input', calc);
@@ -135,7 +150,6 @@ window.addEventListener('load', () => {
     const container = document.getElementById('productos');
     const row = templateRow.cloneNode(true);
     row.querySelectorAll('input').forEach(i => i.value = '');
-    row.querySelector('.product-select').selectedIndex = 0;
     container.appendChild(row);
     bindProduct(row);
   });
