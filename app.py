@@ -709,7 +709,10 @@ def quotation_pdf(quotation_id):
                  seller=quotation.seller, payment_method=quotation.payment_method,
                  bank=quotation.bank, doc_number=quotation.id, note=quotation.note,
                  output_path=pdf_path, qr_url=qr_url,
-                 date=quotation.date, valid_until=valid_until)
+                 date=quotation.date, valid_until=valid_until,
+                 footer=("Condiciones: Esta cotización es válida por 30 días a partir de la fecha de emisión. "
+                         "Los precios están sujetos a cambios sin previo aviso. "
+                         "El ITBIS ha sido calculado conforme a la ley vigente."))
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 @app.route('/cotizaciones/<int:quotation_id>/convertir')
@@ -813,7 +816,10 @@ def order_pdf(order_id):
                  seller=order.seller, payment_method=order.payment_method,
                  bank=order.bank, doc_number=order.id, note=order.note,
                  output_path=pdf_path, qr_url=qr_url,
-                 date=order.date)
+                 date=order.date,
+                 footer=("Este pedido será procesado tras la confirmación de pago. "
+                         "Tiempo estimado de entrega: 3 a 5 días hábiles. "
+                         f"Para cualquier consulta contacte a {company.get('email','correo@empresa.com')} de la empresa del sistema"))
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 # Invoices
@@ -841,7 +847,10 @@ def invoice_pdf(invoice_id):
                  payment_method=invoice.payment_method, bank=invoice.bank,
                  order_number=invoice.order_id, doc_number=invoice.id,
                  invoice_type=invoice.invoice_type, note=invoice.note,
-                 output_path=pdf_path, qr_url=qr_url, date=invoice.date)
+                 output_path=pdf_path, qr_url=qr_url, date=invoice.date,
+                 footer=("Factura generada electrónicamente, válida sin firma ni sello. "
+                         "Para reclamaciones favor comunicarse dentro de las 48 horas siguientes a la emisión. "
+                         "Gracias por su preferencia."))
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 @app.route('/pdfs/<path:filename>')

@@ -27,7 +27,7 @@ body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
 .company-details {{ font-size:14px; line-height:1.2; }}
 .doc-title {{ text-align:right; color:{BLUE}; font-size:20px; margin-bottom:10px; }}
 .meta {{ text-align:right; font-size:12px; margin-bottom:20px; }}
-.client-details {{ margin-bottom:20px; font-size:14px; }}
+.client-details {{ margin-bottom:40px; font-size:14px; }}
 .items {{ width:100%; border-collapse:collapse; margin-bottom:20px; font-size:14px; }}
 .items th {{ background:{BLUE}; color:white; padding:6px; text-align:left; }}
 .items td {{ padding:6px; border-bottom:1px solid #e5e7eb; }}
@@ -37,6 +37,7 @@ body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
 .totals tr:last-child td {{ font-size:16px; font-weight:bold; color:{BLUE}; border-top:2px solid {BLUE}; }}
 .notes {{ margin-top:30px; font-size:12px; }}
 .qr {{ position:absolute; bottom:30px; right:30px; width:80px; }}
+.footer {{ position:absolute; bottom:30px; left:30px; font-size:10px; }}
 """
 
 def _fmt_money(value: float) -> str:
@@ -70,6 +71,8 @@ def _client_to_dict(client) -> dict:
         'name': full_name,
         'address': address,
         'phone': getattr(client, 'phone', '') or '',
+        'identifier': getattr(client, 'identifier', '') or '',
+        'email': getattr(client, 'email', '') or '',
     }
 
 def build_html(title: str, company: dict, client: dict, items: list,
@@ -83,10 +86,16 @@ def build_html(title: str, company: dict, client: dict, items: list,
         f"<td>{_fmt_money(i['unit_price']*i['quantity']-i.get('discount',0))}</td></tr>"
         for i in items
     )
+    if len(items) < 10:
+        empty_row = "<tr>" + "<td>&nbsp;</td>" * 8 + "</tr>"
+        rows += empty_row * (10 - len(items))
     date = meta.get('date', datetime.now())
     meta_block = []
     if meta.get('doc_number'):
-        meta_block.append(f"N° {meta['doc_number']}")
+        label = meta.get('doc_label', title)
+        meta_block.append(f"{label} N° {meta['doc_number']}")
+    if meta.get('order_number'):
+        meta_block.append(f"Orden de pedido: N° {meta['order_number']}")
     meta_block.append(date.strftime('%d/%m/%Y %I:%M %p'))
     if meta.get('ncf'):
         meta_block.append(f"NCF: {meta['ncf']}")
@@ -99,6 +108,8 @@ def build_html(title: str, company: dict, client: dict, items: list,
     if meta.get('payment_method'):
         pay_html = f"<div>Pago: {meta['payment_method']}{' - '+meta['bank'] if meta.get('bank') else ''}</div>"
     qr_html = f"<img src='{meta['qr_path']}' class='qr'>" if meta.get('qr_path') else ""
+    footer_html = f"<div class='footer'>{meta['footer']}</div>" if meta.get('footer') else ""
+    email_line = f"Correo: {client.get('email','')}<br>" if client.get('email') else ""
     return f"""<!DOCTYPE html>
 <html lang='es'>
 <head>
@@ -118,8 +129,10 @@ def build_html(title: str, company: dict, client: dict, items: list,
 <div class='client-details'>
   <strong>Detalles</strong><br>
   Nombre: {client['name']}<br>
+  Cédula/RNC: {client.get('identifier','')}<br>
   Dirección: {client.get('address','')}<br>
-  Teléfono: {client.get('phone','')}
+  Teléfono: {client.get('phone','')}<br>
+  {email_line}
 </div>
 <table class='items'>
   <thead>
@@ -133,7 +146,7 @@ def build_html(title: str, company: dict, client: dict, items: list,
   <tr><td>ITBIS (18%)</td><td style='text-align:right'>{_fmt_money(itbis)}</td></tr>
   <tr><td>Total</td><td style='text-align:right'>{_fmt_money(total)}</td></tr>
 </table>
-{seller_html}{pay_html}{note_html}{qr_html}
+{seller_html}{pay_html}{note_html}{qr_html}{footer_html}
 </body>
 </html>
 """
@@ -145,9 +158,11 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
                  doc_number: int | None = None, invoice_type: str | None = None,
                  note: str | None = None, output_path: str | Path | None = None,
                  qr_url: str | None = None, date: datetime | None = None,
-                 valid_until: datetime | None = None) -> str:
+                 valid_until: datetime | None = None, footer: str | None = None) -> str:
     meta = {
-        'doc_number': doc_number or order_number,
+        'doc_number': doc_number,
+        'order_number': order_number,
+        'doc_label': title,
         'ncf': ncf,
         'seller': seller,
         'payment_method': payment_method,
@@ -155,6 +170,7 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
         'note': note,
         'date': date or datetime.now(),
         'valid_until': valid_until,
+        'footer': footer,
     }
     if qr_url and qrcode:
         os.makedirs(os.path.join(current_app.static_folder, 'qrcodes'), exist_ok=True)
