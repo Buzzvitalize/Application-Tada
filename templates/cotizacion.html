@@ -93,8 +93,8 @@ window.addEventListener('load', () => {
     clientPanel.querySelectorAll('input').forEach(i=>i.disabled=!enabled);
   }
   toggleClient.addEventListener('click',()=>{
-    const show=clientPanel.classList.toggle('hidden');
-    setClientInputsEnabled(show);
+    const hidden = clientPanel.classList.toggle('hidden');
+    setClientInputsEnabled(!hidden);
   });
   cancelClient.addEventListener('click',()=>{
     clientPanel.classList.add('hidden');
@@ -152,6 +152,7 @@ window.addEventListener('load', () => {
       select.appendChild(opt);
       select.value=data.id;
       clientPanel.classList.add('hidden');
+      setClientInputsEnabled(false);
       document.getElementById('new-client-name').value='';
       document.getElementById('new-client-last').value='';
       idField.value='';
