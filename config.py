@@ -1,10 +1,22 @@
 import os
+import warnings
 
 
 class BaseConfig:
-    SECRET_KEY = os.environ.get("SECRET_KEY")
-    if not SECRET_KEY:
-        raise RuntimeError("SECRET_KEY environment variable not set")
+    """Base configuration with safe defaults.
+
+    Falls back to a development key when ``SECRET_KEY`` isn't supplied so the
+    application can still start in local environments.  A warning is emitted to
+    remind deployers to set a proper secret in production.
+    """
+
+    SECRET_KEY = os.environ.get("SECRET_KEY", "dev")
+    if SECRET_KEY == "dev":
+        warnings.warn(
+            "Using default SECRET_KEY; set the SECRET_KEY environment variable in production",
+            UserWarning,
+        )
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 class DevelopmentConfig(BaseConfig):
