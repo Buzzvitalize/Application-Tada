@@ -3,6 +3,7 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Editar Cotización</h1>
 <form method="post" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div id="new-client" class="grid md:grid-cols-2 gap-4">
     <input name="client_name" value="{{ quotation.client.name }}" placeholder="Nombre" class="input" id="client-name" required>
     <input id="client-last" name="client_last_name" value="{{ quotation.client.last_name }}" placeholder="Apellido" class="input {{ '' if quotation.client.is_final_consumer else 'hidden' }}">

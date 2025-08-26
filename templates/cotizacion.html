@@ -3,6 +3,7 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Nueva Cotización</h1>
 <form method="post" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="space-y-2">
     <input id="client-search" class="input" list="client-options" placeholder="Seleccione cliente">
     <datalist id="client-options">

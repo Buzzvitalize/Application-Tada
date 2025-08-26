@@ -16,6 +16,7 @@
       <p><strong>Web:</strong> {{ req.website or 'N/A' }}</p>
       <p><strong>Usuario:</strong> {{ req.username }}</p>
       <form method="post" action="{{ url_for('approve_request', req_id=req.id) }}" class="mt-2 flex items-center space-x-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="flex items-center space-x-1">
           <input type="radio" name="role" value="user" checked>
           <span>Usuario</span>
@@ -27,6 +28,7 @@
         <button class="btn-primary">Aprobar</button>
       </form>
       <form method="post" action="{{ url_for('reject_request', req_id=req.id) }}" class="mt-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn-secondary">Rechazar</button>
       </form>
     </div>

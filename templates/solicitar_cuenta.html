@@ -33,6 +33,7 @@
         {% endif %}
       </div>
       <form method="post" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="flex space-x-4 justify-center">
           <label class="flex items-center space-x-1">
             <input type="radio" name="account_type" value="personal" checked>
