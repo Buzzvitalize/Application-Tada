@@ -163,9 +163,15 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
     client_dict = _client_to_dict(client)
     html = build_html(title, company, client_dict, item_dicts, subtotal, itbis, total, meta)
     output_path = Path(output_path or 'document.pdf')
+    current_app.logger.info("Rendering %s PDF to %s", title, output_path)
     if HTML is None:
+        current_app.logger.warning("WeasyPrint is not installed; generating placeholder PDF")
         with open(output_path, 'wb') as f:  # minimal placeholder PDF
             f.write(b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF")
     else:
-        HTML(string=html, base_url='.').write_pdf(output_path)
+        try:
+            HTML(string=html, base_url='.').write_pdf(output_path)
+        except Exception as exc:  # pragma: no cover
+            current_app.logger.exception("PDF generation failed: %s", exc)
+            raise
     return str(output_path)

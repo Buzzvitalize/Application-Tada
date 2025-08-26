@@ -12,6 +12,8 @@ from flask import (
     g,
 )
 from flask_migrate import Migrate
+import logging
+from logging.handlers import RotatingFileHandler
 try:
     from flask_wtf import CSRFProtect
 except ModuleNotFoundError:  # pragma: no cover
@@ -74,6 +76,15 @@ if os.path.exists(DATA_PATH):
 
 app = Flask(__name__)
 app.config.from_object(DevelopmentConfig)
+
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240, backupCount=10)
+file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+file_handler.setLevel(logging.INFO)
+app.logger.addHandler(file_handler)
+app.logger.setLevel(logging.INFO)
+app.logger.info('Tiendix startup')
 
 
 def _fmt_money(value):
@@ -692,6 +703,7 @@ def quotation_pdf(quotation_id):
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
     qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
     valid_until = quotation.date + timedelta(days=30)
+    app.logger.info("Generating quotation PDF %s", quotation_id)
     generate_pdf('Cotización', company, quotation.client, quotation.items,
                  quotation.subtotal, quotation.itbis, quotation.total,
                  seller=quotation.seller, payment_method=quotation.payment_method,
@@ -795,6 +807,7 @@ def order_pdf(order_id):
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
     qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    app.logger.info("Generating order PDF %s", order_id)
     generate_pdf('Pedido', company, order.client, order.items,
                  order.subtotal, order.itbis, order.total,
                  seller=order.seller, payment_method=order.payment_method,
@@ -821,6 +834,7 @@ def invoice_pdf(invoice_id):
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
     qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
+    app.logger.info("Generating invoice PDF %s", invoice_id)
     generate_pdf('Factura', company, invoice.client, invoice.items,
                  invoice.subtotal, invoice.itbis, invoice.total,
                  ncf=invoice.ncf, seller=invoice.seller,
