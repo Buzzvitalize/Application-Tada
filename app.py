@@ -89,14 +89,15 @@ migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
 app.register_blueprint(auth_bp)
 
-# Ensure a default admin account exists for initial access
-with app.app_context():
-    db.create_all()
-    if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', role='admin')
-        admin.set_password(os.environ.get('ADMIN_PASSWORD', '363636'))
-        db.session.add(admin)
-        db.session.commit()
+def ensure_admin():  # pragma: no cover - optional helper for deployments
+    with app.app_context():
+        db.create_all()
+        if not User.query.filter_by(username='admin').first():
+            admin = User(username='admin', role='admin')
+            admin.set_password(os.environ.get('ADMIN_PASSWORD', '363636'))
+            db.session.add(admin)
+            db.session.commit()
+        db.session.remove()
 
 # Utility constants
 ITBIS_RATE = 0.18
