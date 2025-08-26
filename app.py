@@ -540,8 +540,12 @@ def new_quotation():
         db.session.commit()
         flash('Cotización guardada')
         return redirect(url_for('list_quotations'))
-    clients = company_query(Client).options(load_only(Client.id, Client.name, Client.identifier)).all()
-    products = company_query(Product).options(load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)).all()
+    clients = company_query(Client).options(
+        load_only(Client.id, Client.name, Client.identifier)
+    ).all()
+    products = company_query(Product).options(
+        load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)
+    ).all()
     return render_template('cotizacion.html', clients=clients, products=products)
 
 @app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
@@ -585,7 +589,9 @@ def edit_quotation(quotation_id):
         db.session.commit()
         flash('Cotización actualizada')
         return redirect(url_for('list_quotations'))
-    products = company_query(Product).options(load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)).all()
+    products = company_query(Product).options(
+        load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)
+    ).all()
     product_map = {p.name: p.id for p in products}
     items = []
     for it in quotation.items:
