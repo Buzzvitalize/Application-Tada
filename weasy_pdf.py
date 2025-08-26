@@ -39,6 +39,21 @@ def _fmt_money(value: float) -> str:
     return f"RD$ {value:,.2f}"
 
 
+def _item_to_dict(item) -> dict:
+    """Return a dict representation for table rendering."""
+    if isinstance(item, dict):
+        return item
+    return {
+        'code': getattr(item, 'code', ''),
+        'reference': getattr(item, 'reference', ''),
+        'product_name': getattr(item, 'product_name', getattr(item, 'name', '')),
+        'unit': getattr(item, 'unit', ''),
+        'unit_price': getattr(item, 'unit_price', getattr(item, 'price', 0.0)),
+        'quantity': getattr(item, 'quantity', 0),
+        'discount': getattr(item, 'discount', 0.0),
+    }
+
+
 def build_html(title: str, company: dict, client: dict, items: list, subtotal: float,
                itbis: float, total: float, meta: dict) -> str:
     rows = "".join(
@@ -124,7 +139,8 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
         qr_path = os.path.join(current_app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
         qrcode.make(qr_url).save(qr_path)
         meta['qr_path'] = qr_path
-    html = build_html(title, company, client, items, subtotal, itbis, total, meta)
+    item_dicts = [_item_to_dict(i) for i in items]
+    html = build_html(title, company, client, item_dicts, subtotal, itbis, total, meta)
     output_path = Path(output_path or 'document.pdf')
     HTML(string=html, base_url='.').write_pdf(output_path)
     return str(output_path)
