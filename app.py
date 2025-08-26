@@ -84,6 +84,7 @@ app.register_blueprint(auth_bp)
 
 # Ensure a default admin account exists for initial access
 with app.app_context():
+    db.create_all()
     if not User.query.filter_by(username='admin').first():
         admin = User(username='admin', role='admin')
         admin.set_password(os.environ.get('ADMIN_PASSWORD', '363636'))
