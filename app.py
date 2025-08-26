@@ -423,6 +423,30 @@ def edit_client(client_id):
         return redirect(url_for('clients'))
     return render_template('cliente_form.html', client=client)
 
+@app.post('/api/clients')
+def api_create_client():
+    data = request.get_json() or {}
+    is_final = data.get('type') == 'final'
+    identifier = data.get('identifier') if not is_final else data.get('identifier') or None
+    last_name = data.get('last_name') if is_final else None
+    if not is_final and not identifier:
+        return {'error': 'El RNC es obligatorio para empresas'}, 400
+    client = Client(
+        name=data.get('name'),
+        last_name=last_name,
+        identifier=identifier,
+        phone=data.get('phone'),
+        email=data.get('email'),
+        street=data.get('street'),
+        sector=data.get('sector'),
+        province=data.get('province'),
+        is_final_consumer=is_final,
+        company_id=current_company_id()
+    )
+    db.session.add(client)
+    db.session.commit()
+    return {'id': client.id, 'name': client.name, 'identifier': client.identifier}
+
 # Products CRUD
 @app.route('/productos', methods=['GET', 'POST'])
 def products():
