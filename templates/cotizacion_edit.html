@@ -8,11 +8,11 @@
     <input name="client_name" value="{{ quotation.client.name }}" placeholder="Nombre" class="input" id="client-name" required>
     <input id="client-last" name="client_last_name" value="{{ quotation.client.last_name }}" placeholder="Apellido" class="input {{ '' if quotation.client.is_final_consumer else 'hidden' }}">
     <input name="client_identifier" value="{{ quotation.client.identifier }}" placeholder="{{ 'Cédula' if quotation.client.is_final_consumer else 'RNC *' }}" class="input id-mask" id="client-identifier" data-doc-type="{{ 'cedula' if quotation.client.is_final_consumer else 'rnc' }}" {% if not quotation.client.is_final_consumer %}required{% endif %}>
-    <input name="client_phone" value="{{ quotation.client.phone }}" placeholder="Teléfono" class="input phone-mask" required>
+    <input name="client_phone" value="{{ quotation.client.phone }}" placeholder="Teléfono" class="input phone-mask">
     <input name="client_email" value="{{ quotation.client.email }}" placeholder="Email" class="input">
-    <input name="client_street" value="{{ quotation.client.street }}" placeholder="Calle" class="input" required>
-    <input name="client_sector" value="{{ quotation.client.sector }}" placeholder="Sector" class="input" required>
-    <input name="client_province" value="{{ quotation.client.province }}" placeholder="Provincia" class="input" required>
+    <input name="client_street" value="{{ quotation.client.street }}" placeholder="Calle" class="input">
+    <input name="client_sector" value="{{ quotation.client.sector }}" placeholder="Sector" class="input">
+    <input name="client_province" value="{{ quotation.client.province }}" placeholder="Provincia" class="input">
     <div class="flex space-x-4 col-span-2">
       <label><input type="radio" name="client_type" value="final" {% if quotation.client.is_final_consumer %}checked{% endif %}> Consumidor Final</label>
       <label><input type="radio" name="client_type" value="fiscal" {% if not quotation.client.is_final_consumer %}checked{% endif %}> Comprobante Fiscal</label>
@@ -68,7 +68,7 @@ window.addEventListener('load', () => {
   function toggleType(){
     if(document.querySelector('input[name="client_type"]:checked').value==='final'){
       lastField.classList.remove('hidden');
-      lastField.required=true;
+      lastField.required=false;
       idField.placeholder='Cédula';
       idField.required=false;
       idField.dataset.docType='cedula';

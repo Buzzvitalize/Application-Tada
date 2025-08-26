@@ -5,27 +5,13 @@
 <form method="post" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="space-y-2">
-    <input id="client-search" class="input" list="client-options" placeholder="Seleccione cliente">
-    <datalist id="client-options">
+    <select name="client_id" class="input" required>
+      <option value="">Seleccione cliente</option>
       {% for c in clients %}
-      <option data-id="{{ c.id }}" value="{{ c.name }} - {{ c.identifier }}"></option>
+      <option value="{{ c.id }}">{{ c.name }} - {{ c.identifier }}</option>
       {% endfor %}
-    </datalist>
-    <input type="hidden" name="client_id" id="client-id">
-    <div id="new-client" class="grid md:grid-cols-2 gap-4">
-      <input name="client_name" placeholder="Nombre" class="input" id="client-name">
-      <input id="client-last" name="client_last_name" placeholder="Apellido" class="input">
-      <input name="client_identifier" placeholder="Cédula" class="input id-mask" id="client-identifier" data-doc-type="cedula">
-      <input name="client_phone" placeholder="Teléfono" class="input phone-mask">
-      <input name="client_email" placeholder="Email" class="input">
-      <input name="client_street" placeholder="Calle" class="input">
-      <input name="client_sector" placeholder="Sector" class="input">
-      <input name="client_province" placeholder="Provincia" class="input">
-      <div class="flex space-x-4 col-span-2">
-        <label><input type="radio" name="client_type" value="final" checked> Consumidor Final</label>
-        <label><input type="radio" name="client_type" value="fiscal"> Comprobante Fiscal</label>
-      </div>
-    </div>
+    </select>
+    <a href="{{ url_for('clients') }}" class="text-sm text-blue-600 hover:underline">Agregar cliente</a>
   </div>
   <div class="grid md:grid-cols-3 gap-4">
     <input name="seller" placeholder="Vendedor" class="input" required>
@@ -70,41 +56,6 @@
 {% block scripts %}
 <script>
 window.addEventListener('load', () => {
-  const clientInput = document.getElementById('client-search');
-  const clientIdField = document.getElementById('client-id');
-  const newClient = document.getElementById('new-client');
-  function toggleClient(){
-    const opt = document.querySelector(`#client-options option[value="${clientInput.value}"]`);
-    clientIdField.value = opt ? opt.dataset.id : '';
-    const isNew = !opt;
-    newClient.style.display = isNew ? 'grid' : 'none';
-    newClient.querySelectorAll('input').forEach(i => i.required = isNew);
-  }
-  clientInput.addEventListener('input', toggleClient);
-  toggleClient();
-
-  const typeRadios=document.querySelectorAll('input[name="client_type"]');
-  const idField=document.getElementById('client-identifier');
-  const lastField=document.getElementById('client-last');
-  function toggleType(){
-    if(document.querySelector('input[name="client_type"]:checked').value==='final'){
-      lastField.classList.remove('hidden');
-      lastField.required=true;
-      idField.placeholder='Cédula';
-      idField.required=false;
-      idField.dataset.docType='cedula';
-    }else{
-      lastField.classList.add('hidden');
-      lastField.required=false;
-      idField.placeholder='RNC *';
-      idField.required=true;
-      idField.dataset.docType='rnc';
-    }
-    applyDocMask(idField);
-  }
-  typeRadios.forEach(r=>r.addEventListener('change',toggleType));
-  toggleType();
-
   const paySelect=document.getElementById('payment-method');
   const bankSelect=document.getElementById('bank-select');
   paySelect.addEventListener('change',()=>{

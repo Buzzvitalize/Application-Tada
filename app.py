@@ -487,28 +487,10 @@ def list_quotations():
 def new_quotation():
     if request.method == 'POST':
         client_id = request.form.get('client_id')
-        if client_id:
-            client = company_get(Client, client_id)
-        else:
-            is_final = request.form.get('client_type') == 'final'
-            identifier = request.form.get('client_identifier') if not is_final else request.form.get('client_identifier') or None
-            if not is_final and not identifier:
-                flash('El identificador es obligatorio para comprobante fiscal')
-                return redirect(url_for('new_quotation'))
-            client = Client(
-                name=request.form['client_name'],
-                last_name=request.form.get('client_last_name') if is_final else None,
-                identifier=identifier,
-                phone=request.form['client_phone'],
-                email=request.form.get('client_email'),
-                street=request.form['client_street'],
-                sector=request.form['client_sector'],
-                province=request.form['client_province'],
-                is_final_consumer=is_final,
-                company_id=current_company_id(),
-            )
-            db.session.add(client)
-            db.session.flush()
+        if not client_id:
+            flash('Debe seleccionar un cliente registrado')
+            return redirect(url_for('new_quotation'))
+        client = company_get(Client, client_id)
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
@@ -545,11 +527,11 @@ def edit_quotation(quotation_id):
         client.name = request.form['client_name']
         client.last_name = request.form.get('client_last_name') if is_final else None
         client.identifier = identifier
-        client.phone = request.form['client_phone']
+        client.phone = request.form.get('client_phone')
         client.email = request.form.get('client_email')
-        client.street = request.form['client_street']
-        client.sector = request.form['client_sector']
-        client.province = request.form['client_province']
+        client.street = request.form.get('client_street')
+        client.sector = request.form.get('client_sector')
+        client.province = request.form.get('client_province')
         client.is_final_consumer = is_final
         quotation.items.clear()
         db.session.flush()
