@@ -423,9 +423,12 @@ def edit_client(client_id):
         return redirect(url_for('clients'))
     return render_template('cliente_form.html', client=client)
 
+@csrf.exempt
 @app.post('/api/clients')
 def api_create_client():
     data = request.get_json() or {}
+    if not data.get('name'):
+        return {'error': 'El nombre es obligatorio'}, 400
     is_final = data.get('type') == 'final'
     identifier = data.get('identifier') if not is_final else data.get('identifier') or None
     last_name = data.get('last_name') if is_final else None
