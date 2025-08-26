@@ -21,11 +21,13 @@ BLUE = "#1e3a8a"
 STYLE = f"""
 @page {{ size: A4; margin: 2cm; }}
 body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
-.header {{ display:flex; justify-content:space-between; align-items:center; border-bottom:4px solid {BLUE}; padding-bottom:10px; margin-bottom:20px; }}
-.logo {{ height:60px; }}
-.title {{ text-align:right; color:{BLUE}; }}
-.two-col {{ display:flex; justify-content:space-between; margin-bottom:20px; }}
-.box {{ width:48%; font-size:14px; }}
+.company-header {{ display:flex; align-items:center; margin-bottom:15px; }}
+.company-logo {{ height:60px; margin-right:15px; }}
+.company-name {{ font-size:24px; font-weight:bold; color:{BLUE}; }}
+.company-details {{ font-size:14px; line-height:1.2; }}
+.doc-title {{ text-align:right; color:{BLUE}; font-size:20px; margin-bottom:10px; }}
+.meta {{ text-align:right; font-size:12px; margin-bottom:20px; }}
+.client-details {{ margin-bottom:20px; font-size:14px; }}
 .items {{ width:100%; border-collapse:collapse; margin-bottom:20px; font-size:14px; }}
 .items th {{ background:{BLUE}; color:white; padding:6px; text-align:left; }}
 .items td {{ padding:6px; border-bottom:1px solid #e5e7eb; }}
@@ -37,13 +39,10 @@ body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
 .qr {{ position:absolute; bottom:30px; right:30px; width:80px; }}
 """
 
-
 def _fmt_money(value: float) -> str:
     return f"RD$ {value:,.2f}"
 
-
 def _item_to_dict(item) -> dict:
-    """Return a dict representation for table rendering."""
     if isinstance(item, dict):
         return item
     return {
@@ -56,13 +55,13 @@ def _item_to_dict(item) -> dict:
         'discount': getattr(item, 'discount', 0.0),
     }
 
-
 def _client_to_dict(client) -> dict:
-    """Return a dict with the fields used in PDFs."""
     if isinstance(client, dict):
         return client
     address = ", ".join(
-        filter(None, [getattr(client, 'street', None), getattr(client, 'sector', None), getattr(client, 'province', None)])
+        filter(None, [getattr(client, 'street', None),
+                      getattr(client, 'sector', None),
+                      getattr(client, 'province', None)])
     )
     name = getattr(client, 'name', '')
     last = getattr(client, 'last_name', '')
@@ -73,9 +72,9 @@ def _client_to_dict(client) -> dict:
         'phone': getattr(client, 'phone', '') or '',
     }
 
-
-def build_html(title: str, company: dict, client: dict, items: list, subtotal: float,
-               itbis: float, total: float, meta: dict) -> str:
+def build_html(title: str, company: dict, client: dict, items: list,
+               subtotal: float, discount: float, itbis: float,
+               total: float, meta: dict) -> str:
     rows = "".join(
         f"<tr><td>{i.get('code','')}</td><td>{i.get('reference','')}</td>"
         f"<td>{i['product_name']}</td><td>{i.get('unit','')}</td>"
@@ -100,24 +99,27 @@ def build_html(title: str, company: dict, client: dict, items: list, subtotal: f
     if meta.get('payment_method'):
         pay_html = f"<div>Pago: {meta['payment_method']}{' - '+meta['bank'] if meta.get('bank') else ''}</div>"
     qr_html = f"<img src='{meta['qr_path']}' class='qr'>" if meta.get('qr_path') else ""
-    return f"""
-<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang='es'>
 <head>
 <meta charset='utf-8'>
 <style>{STYLE}</style>
 </head>
 <body>
-<div class='header'>
-  <div><img src='{company.get('logo','')}' class='logo'></div>
-  <div class='title'>
-    <h1>{title}</h1>
-    <div class='meta'>{meta_html}</div>
+<div class='company-header'>
+  <img src='{company.get('logo','')}' class='company-logo'>
+  <div class='company-details'>
+    <div class='company-name'>{company['name']}</div>
+    <div>{company.get('address','')}<br>{company.get('phone','')}</div>
   </div>
 </div>
-<div class='two-col'>
-  <div class='box'><strong>{company['name']}</strong><br>{company.get('address','')}<br>{company.get('phone','')}</div>
-  <div class='box'><strong>{client['name']}</strong><br>{client.get('address','')}<br>{client.get('phone','')}</div>
+<h1 class='doc-title'>{title}</h1>
+<div class='meta'>{meta_html}</div>
+<div class='client-details'>
+  <strong>Detalles</strong><br>
+  Nombre: {client['name']}<br>
+  Dirección: {client.get('address','')}<br>
+  Teléfono: {client.get('phone','')}
 </div>
 <table class='items'>
   <thead>
@@ -127,6 +129,7 @@ def build_html(title: str, company: dict, client: dict, items: list, subtotal: f
 </table>
 <table class='totals'>
   <tr><td>Subtotal</td><td style='text-align:right'>{_fmt_money(subtotal)}</td></tr>
+  <tr><td>Descuento</td><td style='text-align:right'>{_fmt_money(discount)}</td></tr>
   <tr><td>ITBIS (18%)</td><td style='text-align:right'>{_fmt_money(itbis)}</td></tr>
   <tr><td>Total</td><td style='text-align:right'>{_fmt_money(total)}</td></tr>
 </table>
@@ -134,7 +137,6 @@ def build_html(title: str, company: dict, client: dict, items: list, subtotal: f
 </body>
 </html>
 """
-
 
 def generate_pdf(title: str, company: dict, client: dict, items: list,
                  subtotal: float, itbis: float, total: float, ncf: str | None = None,
@@ -160,13 +162,15 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
         qrcode.make(qr_url).save(qr_path)
         meta['qr_path'] = qr_path
     item_dicts = [_item_to_dict(i) for i in items]
+    discount_total = sum(i.get('discount', 0.0) for i in item_dicts)
     client_dict = _client_to_dict(client)
-    html = build_html(title, company, client_dict, item_dicts, subtotal, itbis, total, meta)
+    html = build_html(title, company, client_dict, item_dicts, subtotal,
+                      discount_total, itbis, total, meta)
     output_path = Path(output_path or 'document.pdf')
     current_app.logger.info("Rendering %s PDF to %s", title, output_path)
     if HTML is None:
         current_app.logger.warning("WeasyPrint is not installed; generating placeholder PDF")
-        with open(output_path, 'wb') as f:  # minimal placeholder PDF
+        with open(output_path, 'wb') as f:
             f.write(b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF")
     else:
         try:
