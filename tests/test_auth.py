@@ -6,9 +6,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app import app, db
 from models import User
 
+
 @pytest.fixture
-def client():
+def client(tmp_path):
+    db_path = tmp_path / "test.sqlite"
     app.config.from_object('config.TestingConfig')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     with app.app_context():
         db.create_all()
         u = User(username='admin', role='admin')
@@ -19,6 +22,8 @@ def client():
         yield client
     with app.app_context():
         db.drop_all()
+    if db_path.exists():
+        db_path.unlink()
 
 
 def test_login(client):

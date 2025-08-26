@@ -4,13 +4,23 @@ import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app import app, db
-from models import (CompanyInfo, User, Client, Product, Quotation, QuotationItem,
-                    Order, Invoice)
+from models import (
+    CompanyInfo,
+    User,
+    Client,
+    Product,
+    Quotation,
+    QuotationItem,
+    Order,
+    Invoice,
+)
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
+    db_path = tmp_path / "test.sqlite"
     app.config.from_object('config.TestingConfig')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     with app.app_context():
         db.create_all()
         c1 = CompanyInfo(name='CompA', street='', sector='', province='', phone='', rnc='')
@@ -27,21 +37,37 @@ def client():
         cl1 = Client(name='Alice', company_id=c1.id)
         cl2 = Client(name='BobCorp', is_final_consumer=False, company_id=c2.id)
         db.session.add_all([cl1, cl2])
+        db.session.flush()
         prod = Product(code='P1', name='Prod', unit='Unidad', price=100, company_id=c1.id)
         db.session.add(prod)
-        q = Quotation(client_id=cl1.id, subtotal=100, itbis=18, total=118,
-                      seller='Vendedor', payment_method='Efectivo', company_id=c1.id)
+        q = Quotation(
+            client_id=cl1.id,
+            subtotal=100,
+            itbis=18,
+            total=118,
+            seller='Vendedor',
+            payment_method='Efectivo',
+            company_id=c1.id,
+        )
         db.session.add(q)
         db.session.flush()
-        qi = QuotationItem(quotation_id=q.id, code='P1', product_name='Prod',
-                           unit='Unidad', unit_price=100, quantity=1,
-                           company_id=c1.id)
+        qi = QuotationItem(
+            quotation_id=q.id,
+            code='P1',
+            product_name='Prod',
+            unit='Unidad',
+            unit_price=100,
+            quantity=1,
+            company_id=c1.id,
+        )
         db.session.add(qi)
         db.session.commit()
     with app.test_client() as client:
         yield client
     with app.app_context():
         db.drop_all()
+    if db_path.exists():
+        db_path.unlink()
 
 
 def login(client, username, password):

@@ -87,6 +87,8 @@ app.jinja_env.filters['money'] = _fmt_money
 db.init_app(app)
 migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
+if 'csrf_token' not in app.jinja_env.globals:
+    app.jinja_env.globals['csrf_token'] = lambda: ''
 app.register_blueprint(auth_bp)
 
 def ensure_admin():  # pragma: no cover - optional helper for deployments
