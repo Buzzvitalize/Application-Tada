@@ -553,6 +553,7 @@ def list_quotations():
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 def new_quotation():
     if request.method == 'POST':
+        print('Form data:', dict(request.form))
         client_id = request.form.get('client_id')
         if not client_id:
             flash('Debe seleccionar un cliente registrado')
@@ -579,7 +580,7 @@ def new_quotation():
             db.session.add(q_item)
         db.session.commit()
         flash('Cotización guardada')
-        return redirect(url_for('quotation_pdf', quotation_id=quotation.id))
+        return redirect(url_for('list_quotations'))
     clients = company_query(Client).options(
         load_only(Client.id, Client.name, Client.identifier)
     ).all()
