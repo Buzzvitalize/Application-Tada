@@ -77,6 +77,13 @@ if os.path.exists(DATA_PATH):
 app = Flask(__name__)
 app.config.from_object(DevelopmentConfig)
 
+
+def _fmt_money(value):
+    return f"RD${value:,.2f}"
+
+
+app.jinja_env.filters['money'] = _fmt_money
+
 db.init_app(app)
 migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
@@ -241,15 +248,6 @@ def get_company_info():
         'ncf_final': c.ncf_final,
         'ncf_fiscal': c.ncf_fiscal,
     }
-
-
-def _fmt_money(value):
-    return f"RD${value:,.2f}"
-
-
-app.jinja_env.filters['money'] = _fmt_money
-
-
 # Routes
 @app.before_request
 def require_login():
