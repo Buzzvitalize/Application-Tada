@@ -37,7 +37,7 @@ body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
 .totals tr:last-child td {{ font-size:16px; font-weight:bold; color:{BLUE}; border-top:2px solid {BLUE}; }}
 .notes {{ margin-top:30px; font-size:12px; }}
 .seller-pay {{ display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; }}
-.qr {{ position:absolute; bottom:20px; right:20px; width:80px; }}
+.qr {{ position:absolute; bottom:60px; right:20px; width:80px; }}
 .footer {{ position:absolute; bottom:20px; left:20px; font-size:12px; }}
 """
 
