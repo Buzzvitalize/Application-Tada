@@ -58,7 +58,7 @@ window.addEventListener('load', () => {
   function toggle(){
     if(document.querySelector('input[name="type"]:checked').value==='final'){
       lastField.classList.remove('hidden');
-      lastField.required=true;
+      lastField.required=false;
       idField.placeholder='Cédula';
       idField.required=false;
       idField.dataset.docType='cedula';
