@@ -155,7 +155,18 @@ def calculate_totals(items):
 
 
 def build_items(product_ids, quantities, discounts):
-    ids = [int(pid) for pid in product_ids if pid]
+    # Convert the list of product ids to integers, ignoring any non-numeric
+    # values that may come from malformed form submissions. Previously a
+    # stray string (e.g. the product name) would raise ``ValueError`` and the
+    # quotation silently failed to save.  Now we skip those entries so the
+    # view can provide proper feedback to the user.
+    ids: list[int] = []
+    for pid in product_ids:
+        try:
+            if pid:
+                ids.append(int(pid))
+        except (TypeError, ValueError):
+            continue
     products = (
         company_query(Product)
         .options(load_only(
