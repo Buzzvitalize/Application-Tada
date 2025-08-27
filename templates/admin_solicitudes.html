@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Solicitudes{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Solicitudes de cuenta</h1>
+{% if requests %}
+  <div class="space-y-4">
+  {% for req in requests %}
+    <div class="card">
+      <p><strong>Nombre:</strong> {{ req.first_name }} {{ req.last_name }}</p>
+      <p><strong>Empresa:</strong> {{ req.company }}</p>
+      <p><strong>Tipo:</strong> {{ req.account_type.capitalize() }}</p>
+      <p><strong>RNC/Cédula:</strong> {{ req.identifier }}</p>
+      <p><strong>Teléfono:</strong> {{ req.phone }}</p>
+      <p><strong>Correo:</strong> {{ req.email }}</p>
+      {% if req.address %}<p><strong>Dirección:</strong> {{ req.address }}</p>{% endif %}
+      <p><strong>Web:</strong> {{ req.website or 'N/A' }}</p>
+      <p><strong>Usuario:</strong> {{ req.username }}</p>
+      <form method="post" action="{{ url_for('approve_request', req_id=req.id) }}" class="mt-2 flex items-center space-x-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="flex items-center space-x-1">
+          <input type="radio" name="role" value="user" checked>
+          <span>Usuario</span>
+        </label>
+        <label class="flex items-center space-x-1">
+          <input type="radio" name="role" value="admin">
+          <span>Administrador</span>
+        </label>
+        <button class="btn-primary">Aprobar</button>
+      </form>
+      <form method="post" action="{{ url_for('reject_request', req_id=req.id) }}" class="mt-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn-secondary">Rechazar</button>
+      </form>
+    </div>
+  {% endfor %}
+  </div>
+{% else %}
+  <p>No hay solicitudes pendientes.</p>
+{% endif %}
+{% endblock %}
