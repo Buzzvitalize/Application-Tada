@@ -1440,7 +1440,7 @@ def export_reportes():
         if formato not in {'csv', 'xlsx'} or tipo != 'resumen':
             log_export(session.get('username'), formato, tipo, {}, 'fail', 'permiso')
             return '', 403
-    elif role != 'admin':
+    elif role not in ('admin', 'manager'):
         log_export(session.get('username'), formato, tipo, {}, 'fail', 'permiso')
         return '', 403
 

@@ -15,7 +15,9 @@ def client(tmp_path):
         db.session.add(comp); db.session.flush()
         user = User(username='user', role='company', company_id=comp.id)
         user.set_password('pass')
-        db.session.add(user)
+        mgr = User(username='mgr', role='manager', company_id=comp.id)
+        mgr.set_password('pass')
+        db.session.add_all([user, mgr])
         cli = Client(name='Alice', company_id=comp.id)
         db.session.add(cli); db.session.flush()
         order = Order(client_id=cli.id, subtotal=100, itbis=18, total=118, company_id=comp.id)
@@ -119,6 +121,12 @@ def test_export_permissions(client):
     login(client, 'user', 'pass')
     resp = client.get('/reportes/export?formato=csv')
     assert resp.status_code == 403
+    client.get('/logout')
+    login(client, 'mgr', 'pass')
+    resp = client.get('/reportes/export?formato=csv', follow_redirects=True)
+    assert resp.status_code == 200
+    resp = client.get('/reportes/export?formato=pdf', follow_redirects=True)
+    assert resp.status_code == 200
     client.get('/logout')
     login(client, 'admin', '363636')
     client.get('/admin/companies/select/1')
