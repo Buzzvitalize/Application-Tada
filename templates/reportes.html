@@ -66,6 +66,14 @@
     <div class="text-2xl font-bold">{{ stats.paid | money }}</div>
   </div>
   <div class="card text-center">
+    <div class="text-sm text-gray-500">Efectivo</div>
+    <div class="text-2xl font-bold">{{ stats.cash | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Transferencias</div>
+    <div class="text-2xl font-bold">{{ stats.transfer | money }}</div>
+  </div>
+  <div class="card text-center">
     <div class="text-sm text-gray-500">Ticket Promedio</div>
     <div class="text-2xl font-bold">{{ stats.avg_ticket | money }}</div>
   </div>
@@ -86,26 +94,30 @@
 <div class="grid md:grid-cols-2 gap-6 mb-6">
   <div class="card p-4 flex flex-col items-center">
     <h3 class="text-sm mb-2">Ventas por categoría</h3>
-    <canvas id="catChart" width="718" height="329"></canvas>
+    <canvas id="catChart" class="w-full h-64"></canvas>
   </div>
   <div class="card p-4 flex flex-col items-center">
     <h3 class="text-sm mb-2">Ventas en el tiempo</h3>
-    <canvas id="timeChart" width="718" height="329"></canvas>
+    <canvas id="timeChart" class="w-full h-64"></canvas>
   </div>
 </div>
-<div class="grid md:grid-cols-2 gap-6 mb-6">
+<div class="grid md:grid-cols-3 gap-6 mb-6">
   <div class="card p-4 flex flex-col items-center">
     <h3 class="text-sm mb-2">Estado de facturas</h3>
-    <canvas id="statusChart" width="718" height="329"></canvas>
+    <canvas id="statusChart" class="w-full h-64"></canvas>
   </div>
   <div class="card p-4 flex flex-col items-center">
     <h3 class="text-sm mb-2">Ventas por mes</h3>
-    <canvas id="monthlyChart" width="718" height="329"></canvas>
+    <canvas id="monthlyChart" class="w-full h-64"></canvas>
+  </div>
+  <div class="card p-4 flex flex-col items-center">
+    <h3 class="text-sm mb-2">Métodos de pago</h3>
+    <canvas id="methodChart" class="w-full h-64"></canvas>
   </div>
 </div>
 <div class="card p-4 mb-6 flex flex-col items-center">
   <h3 class="text-sm mb-2">Tendencia 24 meses</h3>
-  <canvas id="trendChart" width="718" height="329"></canvas>
+  <canvas id="trendChart" class="w-full h-64"></canvas>
 </div>
 
 <div class="card overflow-x-auto mb-6">
@@ -212,6 +224,8 @@ const catChart = new Chart(catCtx, {
     datasets: [{ data: {{ cat_totals|tojson }}, backgroundColor:['#1e3a8a','#3b82f6','#60a5fa','#93c5fd','#cbd5e1'] }]
   },
   options:{
+    responsive:true,
+    maintainAspectRatio:false,
     plugins:{
       tooltip:{
         callbacks:{
@@ -244,6 +258,8 @@ new Chart(timeCtx, {
     datasets: [{ label: 'Ventas en el tiempo', data: {{ date_totals|tojson }}, borderColor: '#1e3a8a', fill:false, count: dateCounts }]
   },
   options: {
+    responsive:true,
+    maintainAspectRatio:false,
     plugins: {
       tooltip: {
         callbacks: {
@@ -258,6 +274,7 @@ const statusCtx = document.getElementById('statusChart');
 const statusChart = new Chart(statusCtx, {
   type: 'pie',
   data: {labels: {{ status_labels|tojson }}, datasets: [{data: {{ status_values|tojson }}, backgroundColor:['#1e3a8a','#facc15','#16a34a']} ]},
+  options:{responsive:true, maintainAspectRatio:false}
 });
 statusCtx.onclick = function(evt){
   const points = statusChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
@@ -278,7 +295,8 @@ new Chart(monthlyCtx, {
       {label: 'Año actual', data: {{ year_current|tojson }}, backgroundColor:'#1e3a8a'},
       {label: 'Año anterior', data: {{ year_prev|tojson }}, backgroundColor:'#93c5fd'}
     ]
-  }
+  },
+  options:{responsive:true, maintainAspectRatio:false}
 });
 
 const trendCtx = document.getElementById('trendChart');
@@ -287,7 +305,15 @@ new Chart(trendCtx, {
   data: {
     labels: {{ (trend_24|default([], true))|map(attribute='month', default='')|list|tojson }},
     datasets: [{label:'Últimos 24 meses', data: {{ (trend_24|default([], true))|map(attribute='total', default=0)|list|tojson }}, borderColor:'#1e3a8a', fill:false}]
-  }
+  },
+  options:{responsive:true, maintainAspectRatio:false}
+});
+
+const methodCtx = document.getElementById('methodChart');
+new Chart(methodCtx, {
+  type: 'pie',
+  data:{labels: {{ method_labels|tojson }}, datasets:[{data: {{ method_values|tojson }}, backgroundColor:['#4ade80','#60a5fa']}]},
+  options:{responsive:true, maintainAspectRatio:false}
 });
 
 const exportBtn = document.getElementById('exportBtn');

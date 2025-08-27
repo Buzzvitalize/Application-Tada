@@ -1111,6 +1111,16 @@ def reportes():
             status_totals[st] = amount or 0
             status_counts[st] = cnt or 0
 
+    payment_totals = {'Efectivo': 0, 'Transferencia': 0}
+    payment_counts = {'Efectivo': 0, 'Transferencia': 0}
+    for pm, amount, cnt in (
+        q.with_entities(Invoice.payment_method, func.sum(Invoice.total), func.count(Invoice.id))
+        .group_by(Invoice.payment_method)
+    ):
+        if pm in payment_totals:
+            payment_totals[pm] = amount or 0
+            payment_counts[pm] = cnt or 0
+
     current_year = datetime.utcnow().year
     monthly_totals = (
         q.with_entities(
@@ -1147,6 +1157,8 @@ def reportes():
         'invoices': len(all_invoices),
         'pending': status_totals.get('Pendiente', 0),
         'paid': status_totals.get('Pagada', 0),
+        'cash': payment_totals.get('Efectivo', 0),
+        'transfer': payment_totals.get('Transferencia', 0),
         'avg_ticket': avg_ticket,
         'avg_ticket_month': avg_ticket_month,
         'avg_ticket_year': avg_ticket_year,
@@ -1161,6 +1173,8 @@ def reportes():
     date_counts = [cnt for *_1, cnt in sales_over_time]
     status_labels = list(status_counts.keys())
     status_values = list(status_counts.values())
+    method_labels = list(payment_counts.keys())
+    method_values = list(payment_counts.values())
     months = [
         'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
         'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
@@ -1186,6 +1200,8 @@ def reportes():
                 'date_counts': date_counts,
                 'status_labels': status_labels,
                 'status_values': status_values,
+                'method_labels': method_labels,
+                'method_values': method_values,
                 'months': months,
                 'year_current': year_current,
                 'year_prev': year_prev,
@@ -1221,6 +1237,8 @@ def reportes():
         date_counts=date_counts,
         status_labels=status_labels,
         status_values=status_values,
+        method_labels=method_labels,
+        method_values=method_values,
         months=months,
         year_current=year_current,
         year_prev=year_prev,

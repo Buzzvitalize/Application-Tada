@@ -28,6 +28,7 @@ def client(tmp_path):
             total=118,
             invoice_type='Consumidor Final',
             status='Pagada',
+            payment_method='Efectivo',
             company_id=comp.id,
             date=datetime.utcnow(),
         )
@@ -70,6 +71,7 @@ def multi_client(tmp_path):
                 total=118,
                 invoice_type='Consumidor Final',
                 status='Pagada',
+                payment_method='Efectivo',
                 company_id=comp1.id,
                 date=datetime.utcnow() - timedelta(days=i),
             )
@@ -88,6 +90,7 @@ def multi_client(tmp_path):
             total=59,
             invoice_type='Consumidor Final',
             status='Pendiente',
+            payment_method='Transferencia',
             company_id=comp2.id,
             date=datetime.utcnow(),
         )
@@ -130,6 +133,44 @@ def test_invalid_filters(client):
     resp = client.get('/reportes?fecha_inicio=2020-01-01&fecha_fin=2020-01-02&estado=Foo&categoria=Bar&ajax=1')
     data = resp.get_json()
     assert data['invoices'] == []
+    client.get('/logout')
+
+
+def test_payment_method_stats(client):
+    with app.app_context():
+        comp = CompanyInfo.query.first()
+        cli = Client.query.first()
+        order = Order(client_id=cli.id, subtotal=50, itbis=9, total=59, company_id=comp.id)
+        db.session.add(order); db.session.flush()
+        inv = Invoice(client_id=cli.id, order_id=order.id, subtotal=50, itbis=9, total=59,
+                      invoice_type='Consumidor Final', status='Pagada',
+                      payment_method='Transferencia', company_id=comp.id,
+                      date=datetime.utcnow())
+        db.session.add(inv); db.session.commit()
+    login(client, 'user', 'pass')
+    resp = client.get('/reportes?ajax=1')
+    data = resp.get_json()
+    assert data['stats']['cash'] > 0
+    assert data['stats']['transfer'] > 0
+    client.get('/logout')
+
+
+def test_mark_invoice_paid(client):
+    with app.app_context():
+        comp = CompanyInfo.query.first()
+        cli = Client.query.first()
+        order = Order(client_id=cli.id, subtotal=40, itbis=7.2, total=47.2, company_id=comp.id)
+        db.session.add(order); db.session.flush()
+        inv = Invoice(client_id=cli.id, order_id=order.id, subtotal=40, itbis=7.2, total=47.2,
+                      invoice_type='Consumidor Final', status='Pendiente',
+                      payment_method='Efectivo', company_id=comp.id,
+                      date=datetime.utcnow())
+        db.session.add(inv); db.session.commit()
+        invoice_id = inv.id
+    login(client, 'user', 'pass')
+    client.post(f'/facturas/{invoice_id}/pagar', follow_redirects=True)
+    with app.app_context():
+        assert Invoice.query.get(invoice_id).status == 'Pagada'
     client.get('/logout')
 
 

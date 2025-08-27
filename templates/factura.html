@@ -16,6 +16,7 @@
         <th class="p-2 text-left">Cliente</th>
         <th class="p-2 text-left">Fecha</th>
         <th class="p-2 text-left">Total</th>
+        <th class="p-2 text-left">Estado</th>
         <th class="p-2 text-left">Acciones</th>
       </tr>
     </thead>
@@ -27,7 +28,16 @@
         <td class="p-2">{{ f.client.name }}</td>
         <td class="p-2">{{ f.date.strftime('%d/%m/%Y %I:%M %p') }}</td>
         <td class="p-2">{{ f.total | money }}</td>
-        <td class="p-2"><a class="text-blue-500" href="{{ url_for('invoice_pdf', invoice_id=f.id) }}">PDF</a></td>
+        <td class="p-2">{{ f.status }}</td>
+        <td class="p-2 space-x-2">
+          {% if f.status != 'Pagada' %}
+          <form method="post" action="{{ url_for('pay_invoice', invoice_id=f.id) }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="text-green-600 text-sm" onclick="return confirm('¿Marcar como pagada?')">Pagada</button>
+          </form>
+          {% endif %}
+          <a class="text-blue-500 text-sm" href="{{ url_for('invoice_pdf', invoice_id=f.id) }}">PDF</a>
+        </td>
       </tr>
     {% endfor %}
     </tbody>
