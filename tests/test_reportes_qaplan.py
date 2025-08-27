@@ -27,14 +27,33 @@ def _setup_db(db_path):
         db.session.add_all([cli1, cli2]); db.session.flush()
         # invoices for company1
         for i in range(3):
-            inv = Invoice(client_id=cli1.id, order_id=1, subtotal=10, itbis=1.8, total=11.8,
-                          invoice_type='Pagada', company_id=c1.id, date=datetime.utcnow() - timedelta(days=i))
-            db.session.add(inv); db.session.flush()
+            inv = Invoice(
+                client_id=cli1.id,
+                order_id=1,
+                subtotal=10,
+                itbis=1.8,
+                total=11.8,
+                invoice_type='Consumidor Final',
+                status='Pagada',
+                company_id=c1.id,
+                date=datetime.utcnow() - timedelta(days=i),
+            )
+            db.session.add(inv)
+            db.session.flush()
             db.session.add(InvoiceItem(invoice_id=inv.id, code='A', product_name='ProdA', unit='Unidad',
                                        unit_price=10, quantity=1, category='Servicios', company_id=c1.id))
         # one invoice for company2
-        inv2 = Invoice(client_id=cli2.id, order_id=1, subtotal=10, itbis=1.8, total=11.8,
-                       invoice_type='Pagada', company_id=c2.id, date=datetime.utcnow())
+        inv2 = Invoice(
+            client_id=cli2.id,
+            order_id=1,
+            subtotal=10,
+            itbis=1.8,
+            total=11.8,
+            invoice_type='Consumidor Final',
+            status='Pagada',
+            company_id=c2.id,
+            date=datetime.utcnow(),
+        )
         db.session.add(inv2); db.session.flush()
         db.session.add(InvoiceItem(invoice_id=inv2.id, code='A', product_name='ProdA', unit='Unidad',
                                    unit_price=10, quantity=1, category='Servicios', company_id=c2.id))

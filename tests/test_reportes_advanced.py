@@ -13,7 +13,16 @@ def setup_module(module):
         client = Client(name='A', company_id=company.id)
         db.session.add_all([prod, client]); db.session.commit()
         for i in range(10000):
-            inv = Invoice(client_id=client.id, order_id=1, subtotal=10, itbis=1.8, total=11.8, invoice_type='Pagada', company_id=company.id)
+            inv = Invoice(
+                client_id=client.id,
+                order_id=1,
+                subtotal=10,
+                itbis=1.8,
+                total=11.8,
+                invoice_type='Consumidor Final',
+                status='Pagada',
+                company_id=company.id,
+            )
             db.session.add(inv)
             db.session.flush()
             db.session.add(InvoiceItem(invoice_id=inv.id, product_name='Prod', unit='Unidad', unit_price=10, quantity=1, company_id=company.id))

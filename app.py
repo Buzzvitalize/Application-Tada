@@ -169,7 +169,10 @@ def _export_job(company_id, user, start, end, estado, categoria, formato, tipo, 
         }
         try:
             q = _filtered_invoice_query(start, end, estado, categoria)
-            invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+            invoices = q.options(
+                joinedload(Invoice.client),
+                load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+            ).all()
             path = os.path.join('maint', f'export_{entry_id}.{formato}')
             if formato == 'csv':
                 with open(path, 'w', newline='', encoding='utf-8') as f:
@@ -179,7 +182,7 @@ def _export_job(company_id, user, start, end, estado, categoria, formato, tipo, 
                         writer.writerow([
                             inv.client.name if inv.client else '',
                             inv.date.strftime('%Y-%m-%d'),
-                            inv.invoice_type or '',
+                            inv.status or '',
                             f"{inv.total:.2f}",
                         ])
             entry = ExportLog.query.get(entry_id)
@@ -885,12 +888,23 @@ def order_to_invoice(order_id):
     else:
         ncf = f"B01{company.ncf_fiscal:08d}"
         company.ncf_fiscal += 1
-    invoice = Invoice(client_id=order.client_id, order_id=order.id, subtotal=order.subtotal,
-                      itbis=order.itbis, total=order.total, ncf=ncf,
-                      seller=order.seller, payment_method=order.payment_method,
-                      bank=order.bank, note=order.note,
-                      invoice_type=('Consumidor Final' if order.client.is_final_consumer else 'Crédito Fiscal'),
-                      company_id=current_company_id())
+    invoice = Invoice(
+        client_id=order.client_id,
+        order_id=order.id,
+        subtotal=order.subtotal,
+        itbis=order.itbis,
+        total=order.total,
+        ncf=ncf,
+        seller=order.seller,
+        payment_method=order.payment_method,
+        bank=order.bank,
+        note=order.note,
+        invoice_type=(
+            'Consumidor Final' if order.client.is_final_consumer else 'Crédito Fiscal'
+        ),
+        status='Pendiente',
+        company_id=current_company_id(),
+    )
     db.session.add(invoice)
     db.session.flush()
     for item in order.items:
@@ -942,6 +956,15 @@ def list_invoices():
     invoices = query.order_by(Invoice.date.desc()).all()
     return render_template('factura.html', invoices=invoices, q=q)
 
+
+@app.route('/facturas/<int:invoice_id>/pagar', methods=['POST'])
+def pay_invoice(invoice_id):
+    invoice = company_get(Invoice, invoice_id)
+    invoice.status = 'Pagada'
+    db.session.commit()
+    flash('Factura marcada como pagada')
+    return redirect(url_for('list_invoices'))
+
 @app.route('/facturas/<int:invoice_id>/pdf')
 def invoice_pdf(invoice_id):
     invoice = company_get(Invoice, invoice_id)
@@ -975,7 +998,7 @@ def _filtered_invoice_query(fecha_inicio, fecha_fin, estado, categoria):
     if fecha_fin:
         q = q.filter(Invoice.date <= fecha_fin)
     if estado:
-        q = q.filter(Invoice.invoice_type == estado)
+        q = q.filter(Invoice.status == estado)
     if categoria:
         q = q.join(Invoice.items).filter(InvoiceItem.category == categoria)
     return q
@@ -993,13 +1016,18 @@ def reportes():
     q = _filtered_invoice_query(start, end, estado, categoria)
 
     pagination = (
-        q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type))
+        q.options(
+            joinedload(Invoice.client),
+            load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+        )
         .order_by(Invoice.date.desc())
         .paginate(page=page, per_page=10, error_out=False)
     )
     invoices = pagination.items
 
-    all_invoices = q.options(load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+    all_invoices = q.options(
+        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status)
+    ).all()
     total_sales = sum(i.total for i in all_invoices)
     unique_clients = len({i.client_id for i in all_invoices})
 
@@ -1009,7 +1037,7 @@ def reportes():
     if end:
         item_query = item_query.filter(Invoice.date <= end)
     if estado:
-        item_query = item_query.filter(Invoice.invoice_type == estado)
+        item_query = item_query.filter(Invoice.status == estado)
     if categoria:
         item_query = item_query.filter(InvoiceItem.category == categoria)
 
@@ -1076,8 +1104,8 @@ def reportes():
     status_totals = {s: 0 for s in INVOICE_STATUSES}
     status_counts = {s: 0 for s in INVOICE_STATUSES}
     for st, amount, cnt in (
-        q.with_entities(Invoice.invoice_type, func.sum(Invoice.total), func.count(Invoice.id))
-        .group_by(Invoice.invoice_type)
+        q.with_entities(Invoice.status, func.sum(Invoice.total), func.count(Invoice.id))
+        .group_by(Invoice.status)
     ):
         if st in status_totals:
             status_totals[st] = amount or 0
@@ -1167,7 +1195,7 @@ def reportes():
                     {
                         'client': i.client.name if i.client else '',
                         'date': i.date.strftime('%Y-%m-%d'),
-                        'estado': i.invoice_type or '',
+                        'estado': i.status or '',
                         'total': i.total,
                     }
                     for i in invoices
@@ -1247,7 +1275,10 @@ def export_reportes():
         )
         return jsonify({'job': entry_id})
 
-    invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+    invoices = q.options(
+        joinedload(Invoice.client),
+        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+    ).all()
 
     company = get_company_info()
     header = [
@@ -1282,7 +1313,7 @@ def export_reportes():
             if end:
                 summary = summary.filter(Invoice.date <= end)
             if estado:
-                summary = summary.filter(Invoice.invoice_type == estado)
+                summary = summary.filter(Invoice.status == estado)
             for cat, cnt, tot in summary:
                 writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
         else:
@@ -1291,7 +1322,7 @@ def export_reportes():
                 writer.writerow([
                     inv.client.name if inv.client else '',
                     inv.date.strftime('%Y-%m-%d'),
-                    inv.invoice_type or '',
+                    inv.status or '',
                     f"{inv.total:.2f}",
                 ])
         mem = BytesIO()
@@ -1325,7 +1356,7 @@ def export_reportes():
             if end:
                 summary = summary.filter(Invoice.date <= end)
             if estado:
-                summary = summary.filter(Invoice.invoice_type == estado)
+                summary = summary.filter(Invoice.status == estado)
             for cat, cnt, tot in summary:
                 ws.append([cat or 'Sin categoría', cnt, float(tot or 0)])
         else:
@@ -1334,7 +1365,7 @@ def export_reportes():
                 ws.append([
                     inv.client.name if inv.client else '',
                     inv.date.strftime('%Y-%m-%d'),
-                    inv.invoice_type or '',
+                    inv.status or '',
                     float(inv.total),
                 ])
         mem = BytesIO()

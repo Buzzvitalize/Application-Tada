@@ -20,8 +20,17 @@ def client(tmp_path):
         db.session.add(cli); db.session.flush()
         order = Order(client_id=cli.id, subtotal=100, itbis=18, total=118, company_id=comp.id)
         db.session.add(order); db.session.flush()
-        inv = Invoice(client_id=cli.id, order_id=order.id, subtotal=100, itbis=18, total=118,
-                      invoice_type='Pagada', company_id=comp.id, date=datetime.utcnow())
+        inv = Invoice(
+            client_id=cli.id,
+            order_id=order.id,
+            subtotal=100,
+            itbis=18,
+            total=118,
+            invoice_type='Consumidor Final',
+            status='Pagada',
+            company_id=comp.id,
+            date=datetime.utcnow(),
+        )
         db.session.add(inv); db.session.flush()
         item = InvoiceItem(invoice_id=inv.id, code='P1', product_name='Prod', unit='Unidad', unit_price=100,
                            quantity=1, category='Servicios', company_id=comp.id)
@@ -53,7 +62,17 @@ def multi_client(tmp_path):
             db.session.add(cli); db.session.flush()
             order = Order(client_id=cli.id, subtotal=100, itbis=18, total=118, company_id=comp1.id)
             db.session.add(order); db.session.flush()
-            inv = Invoice(client_id=cli.id, order_id=order.id, subtotal=100, itbis=18, total=118, invoice_type='Pagada', company_id=comp1.id, date=datetime.utcnow()-timedelta(days=i))
+            inv = Invoice(
+                client_id=cli.id,
+                order_id=order.id,
+                subtotal=100,
+                itbis=18,
+                total=118,
+                invoice_type='Consumidor Final',
+                status='Pagada',
+                company_id=comp1.id,
+                date=datetime.utcnow() - timedelta(days=i),
+            )
             db.session.add(inv); db.session.flush()
             item = InvoiceItem(invoice_id=inv.id, code='P1', product_name='Prod', unit='Unidad', unit_price=100, quantity=1, category='Servicios', company_id=comp1.id)
             db.session.add(item)
@@ -61,7 +80,17 @@ def multi_client(tmp_path):
         db.session.add(cli2); db.session.flush()
         order2 = Order(client_id=cli2.id, subtotal=50, itbis=9, total=59, company_id=comp2.id)
         db.session.add(order2); db.session.flush()
-        inv2 = Invoice(client_id=cli2.id, order_id=order2.id, subtotal=50, itbis=9, total=59, invoice_type='Pendiente', company_id=comp2.id, date=datetime.utcnow())
+        inv2 = Invoice(
+            client_id=cli2.id,
+            order_id=order2.id,
+            subtotal=50,
+            itbis=9,
+            total=59,
+            invoice_type='Consumidor Final',
+            status='Pendiente',
+            company_id=comp2.id,
+            date=datetime.utcnow(),
+        )
         db.session.add(inv2); db.session.flush()
         item2 = InvoiceItem(invoice_id=inv2.id, code='P1', product_name='Prod', unit='Unidad', unit_price=50, quantity=1, category='Servicios', company_id=comp2.id)
         db.session.add(item2); db.session.commit()

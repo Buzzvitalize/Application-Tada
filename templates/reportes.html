@@ -177,7 +177,7 @@
       <tr class="border-t">
         <td class="p-2">{{ inv.client.name }}</td>
         <td class="p-2">{{ inv.date.strftime('%Y-%m-%d') }}</td>
-        <td class="p-2">{{ inv.invoice_type }}</td>
+        <td class="p-2">{{ inv.status }}</td>
         <td class="p-2 text-right">{{ inv.total | money }}</td>
       </tr>
       {% endfor %}

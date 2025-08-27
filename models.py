@@ -121,6 +121,7 @@ class Invoice(db.Model):
     payment_method = db.Column(db.String(20))
     bank = db.Column(db.String(50))
     invoice_type = db.Column(db.String(20))
+    status = db.Column(db.String(20), default='Pendiente')
     note = db.Column(db.Text)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
