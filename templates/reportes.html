@@ -3,24 +3,34 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Reportes</h1>
 
-<form class="card mb-6 grid md:grid-cols-4 gap-4" method="get" action="{{ url_for('reportes') }}">
+<form id="filters" class="card mb-6 grid md:grid-cols-5 gap-4" method="get" action="{{ url_for('reportes') }}">
   <input type="date" name="fecha_inicio" value="{{ filters.fecha_inicio }}" class="input">
   <input type="date" name="fecha_fin" value="{{ filters.fecha_fin }}" class="input">
-  <input type="text" name="estado" placeholder="Estado" value="{{ filters.estado }}" class="input">
+  <select name="estado" class="input">
+    <option value="">Todos los estados</option>
+    {% for s in statuses %}
+    <option value="{{ s }}" {% if filters.estado==s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
   <select name="categoria" class="input">
     <option value="">Todas las categorías</option>
     {% for c in categories %}
     <option value="{{ c }}" {% if filters.categoria==c %}selected{% endif %}>{{ c }}</option>
     {% endfor %}
   </select>
-  <div class="md:col-span-4 flex gap-2 mt-2">
+  <div class="relative"><button type="button" id="exportBtn" class="btn w-full">Exportar</button>
+    <div id="exportMenu" class="absolute right-0 mt-2 w-40 bg-white border rounded shadow hidden z-10">
+      <a href="#" data-format="csv" class="block px-4 py-2 hover:bg-gray-100">Exportar CSV</a>
+      <a href="#" data-format="pdf" class="block px-4 py-2 hover:bg-gray-100">Exportar PDF</a>
+    </div>
+  </div>
+  <div class="md:col-span-5 flex gap-2 mt-2">
     <button class="btn" type="submit">Filtrar</button>
-    <a class="btn" href="{{ url_for('export_reportes', formato='csv', **filters) }}">Descargar CSV</a>
-    <a class="btn" href="{{ url_for('export_reportes', formato='pdf', **filters) }}" target="_blank">Descargar PDF</a>
+    <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
   </div>
 </form>
 
-<div class="grid md:grid-cols-3 gap-4 mb-6">
+<div class="grid md:grid-cols-6 gap-4 mb-6">
   <div class="card text-center">
     <div class="text-sm text-gray-500">Ventas Totales</div>
     <div class="text-2xl font-bold">{{ stats.total_sales | money }}</div>
@@ -32,6 +42,18 @@
   <div class="card text-center">
     <div class="text-sm text-gray-500">Facturas</div>
     <div class="text-2xl font-bold">{{ stats.invoices }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Pendientes</div>
+    <div class="text-2xl font-bold">{{ stats.pending | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Pagadas</div>
+    <div class="text-2xl font-bold">{{ stats.paid | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ticket Promedio</div>
+    <div class="text-2xl font-bold">{{ stats.avg_ticket | money }}</div>
   </div>
 </div>
 
@@ -64,6 +86,26 @@
   </table>
 </div>
 
+<div class="card overflow-x-auto mb-6">
+  <h2 class="text-xl font-semibold mb-2">Top 5 Clientes</h2>
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Cliente</th>
+        <th class="p-2 text-right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name, total in top_clients %}
+      <tr class="border-t">
+        <td class="p-2">{{ name }}</td>
+        <td class="p-2 text-right">{{ total | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 <div class="card overflow-x-auto">
   <h2 class="text-xl font-semibold mb-2">Detalle de Facturas</h2>
   <table class="min-w-full text-sm">
@@ -86,6 +128,14 @@
       {% endfor %}
     </tbody>
   </table>
+  <div class="flex justify-end gap-2 mt-2">
+    {% if pagination.page > 1 %}
+    <a class="btn" href="{{ url_for('reportes', page=pagination.page-1, **filters) }}">Anterior</a>
+    {% endif %}
+    {% if pagination.page < pagination.pages %}
+    <a class="btn" href="{{ url_for('reportes', page=pagination.page+1, **filters) }}">Siguiente</a>
+    {% endif %}
+  </div>
 </div>
 
 {% endblock %}
@@ -94,22 +144,62 @@
 {{ super() }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+const currency = new Intl.NumberFormat('es-DO',{style:'currency',currency:'DOP'});
+
 const catCtx = document.getElementById('catChart');
+const catCounts = {{ cat_counts|tojson }};
 new Chart(catCtx, {
   type: 'bar',
   data: {
     labels: {{ cat_labels|tojson }},
-    datasets: [{ label: 'Ventas por categoría', data: {{ cat_totals|tojson }}, backgroundColor: '#1e3a8a' }]
+    datasets: [{ label: 'Ventas por categoría', data: {{ cat_totals|tojson }}, backgroundColor: '#1e3a8a', categoryCounts: catCounts }]
+  },
+  options: {
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: ctx => `${currency.format(ctx.parsed.y)} (${ctx.dataset.categoryCounts[ctx.dataIndex]} ventas)`
+        }
+      }
+    }
   }
 });
+
 const timeCtx = document.getElementById('timeChart');
+const dateCounts = {{ date_counts|tojson }};
 new Chart(timeCtx, {
   type: 'line',
   data: {
     labels: {{ date_labels|tojson }},
-    datasets: [{ label: 'Ventas en el tiempo', data: {{ date_totals|tojson }}, borderColor: '#1e3a8a', fill:false }]
+    datasets: [{ label: 'Ventas en el tiempo', data: {{ date_totals|tojson }}, borderColor: '#1e3a8a', fill:false, count: dateCounts }]
+  },
+  options: {
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: ctx => `${currency.format(ctx.parsed.y)} (${ctx.dataset.count[ctx.dataIndex]} ventas)`
+        }
+      }
+    }
   }
 });
+
+const exportBtn = document.getElementById('exportBtn');
+const exportMenu = document.getElementById('exportMenu');
+const spinner = document.getElementById('exportSpinner');
+exportBtn.addEventListener('click', () => exportMenu.classList.toggle('hidden'));
+exportMenu.querySelectorAll('a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    spinner.classList.remove('hidden');
+    const params = new URLSearchParams(new FormData(document.getElementById('filters')));
+    window.location = `{{ url_for('export_reportes') }}?formato=${a.dataset.format}&` + params.toString();
+    setTimeout(() => spinner.classList.add('hidden'), 3000);
+    exportMenu.classList.add('hidden');
+  });
+});
+
+document.getElementById('filters').addEventListener('change', () => document.getElementById('filters').submit());
 </script>
 {% endblock %}
 

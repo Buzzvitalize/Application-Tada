@@ -11,7 +11,14 @@ from flask import (
     jsonify,
     g,
 )
-from flask_migrate import Migrate
+try:
+    from flask_migrate import Migrate
+except ModuleNotFoundError:  # pragma: no cover
+    class Migrate:
+        def __init__(self, *a, **k):
+            pass
+        def init_app(self, *a, **k):
+            pass
 import logging
 from logging.handlers import RotatingFileHandler
 try:
@@ -144,6 +151,7 @@ def ensure_admin():  # pragma: no cover - optional helper for deployments
 ITBIS_RATE = 0.18
 UNITS = ('Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro')
 CATEGORIES = ('Servicios', 'Consumo', 'Liquido', 'Otros')
+INVOICE_STATUSES = ('Pendiente', 'Pagada')
 
 
 def current_company_id():
@@ -172,6 +180,28 @@ def _to_int(value):
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _parse_report_params(fecha_inicio, fecha_fin, estado, categoria):
+    """Validate and normalize report filter parameters."""
+    start = end = None
+    if fecha_inicio:
+        try:
+            start = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        except ValueError:
+            start = None
+    if fecha_fin:
+        try:
+            end = datetime.strptime(fecha_fin, '%Y-%m-%d')
+        except ValueError:
+            end = None
+    if start and end and start > end:
+        start = end = None
+    if estado not in INVOICE_STATUSES:
+        estado = None
+    if categoria not in CATEGORIES:
+        categoria = None
+    return start, end, estado, categoria
 
 
 @app.template_filter('phone')
@@ -858,19 +888,12 @@ def serve_pdf(filename):
     return send_from_directory(os.path.join(app.static_folder, 'pdfs'), filename)
 
 def _filtered_invoice_query(fecha_inicio, fecha_fin, estado, categoria):
+    """Return an invoice query filtered by the provided parameters."""
     q = company_query(Invoice)
     if fecha_inicio:
-        try:
-            start = datetime.strptime(fecha_inicio, '%Y-%m-%d')
-            q = q.filter(Invoice.date >= start)
-        except ValueError:
-            pass
+        q = q.filter(Invoice.date >= fecha_inicio)
     if fecha_fin:
-        try:
-            end = datetime.strptime(fecha_fin, '%Y-%m-%d')
-            q = q.filter(Invoice.date <= end)
-        except ValueError:
-            pass
+        q = q.filter(Invoice.date <= fecha_fin)
     if estado:
         q = q.filter(Invoice.invoice_type == estado)
     if categoria:
@@ -884,26 +907,27 @@ def reportes():
     fecha_fin = request.args.get('fecha_fin')
     estado = request.args.get('estado')
     categoria = request.args.get('categoria')
+    page = request.args.get('page', 1, type=int)
 
-    q = _filtered_invoice_query(fecha_inicio, fecha_fin, estado, categoria)
-    invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+    start, end, estado, categoria = _parse_report_params(fecha_inicio, fecha_fin, estado, categoria)
+    q = _filtered_invoice_query(start, end, estado, categoria)
 
-    total_sales = sum(i.total for i in invoices)
-    unique_clients = len({i.client_id for i in invoices})
+    pagination = (
+        q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type))
+        .order_by(Invoice.date.desc())
+        .paginate(page=page, per_page=10, error_out=False)
+    )
+    invoices = pagination.items
+
+    all_invoices = q.options(load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+    total_sales = sum(i.total for i in all_invoices)
+    unique_clients = len({i.client_id for i in all_invoices})
 
     item_query = company_query(InvoiceItem).join(Invoice)
-    if fecha_inicio:
-        try:
-            start = datetime.strptime(fecha_inicio, '%Y-%m-%d')
-            item_query = item_query.filter(Invoice.date >= start)
-        except ValueError:
-            pass
-    if fecha_fin:
-        try:
-            end = datetime.strptime(fecha_fin, '%Y-%m-%d')
-            item_query = item_query.filter(Invoice.date <= end)
-        except ValueError:
-            pass
+    if start:
+        item_query = item_query.filter(Invoice.date >= start)
+    if end:
+        item_query = item_query.filter(Invoice.date <= end)
     if estado:
         item_query = item_query.filter(Invoice.invoice_type == estado)
     if categoria:
@@ -919,22 +943,45 @@ def reportes():
     )
 
     sales_over_time = (
-        q.with_entities(func.date(Invoice.date), func.sum(Invoice.total))
+        q.with_entities(func.date(Invoice.date), func.sum(Invoice.total), func.count(Invoice.id))
         .group_by(func.date(Invoice.date))
         .order_by(func.date(Invoice.date))
+        .all()
+    )
+
+    status_totals = {s: 0 for s in INVOICE_STATUSES}
+    for st, amount in (
+        q.with_entities(Invoice.invoice_type, func.sum(Invoice.total)).group_by(Invoice.invoice_type)
+    ):
+        if st in status_totals:
+            status_totals[st] = amount or 0
+
+    avg_ticket = total_sales / unique_clients if unique_clients else 0
+
+    top_clients = (
+        q.join(Client)
+        .with_entities(Client.name, func.sum(Invoice.total))
+        .group_by(Client.id)
+        .order_by(func.sum(Invoice.total).desc())
+        .limit(5)
         .all()
     )
 
     stats = {
         'total_sales': total_sales,
         'unique_clients': unique_clients,
-        'invoices': len(invoices),
+        'invoices': len(all_invoices),
+        'pending': status_totals.get('Pendiente', 0),
+        'paid': status_totals.get('Pagada', 0),
+        'avg_ticket': avg_ticket,
     }
 
     cat_labels = [c or 'Sin categoría' for c, *_ in sales_by_category]
     cat_totals = [s or 0 for *_1, _2, s in sales_by_category]
-    date_labels = [d.strftime('%Y-%m-%d') for d, _ in sales_over_time]
-    date_totals = [t or 0 for _, t in sales_over_time]
+    cat_counts = [qtd for _cat, qtd, *_ in sales_by_category]
+    date_labels = [d if isinstance(d, str) else d.strftime('%Y-%m-%d') for d, *_ in sales_over_time]
+    date_totals = [t or 0 for _, t, _ in sales_over_time]
+    date_counts = [cnt for *_1, cnt in sales_over_time]
 
     filters = {
         'fecha_inicio': fecha_inicio or '',
@@ -943,29 +990,62 @@ def reportes():
         'categoria': categoria or '',
     }
 
+    if request.args.get('ajax') == '1':
+        return jsonify(
+            {
+                'stats': stats,
+                'top_clients': [{'name': n, 'total': t} for n, t in top_clients],
+                'cat_labels': cat_labels,
+                'cat_totals': cat_totals,
+                'cat_counts': cat_counts,
+                'date_labels': date_labels,
+                'date_totals': date_totals,
+                'date_counts': date_counts,
+                'invoices': [
+                    {
+                        'client': i.client.name if i.client else '',
+                        'date': i.date.strftime('%Y-%m-%d'),
+                        'estado': i.invoice_type or '',
+                        'total': i.total,
+                    }
+                    for i in invoices
+                ],
+                'pagination': {'page': pagination.page, 'pages': pagination.pages},
+            }
+        )
+
     return render_template(
         'reportes.html',
         invoices=invoices,
+        pagination=pagination,
         sales_by_category=sales_by_category,
         stats=stats,
+        top_clients=top_clients,
         cat_labels=cat_labels,
         cat_totals=cat_totals,
+        cat_counts=cat_counts,
         date_labels=date_labels,
         date_totals=date_totals,
+        date_counts=date_counts,
         filters=filters,
         categories=CATEGORIES,
+        statuses=INVOICE_STATUSES,
     )
 
 
 @app.route('/reportes/export')
 def export_reportes():
+    if session.get('role') not in ('admin', 'contabilidad'):
+        return '', 403
+
     formato = request.args.get('formato', 'csv')
     fecha_inicio = request.args.get('fecha_inicio')
     fecha_fin = request.args.get('fecha_fin')
     estado = request.args.get('estado')
     categoria = request.args.get('categoria')
 
-    q = _filtered_invoice_query(fecha_inicio, fecha_fin, estado, categoria)
+    start, end, estado, categoria = _parse_report_params(fecha_inicio, fecha_fin, estado, categoria)
+    q = _filtered_invoice_query(start, end, estado, categoria)
     invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
 
     if formato == 'csv':
