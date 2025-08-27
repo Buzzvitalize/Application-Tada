@@ -550,8 +550,13 @@ def cpanel_home():
 @app.route('/cpaneltx/users')
 @admin_only
 def cpanel_users():
-    users = User.query.all()
-    return render_template('cpanel_users.html', users=users)
+    q = request.args.get('q', '')
+    page = request.args.get('page', 1, type=int)
+    query = User.query
+    if q:
+        query = query.filter(User.username.ilike(f'%{q}%'))
+    users = query.order_by(User.id).paginate(page=page, per_page=10, error_out=False)
+    return render_template('cpanel_users.html', users=users, q=q)
 
 
 @app.post('/cpaneltx/users/<int:user_id>/role')
@@ -579,8 +584,13 @@ def cpanel_user_delete(user_id):
 @app.route('/cpaneltx/companies')
 @admin_only
 def cpanel_companies():
-    companies = CompanyInfo.query.all()
-    return render_template('cpanel_companies.html', companies=companies)
+    q = request.args.get('q', '')
+    page = request.args.get('page', 1, type=int)
+    query = CompanyInfo.query
+    if q:
+        query = query.filter(CompanyInfo.name.ilike(f'%{q}%'))
+    companies = query.order_by(CompanyInfo.id).paginate(page=page, per_page=10, error_out=False)
+    return render_template('cpanel_companies.html', companies=companies, q=q)
 
 
 @app.post('/cpaneltx/companies/<int:cid>/delete')

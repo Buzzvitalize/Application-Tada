@@ -11,6 +11,7 @@
     <td class="p-2">{{ o.total|money }}</td>
     <td class="p-2 text-right">
       <form method="post" action="{{ url_for('cpanel_order_delete', oid=o.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="text-red-600" onclick="return confirm('Eliminar?')">Eliminar</button>
       </form>
     </td>
