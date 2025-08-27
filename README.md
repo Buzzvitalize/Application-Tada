@@ -13,6 +13,7 @@ Key features:
 - Optional document notes stored with quotations and carried over to orders and invoices, appearing on generated PDFs
 - PDF exports display document numbers and invoice type (Consumidor Final o Crédito Fiscal)
 - Quotation form reuses existing clients and products via auto-complete fields
+- Approved account requests trigger an email notification with login details
 
 ## Configuration
 
@@ -20,6 +21,11 @@ Copy `.env.example` to `.env` and define a random secret key:
 
 ```
 SECRET_KEY=replace_with_random_string
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=user@example.com
+SMTP_PASS=supersecret
+SMTP_FROM=tiendix@example.com
 ```
 
 This value secures Flask sessions and is required for the application to start.

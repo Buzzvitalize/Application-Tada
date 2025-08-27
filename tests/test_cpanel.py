@@ -4,7 +4,7 @@ import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app import app, db
-from models import User, CompanyInfo
+from models import User, CompanyInfo, AccountRequest
 
 @pytest.fixture
 def client(tmp_path):
@@ -61,3 +61,33 @@ def test_non_admin_denied(client):
     login(client, 'user', '123')
     r = client.get('/cpaneltx')
     assert r.status_code == 302
+
+
+def test_account_approval_sends_email(client, monkeypatch):
+    with app.app_context():
+        req = AccountRequest(
+            account_type='personal',
+            first_name='Ana',
+            last_name='Doe',
+            company='AnaCo',
+            identifier='001',
+            phone='123',
+            email='ana@example.com',
+            username='anita',
+            password='pw',
+        )
+        db.session.add(req)
+        db.session.commit()
+        rid = req.id
+    sent = {}
+    def fake_send(to, subject, html):
+        sent['to'] = to
+        sent['subject'] = subject
+        sent['html'] = html
+    monkeypatch.setattr('app.send_email', fake_send)
+    login(client, 'admin', '363636')
+    client.post(f'/admin/solicitudes/{rid}/aprobar', data={'role': 'company'})
+    assert sent['to'] == 'ana@example.com'
+    assert 'aprobada' in sent['subject'].lower()
+    with app.app_context():
+        assert User.query.filter_by(username='anita').first() is not None

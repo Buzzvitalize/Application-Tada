@@ -22,6 +22,8 @@ except ModuleNotFoundError:  # pragma: no cover
             pass
 import logging
 from logging.handlers import RotatingFileHandler
+import smtplib
+from email.mime.text import MIMEText
 try:
     from flask_wtf import CSRFProtect
 except ModuleNotFoundError:  # pragma: no cover
@@ -108,6 +110,30 @@ file_handler.setLevel(logging.INFO)
 app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 app.logger.info('Tiendix startup')
+
+SMTP_HOST = os.getenv('SMTP_HOST')
+SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
+SMTP_USER = os.getenv('SMTP_USER')
+SMTP_PASS = os.getenv('SMTP_PASS')
+SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER)
+
+
+def send_email(to, subject, html):
+    if not SMTP_HOST or not SMTP_FROM:
+        app.logger.warning('Email settings missing; skipping send to %s', to)
+        return
+    msg = MIMEText(html, 'html')
+    msg['Subject'] = subject
+    msg['From'] = SMTP_FROM
+    msg['To'] = to
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            if SMTP_USER and SMTP_PASS:
+                s.starttls()
+                s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(SMTP_FROM, [to], msg.as_string())
+    except Exception as e:  # pragma: no cover
+        app.logger.error('Email send failed: %s', e)
 
 
 def _fmt_money(value):
@@ -513,6 +539,9 @@ def clear_company():
 def approve_request(req_id):
     req = AccountRequest.query.get_or_404(req_id)
     role = request.form.get('role', 'company')
+    username = req.username
+    password = req.password
+    email = req.email
     company = CompanyInfo(
         name=req.company,
         street=req.address or '',
@@ -525,10 +554,18 @@ def approve_request(req_id):
     )
     db.session.add(company)
     db.session.flush()
-    user = User(username=req.username, password=req.password, role=role, company_id=company.id)
+    user = User(username=username, password=password, role=role, company_id=company.id)
     db.session.add(user)
     db.session.delete(req)
     db.session.commit()
+    html = render_template(
+        'emails/account_approved.html',
+        username=username,
+        password=password,
+        company=company.name,
+        login_url=url_for('auth.login', _external=True),
+    )
+    send_email(email, 'Tu cuenta ha sido aprobada', html)
     flash('Cuenta aprobada')
     return redirect(url_for('admin_requests'))
 
