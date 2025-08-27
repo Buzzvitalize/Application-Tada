@@ -40,6 +40,7 @@
       <button type="button" data-range="year" class="btn text-xs">Año</button>
     </div>
     <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
+    <a href="{{ url_for('export_history') }}" class="btn ml-auto">Historial</a>
   </div>
 </form>
 
@@ -68,6 +69,18 @@
     <div class="text-sm text-gray-500">Ticket Promedio</div>
     <div class="text-2xl font-bold">{{ stats.avg_ticket | money }}</div>
   </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ticket Prom. Mes</div>
+    <div class="text-2xl font-bold">{{ stats.avg_ticket_month | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ticket Prom. Año</div>
+    <div class="text-2xl font-bold">{{ stats.avg_ticket_year | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Retención</div>
+    <div class="text-2xl font-bold">{{ '%.1f%%'|format(stats.retention) }}</div>
+  </div>
 </div>
 
 <div class="grid md:grid-cols-2 gap-6 mb-6">
@@ -77,6 +90,9 @@
 <div class="grid md:grid-cols-2 gap-6 mb-6">
   <canvas id="statusChart" class="card p-4"></canvas>
   <canvas id="monthlyChart" class="card p-4"></canvas>
+</div>
+<div class="card p-4 mb-6">
+  <canvas id="trendChart"></canvas>
 </div>
 
 <div class="card overflow-x-auto mb-6">
@@ -176,23 +192,35 @@
 const currency = new Intl.NumberFormat('es-DO',{style:'currency',currency:'DOP'});
 
 const catCtx = document.getElementById('catChart');
-const catCounts = {{ cat_counts|tojson }};
-new Chart(catCtx, {
-  type: 'bar',
+const catChart = new Chart(catCtx, {
+  type: 'pie',
   data: {
     labels: {{ cat_labels|tojson }},
-    datasets: [{ label: 'Ventas por categoría', data: {{ cat_totals|tojson }}, backgroundColor: '#1e3a8a', categoryCounts: catCounts }]
+    datasets: [{ data: {{ cat_totals|tojson }}, backgroundColor:['#1e3a8a','#3b82f6','#60a5fa','#93c5fd','#cbd5e1'] }]
   },
-  options: {
-    plugins: {
-      tooltip: {
-        callbacks: {
-          label: ctx => `${currency.format(ctx.parsed.y)} (${ctx.dataset.categoryCounts[ctx.dataIndex]} ventas)`
+  options:{
+    plugins:{
+      tooltip:{
+        callbacks:{
+          label: ctx => {
+            const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+            const pct = total? (ctx.parsed/total*100).toFixed(1):0;
+            return `${ctx.label}: ${currency.format(ctx.parsed)} (${pct}%)`;
+          }
         }
       }
     }
   }
 });
+catCtx.onclick = function(evt){
+  const points = catChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+  if(points.length){
+    const label = catChart.data.labels[points[0].index];
+    const params = new URLSearchParams(new FormData(document.getElementById('filters')));
+    params.set('categoria', label);
+    window.location = '?' + params.toString();
+  }
+};
 
 const timeCtx = document.getElementById('timeChart');
 const dateCounts = {{ date_counts|tojson }};
@@ -214,10 +242,19 @@ new Chart(timeCtx, {
 });
 
 const statusCtx = document.getElementById('statusChart');
-new Chart(statusCtx, {
+const statusChart = new Chart(statusCtx, {
   type: 'pie',
   data: {labels: {{ status_labels|tojson }}, datasets: [{data: {{ status_values|tojson }}, backgroundColor:['#1e3a8a','#facc15','#16a34a']} ]},
 });
+statusCtx.onclick = function(evt){
+  const points = statusChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+  if(points.length){
+    const label = statusChart.data.labels[points[0].index];
+    const params = new URLSearchParams(new FormData(document.getElementById('filters')));
+    params.set('estado', label);
+    window.location = '?' + params.toString();
+  }
+};
 
 const monthlyCtx = document.getElementById('monthlyChart');
 new Chart(monthlyCtx, {
@@ -228,6 +265,15 @@ new Chart(monthlyCtx, {
       {label: 'Año actual', data: {{ year_current|tojson }}, backgroundColor:'#1e3a8a'},
       {label: 'Año anterior', data: {{ year_prev|tojson }}, backgroundColor:'#93c5fd'}
     ]
+  }
+});
+
+const trendCtx = document.getElementById('trendChart');
+new Chart(trendCtx, {
+  type: 'line',
+  data: {
+    labels: {{ trend_24|map(attribute='month')|list|tojson }},
+    datasets: [{label:'Últimos 24 meses', data: {{ trend_24|map(attribute='total')|list|tojson }}, borderColor:'#1e3a8a', fill:false}]
   }
 });
 

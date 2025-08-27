@@ -184,3 +184,16 @@ class AccountRequest(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     created_at = db.Column(db.DateTime, default=dom_now)
+
+
+class ExportLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user = db.Column(db.String(80))
+    company_id = db.Column(db.Integer)
+    formato = db.Column(db.String(10))
+    tipo = db.Column(db.String(20))
+    filtros = db.Column(db.Text)
+    status = db.Column(db.String(20))  # queued, success, fail
+    message = db.Column(db.Text)
+    file_path = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=dom_now)

@@ -47,6 +47,7 @@ from models import (
     CompanyInfo,
     User,
     AccountRequest,
+    ExportLog,
     dom_now,
 )
 from io import BytesIO, StringIO
@@ -62,6 +63,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
 import os
 import re
+import json
 from ai import recommend_products
 from weasy_pdf import generate_pdf
 from functools import wraps
@@ -72,6 +74,13 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     def load_dotenv():
         pass
+try:
+    from rq import Queue
+    from redis import Redis
+except Exception:  # pragma: no cover
+    Queue = None
+    Redis = None
+import threading
 
 load_dotenv()
 # Load RNC data for company name lookup
@@ -117,6 +126,71 @@ app.register_blueprint(auth_bp)
 with app.app_context():
     db.create_all()
 
+if Queue and Redis:
+    redis_conn = Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
+    export_queue = Queue('exports', connection=redis_conn)
+else:  # pragma: no cover
+    export_queue = None
+
+
+def enqueue_export(fn, *args):
+    if export_queue:
+        return export_queue.enqueue(fn, *args)
+    t = threading.Thread(target=fn, args=args, daemon=True)
+    t.start()
+    return t
+
+
+def log_export(user, formato, tipo, filtros, status, message='', file_path=None):
+    with app.app_context():
+        entry = ExportLog(
+            user=user,
+            company_id=current_company_id(),
+            formato=formato,
+            tipo=tipo,
+            filtros=json.dumps(filtros),
+            status=status,
+            message=message,
+            file_path=file_path,
+        )
+        db.session.add(entry)
+        db.session.commit()
+        return entry.id
+
+
+def _export_job(company_id, user, start, end, estado, categoria, formato, tipo, entry_id):  # pragma: no cover - background
+    with app.app_context():
+        session['company_id'] = company_id
+        filtros = {
+            'fecha_inicio': start.strftime('%Y-%m-%d') if start else '',
+            'fecha_fin': end.strftime('%Y-%m-%d') if end else '',
+            'estado': estado or '',
+            'categoria': categoria or '',
+        }
+        try:
+            q = _filtered_invoice_query(start, end, estado, categoria)
+            invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+            path = os.path.join('maint', f'export_{entry_id}.{formato}')
+            if formato == 'csv':
+                with open(path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+                    for inv in invoices:
+                        writer.writerow([
+                            inv.client.name if inv.client else '',
+                            inv.date.strftime('%Y-%m-%d'),
+                            inv.invoice_type or '',
+                            f"{inv.total:.2f}",
+                        ])
+            entry = ExportLog.query.get(entry_id)
+            entry.status = 'success'
+            entry.file_path = path
+            db.session.commit()
+        except Exception as exc:
+            entry = ExportLog.query.get(entry_id)
+            entry.status = 'fail'
+            entry.message = str(exc)
+            db.session.commit()
 def _migrate_legacy_schema():
     """Add missing columns to older SQLite databases.
 
@@ -157,6 +231,7 @@ ITBIS_RATE = 0.18
 UNITS = ('Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro')
 CATEGORIES = ('Servicios', 'Consumo', 'Liquido', 'Otros')
 INVOICE_STATUSES = ('Pendiente', 'Pagada')
+MAX_EXPORT_ROWS = 50000
 
 
 def current_company_id():
@@ -954,6 +1029,48 @@ def reportes():
         .all()
     )
 
+    # retention
+    client_counts = (
+        q.with_entities(Invoice.client_id, func.count(Invoice.id))
+        .group_by(Invoice.client_id)
+        .all()
+    )
+    retained = len([1 for _cid, cnt in client_counts if cnt > 1])
+    retention = (retained / len(client_counts)) * 100 if client_counts else 0
+
+    # top categories last year
+    last_year_start = datetime.utcnow().replace(year=datetime.utcnow().year - 1, month=1, day=1)
+    top_cats = (
+        company_query(InvoiceItem)
+        .join(Invoice)
+        .with_entities(InvoiceItem.category, func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount))
+        .filter(Invoice.date >= last_year_start)
+        .group_by(InvoiceItem.category)
+        .order_by(func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount).desc())
+        .limit(5)
+        .all()
+    )
+
+    # monthly and yearly avg ticket
+    today = datetime.utcnow()
+    month_invoices = [i for i in all_invoices if i.date.month == today.month and i.date.year == today.year]
+    month_total = sum(i.total for i in month_invoices)
+    month_clients = len({i.client_id for i in month_invoices})
+    avg_ticket_month = month_total / month_clients if month_clients else 0
+    year_invoices = [i for i in all_invoices if i.date.year == today.year]
+    year_total = sum(i.total for i in year_invoices)
+    year_clients = len({i.client_id for i in year_invoices})
+    avg_ticket_year = year_total / year_clients if year_clients else 0
+
+    # trend last 24 months
+    trend_query = (
+        q.with_entities(func.strftime('%Y-%m', Invoice.date), func.sum(Invoice.total))
+        .filter(Invoice.date >= datetime(today.year - 2, today.month, 1))
+        .group_by(func.strftime('%Y-%m', Invoice.date))
+        .order_by(func.strftime('%Y-%m', Invoice.date))
+    )
+    trend_24 = trend_query.all()
+
     status_totals = {s: 0 for s in INVOICE_STATUSES}
     status_counts = {s: 0 for s in INVOICE_STATUSES}
     for st, amount, cnt in (
@@ -1001,6 +1118,9 @@ def reportes():
         'pending': status_totals.get('Pendiente', 0),
         'paid': status_totals.get('Pagada', 0),
         'avg_ticket': avg_ticket,
+        'avg_ticket_month': avg_ticket_month,
+        'avg_ticket_year': avg_ticket_year,
+        'retention': retention,
     }
 
     cat_labels = [c or 'Sin categoría' for c, *_ in sales_by_category]
@@ -1039,6 +1159,8 @@ def reportes():
                 'months': months,
                 'year_current': year_current,
                 'year_prev': year_prev,
+                'top_categories_year': [{'category': c or 'Sin categoría', 'total': t or 0} for c, t in top_cats],
+                'trend_24': [{'month': m, 'total': tot or 0} for m, tot in trend_24],
                 'invoices': [
                     {
                         'client': i.client.name if i.client else '',
@@ -1059,6 +1181,8 @@ def reportes():
         sales_by_category=sales_by_category,
         stats=stats,
         top_clients=top_clients,
+        top_categories_year=top_cats,
+        trend_24=trend_24,
         cat_labels=cat_labels,
         cat_totals=cat_totals,
         cat_counts=cat_counts,
@@ -1083,8 +1207,10 @@ def export_reportes():
     tipo = request.args.get('tipo', 'detalle')
     if role == 'contabilidad':
         if formato not in {'csv', 'xlsx'} or tipo != 'resumen':
+            log_export(session.get('username'), formato, tipo, {}, 'fail', 'permiso')
             return '', 403
     elif role != 'admin':
+        log_export(session.get('username'), formato, tipo, {}, 'fail', 'permiso')
         return '', 403
 
     fecha_inicio = request.args.get('fecha_inicio')
@@ -1094,10 +1220,34 @@ def export_reportes():
 
     start, end, estado, categoria = _parse_report_params(fecha_inicio, fecha_fin, estado, categoria)
     q = _filtered_invoice_query(start, end, estado, categoria)
+    count = q.count()
+    filtros = {'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'estado': estado, 'categoria': categoria}
+    user = session.get('username')
+
+    max_rows = current_app.config.get('MAX_EXPORT_ROWS', MAX_EXPORT_ROWS)
+    if count > max_rows and request.args.get('async') != '1':
+        log_export(user, formato, tipo, filtros, 'fail', 'too_many_rows')
+        return jsonify({'error': 'too many rows', 'suggest': 'async'}), 400
+
+    if count > max_rows and request.args.get('async') == '1':
+        entry_id = log_export(user, formato, tipo, filtros, 'queued')
+        enqueue_export(
+            _export_job,
+            current_company_id(),
+            user,
+            start,
+            end,
+            estado,
+            categoria,
+            formato,
+            tipo,
+            entry_id,
+        )
+        return jsonify({'job': entry_id})
+
     invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
 
     company = get_company_info()
-    user = session.get('username')
     header = [
         f"Empresa: {company.get('name', '')}",
         f"Rango: {(fecha_inicio or 'Todas')} - {(fecha_fin or 'Todas')}",
@@ -1109,7 +1259,7 @@ def export_reportes():
         current_company_id(),
         formato,
         tipo,
-        {'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'estado': estado, 'categoria': categoria},
+        filtros,
     )
 
     if formato == 'csv':
@@ -1145,6 +1295,7 @@ def export_reportes():
         mem = BytesIO()
         mem.write(output.getvalue().encode('utf-8'))
         mem.seek(0)
+        log_export(user, formato, tipo, filtros, 'success')
         return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='reportes.csv')
 
     if formato == 'xlsx':
@@ -1187,6 +1338,7 @@ def export_reportes():
         mem = BytesIO()
         wb.save(mem)
         mem.seek(0)
+        log_export(user, formato, tipo, filtros, 'success')
         return send_file(
             mem,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1220,9 +1372,28 @@ def export_reportes():
             note=note,
             output_path='reportes.pdf'
         )
-        return send_file(pdf_path, as_attachment=True, download_name='reportes.pdf')
+        log_export(user, formato, tipo, filtros, 'success', file_path=pdf_path)
+    return send_file(pdf_path, as_attachment=True, download_name='reportes.pdf')
 
     return redirect(url_for('reportes'))
+
+
+@app.route('/reportes/exportes')
+def export_history():
+    q = company_query(ExportLog).order_by(ExportLog.created_at.desc())
+    usuario = request.args.get('usuario')
+    formato = request.args.get('formato')
+    if usuario:
+        q = q.filter(ExportLog.user == usuario)
+    if formato:
+        q = q.filter(ExportLog.formato == formato)
+    logs = q.limit(100).all()
+    return render_template('export_history.html', logs=logs)
+
+
+@app.route('/docs')
+def docs():
+    return render_template('docs.html')
 
 
 @app.route('/contabilidad')
