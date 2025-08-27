@@ -1069,7 +1069,8 @@ def reportes():
         .group_by(func.strftime('%Y-%m', Invoice.date))
         .order_by(func.strftime('%Y-%m', Invoice.date))
     )
-    trend_24 = trend_query.all()
+    # ensure a list is always provided even if the query returns no rows
+    trend_24 = trend_query.all() if trend_query is not None else []
 
     status_totals = {s: 0 for s in INVOICE_STATUSES}
     status_counts = {s: 0 for s in INVOICE_STATUSES}
@@ -1182,7 +1183,7 @@ def reportes():
         stats=stats,
         top_clients=top_clients,
         top_categories_year=top_cats,
-        trend_24=trend_24,
+        trend_24=trend_24 or [],
         cat_labels=cat_labels,
         cat_totals=cat_totals,
         cat_counts=cat_counts,
