@@ -7,3 +7,8 @@ qrcode
 WeasyPrint
 openpyxl
 Faker
+pytest
+pytest-benchmark
+pytest-cov
+pytest-xdist
+locust
