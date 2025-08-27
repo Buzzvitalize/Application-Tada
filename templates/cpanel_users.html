@@ -8,7 +8,14 @@
 </form>
 
 <table class="min-w-full bg-white">
-  <thead><tr class="bg-gray-100"><th class="p-2 text-left">Usuario</th><th class="p-2 text-left">Rol</th><th></th></tr></thead>
+  <thead>
+    <tr class="bg-gray-100">
+      <th class="p-2 text-left">Usuario</th>
+      <th class="p-2 text-left">Rol</th>
+      <th class="p-2 text-left">Credenciales</th>
+      <th></th>
+    </tr>
+  </thead>
   <tbody>
   {% for u in users.items %}
   <tr class="border-t">
@@ -22,6 +29,14 @@
           {% endfor %}
         </select>
         <button class="bg-blue-600 text-white px-2 rounded" type="submit">Guardar</button>
+      </form>
+    </td>
+    <td class="p-2">
+      <form method="post" action="{{ url_for('cpanel_user_update', user_id=u.id) }}" class="flex gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input name="email" value="{{ u.email or '' }}" placeholder="Email" class="border p-1 rounded">
+        <input name="password" type="password" placeholder="Nueva contraseña" class="border p-1 rounded">
+        <button class="bg-blue-600 text-white px-2 rounded" type="submit">Actualizar</button>
       </form>
     </td>
     <td class="p-2">

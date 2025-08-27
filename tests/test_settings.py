@@ -55,3 +55,15 @@ def test_ncf_cannot_decrease(client):
     }, follow_redirects=True)
     assert b'NCF Consumidor Final no puede ser menor' in resp.data
 
+
+def test_manager_cannot_change_other_fields(client):
+    with app.app_context():
+        company = CompanyInfo.query.first()
+        original_name = company.name
+        original_phone = company.phone
+    client.post('/ajustes', data={'name': 'Nuevo', 'phone': '999', 'ncf_final': '5', 'ncf_fiscal': '1'})
+    with app.app_context():
+        c = CompanyInfo.query.first()
+        assert c.name == original_name
+        assert c.phone == original_phone
+

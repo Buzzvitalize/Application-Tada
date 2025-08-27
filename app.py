@@ -559,6 +559,21 @@ def cpanel_users():
     return render_template('cpanel_users.html', users=users, q=q)
 
 
+@app.post('/cpaneltx/users/<int:user_id>/update')
+@admin_only
+def cpanel_user_update(user_id):
+    user = User.query.get_or_404(user_id)
+    email = request.form.get('email')
+    password = request.form.get('password')
+    if email:
+        user.email = email
+    if password:
+        user.set_password(password)
+    db.session.commit()
+    flash('Usuario actualizado')
+    return redirect(url_for('cpanel_users'))
+
+
 @app.post('/cpaneltx/users/<int:user_id>/role')
 @admin_only
 def cpanel_user_role(user_id):
@@ -896,13 +911,15 @@ def settings():
         flash('Seleccione una empresa')
         return redirect(url_for('admin_companies'))
     if request.method == 'POST':
-        company.name = request.form['name']
-        company.street = request.form['street']
-        company.sector = request.form['sector']
-        company.province = request.form['province']
-        company.phone = request.form['phone']
-        company.rnc = request.form['rnc']
-        company.website = request.form.get('website')
+        role = session.get('role')
+        if role != 'manager':
+            company.name = request.form.get('name', company.name)
+            company.street = request.form.get('street', company.street)
+            company.sector = request.form.get('sector', company.sector)
+            company.province = request.form.get('province', company.province)
+            company.phone = request.form.get('phone', company.phone)
+            company.rnc = request.form.get('rnc', company.rnc)
+            company.website = request.form.get('website') or None
 
         if request.form.get('remove_logo'):
             if company.logo:

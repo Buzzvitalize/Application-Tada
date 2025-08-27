@@ -161,6 +161,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(128), nullable=False)
+    email = db.Column(db.String(120))
     role = db.Column(db.String(20), default='company')  # 'admin', 'manager' or 'company'
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'))
 

@@ -1,24 +1,25 @@
 {% extends 'base.html' %}
 {% block title %}Ajustes{% endblock %}
 {% block content %}
+{% set is_manager = session.get('role')=='manager' %}
 <h1 class="text-2xl font-semibold mb-4">Ajustes</h1>
 <form method="post" enctype="multipart/form-data" class="card space-y-4 max-w-4xl mx-auto">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="grid md:grid-cols-2 gap-4">
-    <input name="name" value="{{ company.name }}" placeholder="Nombre" class="input" required>
-    <input name="rnc" value="{{ company.rnc }}" placeholder="RNC" class="input id-mask" data-doc-type="rnc" required>
-    <input name="phone" value="{{ company.phone }}" placeholder="Teléfono" class="input phone-mask" required>
-    <input name="website" value="{{ company.website }}" placeholder="Sitio Web" class="input">
-    <input name="street" value="{{ company.street }}" placeholder="Calle" class="input" required>
-    <input name="sector" value="{{ company.sector }}" placeholder="Sector" class="input" required>
-    <input name="province" value="{{ company.province }}" placeholder="Provincia" class="input" required>
-      <div class="space-y-2">
-        <input type="file" name="logo" id="logo-input" class="input">
-        <img id="logo-preview" src="{% if company.logo %}{{ url_for('static', filename=company.logo) }}{% endif %}" class="h-16">
-        {% if company.logo %}
-        <button name="remove_logo" value="1" class="btn-secondary" onclick="return confirm('¿Eliminar logo?')">Eliminar logo</button>
-        {% endif %}
-      </div>
+    <input name="name" value="{{ company.name }}" placeholder="Nombre" class="input" {% if is_manager %}disabled{% else %}required{% endif %}>
+    <input name="rnc" value="{{ company.rnc }}" placeholder="RNC" class="input id-mask" data-doc-type="rnc" {% if is_manager %}disabled{% endif %}>
+    <input name="phone" value="{{ company.phone }}" placeholder="Teléfono" class="input phone-mask" {% if is_manager %}disabled{% endif %}>
+    <input name="website" value="{{ company.website }}" placeholder="Sitio Web" class="input" {% if is_manager %}disabled{% endif %}>
+    <input name="street" value="{{ company.street }}" placeholder="Calle" class="input" {% if is_manager %}disabled{% endif %}>
+    <input name="sector" value="{{ company.sector }}" placeholder="Sector" class="input" {% if is_manager %}disabled{% endif %}>
+    <input name="province" value="{{ company.province }}" placeholder="Provincia" class="input" {% if is_manager %}disabled{% endif %}>
+    <div class="space-y-2">
+      <input type="file" name="logo" id="logo-input" class="input">
+      <img id="logo-preview" src="{% if company.logo %}{{ url_for('static', filename=company.logo) }}{% endif %}" class="h-16"/>
+      {% if company.logo %}
+      <button name="remove_logo" value="1" class="btn-secondary" onclick="return confirm('¿Eliminar logo?')">Eliminar logo</button>
+      {% endif %}
+    </div>
     <input name="ncf_final" value="{{ company.ncf_final }}" placeholder="NCF Consumidor Final" class="input">
     <input name="ncf_fiscal" value="{{ company.ncf_fiscal }}" placeholder="NCF Comprobante Fiscal" class="input">
   </div>
