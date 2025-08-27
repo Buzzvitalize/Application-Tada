@@ -10,6 +10,7 @@ from flask import (
     session,
     jsonify,
     g,
+    current_app,
 )
 try:
     from flask_migrate import Migrate
@@ -50,6 +51,10 @@ from models import (
 )
 from io import BytesIO, StringIO
 import csv
+try:
+    from openpyxl import Workbook
+except ModuleNotFoundError:  # pragma: no cover
+    Workbook = None
 from datetime import datetime, timedelta
 from sqlalchemy import func, inspect
 from sqlalchemy.orm import load_only, joinedload
@@ -950,11 +955,33 @@ def reportes():
     )
 
     status_totals = {s: 0 for s in INVOICE_STATUSES}
-    for st, amount in (
-        q.with_entities(Invoice.invoice_type, func.sum(Invoice.total)).group_by(Invoice.invoice_type)
+    status_counts = {s: 0 for s in INVOICE_STATUSES}
+    for st, amount, cnt in (
+        q.with_entities(Invoice.invoice_type, func.sum(Invoice.total), func.count(Invoice.id))
+        .group_by(Invoice.invoice_type)
     ):
         if st in status_totals:
             status_totals[st] = amount or 0
+            status_counts[st] = cnt or 0
+
+    current_year = datetime.utcnow().year
+    monthly_totals = (
+        q.with_entities(
+            func.strftime('%Y', Invoice.date).label('y'),
+            func.strftime('%m', Invoice.date).label('m'),
+            func.sum(Invoice.total),
+        )
+        .filter(Invoice.date >= datetime(current_year - 1, 1, 1))
+        .group_by('y', 'm')
+        .all()
+    )
+    year_current = [0] * 12
+    year_prev = [0] * 12
+    for y, m, total in monthly_totals:
+        if int(y) == current_year:
+            year_current[int(m) - 1] = total or 0
+        else:
+            year_prev[int(m) - 1] = total or 0
 
     avg_ticket = total_sales / unique_clients if unique_clients else 0
 
@@ -982,6 +1009,12 @@ def reportes():
     date_labels = [d if isinstance(d, str) else d.strftime('%Y-%m-%d') for d, *_ in sales_over_time]
     date_totals = [t or 0 for _, t, _ in sales_over_time]
     date_counts = [cnt for *_1, cnt in sales_over_time]
+    status_labels = list(status_counts.keys())
+    status_values = list(status_counts.values())
+    months = [
+        'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+    ]
 
     filters = {
         'fecha_inicio': fecha_inicio or '',
@@ -1001,6 +1034,11 @@ def reportes():
                 'date_labels': date_labels,
                 'date_totals': date_totals,
                 'date_counts': date_counts,
+                'status_labels': status_labels,
+                'status_values': status_values,
+                'months': months,
+                'year_current': year_current,
+                'year_prev': year_prev,
                 'invoices': [
                     {
                         'client': i.client.name if i.client else '',
@@ -1027,6 +1065,11 @@ def reportes():
         date_labels=date_labels,
         date_totals=date_totals,
         date_counts=date_counts,
+        status_labels=status_labels,
+        status_values=status_values,
+        months=months,
+        year_current=year_current,
+        year_prev=year_prev,
         filters=filters,
         categories=CATEGORIES,
         statuses=INVOICE_STATUSES,
@@ -1035,10 +1078,15 @@ def reportes():
 
 @app.route('/reportes/export')
 def export_reportes():
-    if session.get('role') not in ('admin', 'contabilidad'):
+    role = session.get('role')
+    formato = request.args.get('formato', 'csv')
+    tipo = request.args.get('tipo', 'detalle')
+    if role == 'contabilidad':
+        if formato not in {'csv', 'xlsx'} or tipo != 'resumen':
+            return '', 403
+    elif role != 'admin':
         return '', 403
 
-    formato = request.args.get('formato', 'csv')
     fecha_inicio = request.args.get('fecha_inicio')
     fecha_fin = request.args.get('fecha_fin')
     estado = request.args.get('estado')
@@ -1048,21 +1096,103 @@ def export_reportes():
     q = _filtered_invoice_query(start, end, estado, categoria)
     invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
 
+    company = get_company_info()
+    user = session.get('username')
+    header = [
+        f"Empresa: {company.get('name', '')}",
+        f"Rango: {(fecha_inicio or 'Todas')} - {(fecha_fin or 'Todas')}",
+        f"Generado: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} por {user}",
+    ]
+    current_app.logger.info(
+        "export user=%s company=%s formato=%s tipo=%s filtros=%s",
+        user,
+        current_company_id(),
+        formato,
+        tipo,
+        {'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'estado': estado, 'categoria': categoria},
+    )
+
     if formato == 'csv':
         output = StringIO()
         writer = csv.writer(output)
-        writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
-        for inv in invoices:
-            writer.writerow([
-                inv.client.name if inv.client else '',
-                inv.date.strftime('%Y-%m-%d'),
-                inv.invoice_type or '',
-                f"{inv.total:.2f}",
-            ])
+        for h in header:
+            writer.writerow([h])
+        if tipo == 'resumen':
+            writer.writerow(['Categoría', 'Cantidad', 'Total'])
+            summary = (
+                company_query(InvoiceItem)
+                .join(Invoice)
+                .with_entities(InvoiceItem.category, func.count(InvoiceItem.id), func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount))
+                .group_by(InvoiceItem.category)
+            )
+            if start:
+                summary = summary.filter(Invoice.date >= start)
+            if end:
+                summary = summary.filter(Invoice.date <= end)
+            if estado:
+                summary = summary.filter(Invoice.invoice_type == estado)
+            for cat, cnt, tot in summary:
+                writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
+        else:
+            writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+            for inv in invoices:
+                writer.writerow([
+                    inv.client.name if inv.client else '',
+                    inv.date.strftime('%Y-%m-%d'),
+                    inv.invoice_type or '',
+                    f"{inv.total:.2f}",
+                ])
         mem = BytesIO()
         mem.write(output.getvalue().encode('utf-8'))
         mem.seek(0)
         return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='reportes.csv')
+
+    if formato == 'xlsx':
+        if Workbook is None:
+            mem = BytesIO()
+            mem.write(b'')
+            mem.seek(0)
+            return send_file(mem, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='reportes.xlsx')
+        wb = Workbook()
+        ws = wb.active
+        row = 1
+        for h in header:
+            ws.cell(row=row, column=1, value=h)
+            row += 1
+        if tipo == 'resumen':
+            ws.append(['Categoría', 'Cantidad', 'Total'])
+            summary = (
+                company_query(InvoiceItem)
+                .join(Invoice)
+                .with_entities(InvoiceItem.category, func.count(InvoiceItem.id), func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount))
+                .group_by(InvoiceItem.category)
+            )
+            if start:
+                summary = summary.filter(Invoice.date >= start)
+            if end:
+                summary = summary.filter(Invoice.date <= end)
+            if estado:
+                summary = summary.filter(Invoice.invoice_type == estado)
+            for cat, cnt, tot in summary:
+                ws.append([cat or 'Sin categoría', cnt, float(tot or 0)])
+        else:
+            ws.append(['Cliente', 'Fecha', 'Estado', 'Total'])
+            for inv in invoices:
+                ws.append([
+                    inv.client.name if inv.client else '',
+                    inv.date.strftime('%Y-%m-%d'),
+                    inv.invoice_type or '',
+                    float(inv.total),
+                ])
+        mem = BytesIO()
+        wb.save(mem)
+        mem.seek(0)
+        return send_file(
+            mem,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='reportes.xlsx',
+        )
 
     if formato == 'pdf':
         items = [
@@ -1078,14 +1208,16 @@ def export_reportes():
             for inv in invoices
         ]
         subtotal = sum(inv.total for inv in invoices)
+        note = f"Rango: {(fecha_inicio or 'Todas')} - {(fecha_fin or 'Todas')} | Usuario: {user}"
         pdf_path = generate_pdf(
             'Reporte de Facturas',
-            get_company_info(),
+            company,
             {'name': '', 'address': '', 'phone': ''},
             items,
             subtotal,
             0,
             subtotal,
+            note=note,
             output_path='reportes.pdf'
         )
         return send_file(pdf_path, as_attachment=True, download_name='reportes.pdf')

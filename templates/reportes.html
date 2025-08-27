@@ -18,14 +18,27 @@
     <option value="{{ c }}" {% if filters.categoria==c %}selected{% endif %}>{{ c }}</option>
     {% endfor %}
   </select>
-  <div class="relative"><button type="button" id="exportBtn" class="btn w-full">Exportar</button>
+  <div class="relative">
+    <select id="exportTipo" class="input mb-2">
+      <option value="detalle">Detalle</option>
+      <option value="resumen">Resumen</option>
+    </select>
+    <button type="button" id="exportBtn" class="btn w-full">Exportar</button>
     <div id="exportMenu" class="absolute right-0 mt-2 w-40 bg-white border rounded shadow hidden z-10">
-      <a href="#" data-format="csv" class="block px-4 py-2 hover:bg-gray-100">Exportar CSV</a>
-      <a href="#" data-format="pdf" class="block px-4 py-2 hover:bg-gray-100">Exportar PDF</a>
+      <a href="#" data-format="csv" class="block px-4 py-2 hover:bg-gray-100">CSV</a>
+      <a href="#" data-format="xlsx" class="block px-4 py-2 hover:bg-gray-100">Excel</a>
+      <a href="#" data-format="pdf" class="block px-4 py-2 hover:bg-gray-100">PDF</a>
     </div>
   </div>
-  <div class="md:col-span-5 flex gap-2 mt-2">
+  <div class="md:col-span-5 flex flex-wrap gap-2 mt-2">
     <button class="btn" type="submit">Filtrar</button>
+    <button class="btn" type="button" id="resetFilters">Reset</button>
+    <div class="flex gap-1">
+      <button type="button" data-range="today" class="btn text-xs">Hoy</button>
+      <button type="button" data-range="7" class="btn text-xs">7 días</button>
+      <button type="button" data-range="month" class="btn text-xs">Mes</button>
+      <button type="button" data-range="year" class="btn text-xs">Año</button>
+    </div>
     <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
   </div>
 </form>
@@ -61,6 +74,10 @@
   <canvas id="catChart" class="card p-4"></canvas>
   <canvas id="timeChart" class="card p-4"></canvas>
 </div>
+<div class="grid md:grid-cols-2 gap-6 mb-6">
+  <canvas id="statusChart" class="card p-4"></canvas>
+  <canvas id="monthlyChart" class="card p-4"></canvas>
+</div>
 
 <div class="card overflow-x-auto mb-6">
   <h2 class="text-xl font-semibold mb-2">Ventas por Categoría</h2>
@@ -74,6 +91,7 @@
       </tr>
     </thead>
     <tbody>
+      {% if sales_by_category %}
       {% for cat, qty, avg, total in sales_by_category %}
       <tr class="border-t">
         <td class="p-2">{{ cat or 'Sin categoría' }}</td>
@@ -82,6 +100,9 @@
         <td class="p-2 text-right">{{ total | money }}</td>
       </tr>
       {% endfor %}
+      {% else %}
+      <tr class="border-t"><td class="p-2 text-center" colspan="4">Sin datos</td></tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
@@ -96,12 +117,16 @@
       </tr>
     </thead>
     <tbody>
+      {% if top_clients %}
       {% for name, total in top_clients %}
       <tr class="border-t">
         <td class="p-2">{{ name }}</td>
         <td class="p-2 text-right">{{ total | money }}</td>
       </tr>
       {% endfor %}
+      {% else %}
+      <tr class="border-t"><td class="p-2 text-center" colspan="2">Sin datos</td></tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
@@ -118,6 +143,7 @@
       </tr>
     </thead>
     <tbody>
+      {% if invoices %}
       {% for inv in invoices %}
       <tr class="border-t">
         <td class="p-2">{{ inv.client.name }}</td>
@@ -126,6 +152,9 @@
         <td class="p-2 text-right">{{ inv.total | money }}</td>
       </tr>
       {% endfor %}
+      {% else %}
+      <tr class="border-t"><td class="p-2 text-center" colspan="4">Sin datos</td></tr>
+      {% endif %}
     </tbody>
   </table>
   <div class="flex justify-end gap-2 mt-2">
@@ -184,22 +213,67 @@ new Chart(timeCtx, {
   }
 });
 
+const statusCtx = document.getElementById('statusChart');
+new Chart(statusCtx, {
+  type: 'pie',
+  data: {labels: {{ status_labels|tojson }}, datasets: [{data: {{ status_values|tojson }}, backgroundColor:['#1e3a8a','#facc15','#16a34a']} ]},
+});
+
+const monthlyCtx = document.getElementById('monthlyChart');
+new Chart(monthlyCtx, {
+  type: 'bar',
+  data: {
+    labels: {{ months|tojson }},
+    datasets: [
+      {label: 'Año actual', data: {{ year_current|tojson }}, backgroundColor:'#1e3a8a'},
+      {label: 'Año anterior', data: {{ year_prev|tojson }}, backgroundColor:'#93c5fd'}
+    ]
+  }
+});
+
 const exportBtn = document.getElementById('exportBtn');
 const exportMenu = document.getElementById('exportMenu');
 const spinner = document.getElementById('exportSpinner');
+const exportTipo = document.getElementById('exportTipo');
 exportBtn.addEventListener('click', () => exportMenu.classList.toggle('hidden'));
 exportMenu.querySelectorAll('a').forEach(a => {
   a.addEventListener('click', e => {
     e.preventDefault();
     spinner.classList.remove('hidden');
     const params = new URLSearchParams(new FormData(document.getElementById('filters')));
-    window.location = `{{ url_for('export_reportes') }}?formato=${a.dataset.format}&` + params.toString();
+    window.location = `{{ url_for('export_reportes') }}?formato=${a.dataset.format}&tipo=${exportTipo.value}&` + params.toString();
     setTimeout(() => spinner.classList.add('hidden'), 3000);
     exportMenu.classList.add('hidden');
   });
 });
 
-document.getElementById('filters').addEventListener('change', () => document.getElementById('filters').submit());
+document.getElementById('resetFilters').addEventListener('click', () => {
+  window.location = '{{ url_for('reportes') }}';
+});
+document.querySelectorAll('[data-range]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const end = new Date();
+    let start = new Date();
+    const range = btn.dataset.range;
+    if (range === '7') {
+      start.setDate(start.getDate() - 6);
+    } else if (range === 'month') {
+      start = new Date(start.getFullYear(), start.getMonth(), 1);
+    } else if (range === 'year') {
+      start = new Date(start.getFullYear(), 0, 1);
+    }
+    const fmt = d => d.toISOString().slice(0,10);
+    document.querySelector('input[name="fecha_inicio"]').value = fmt(start);
+    document.querySelector('input[name="fecha_fin"]').value = fmt(end);
+  });
+});
+
+document.getElementById('filters').addEventListener('change', (e) => {
+  if(e.target.id !== 'exportTipo') document.getElementById('filters').submit();
+});
+document.getElementById('filters').addEventListener('submit', () => {
+  spinner.classList.remove('hidden');
+});
 </script>
 {% endblock %}
 
