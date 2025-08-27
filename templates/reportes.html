@@ -84,15 +84,28 @@
 </div>
 
 <div class="grid md:grid-cols-2 gap-6 mb-6">
-  <canvas id="catChart" class="card p-4"></canvas>
-  <canvas id="timeChart" class="card p-4"></canvas>
+  <div class="card p-4 flex flex-col items-center">
+    <h3 class="text-sm mb-2">Ventas por categoría</h3>
+    <canvas id="catChart" width="718" height="329"></canvas>
+  </div>
+  <div class="card p-4 flex flex-col items-center">
+    <h3 class="text-sm mb-2">Ventas en el tiempo</h3>
+    <canvas id="timeChart" width="718" height="329"></canvas>
+  </div>
 </div>
 <div class="grid md:grid-cols-2 gap-6 mb-6">
-  <canvas id="statusChart" class="card p-4"></canvas>
-  <canvas id="monthlyChart" class="card p-4"></canvas>
+  <div class="card p-4 flex flex-col items-center">
+    <h3 class="text-sm mb-2">Estado de facturas</h3>
+    <canvas id="statusChart" width="718" height="329"></canvas>
+  </div>
+  <div class="card p-4 flex flex-col items-center">
+    <h3 class="text-sm mb-2">Ventas por mes</h3>
+    <canvas id="monthlyChart" width="718" height="329"></canvas>
+  </div>
 </div>
-<div class="card p-4 mb-6">
-  <canvas id="trendChart"></canvas>
+<div class="card p-4 mb-6 flex flex-col items-center">
+  <h3 class="text-sm mb-2">Tendencia 24 meses</h3>
+  <canvas id="trendChart" width="718" height="329"></canvas>
 </div>
 
 <div class="card overflow-x-auto mb-6">
