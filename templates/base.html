@@ -28,6 +28,8 @@
       {% if session.get('role') == 'admin' %}
       <a href="{{ url_for('admin_companies') }}" class="nav-link">Empresas</a>
       <a href="{{ url_for('admin_requests') }}" class="nav-link">Solicitudes</a>
+      {% endif %}
+      {% if session.get('role') in ['admin', 'manager'] %}
       <a href="{{ url_for('settings') }}" class="nav-link">Ajustes</a>
       {% endif %}
     </nav>

@@ -161,7 +161,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(128), nullable=False)
-    role = db.Column(db.String(20), default='company')  # 'admin' or 'company'
+    role = db.Column(db.String(20), default='company')  # 'admin', 'manager' or 'company'
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'))
 
     def set_password(self, password: str) -> None:
@@ -198,3 +198,14 @@ class ExportLog(db.Model):
     message = db.Column(db.Text)
     file_path = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=dom_now)
+
+
+class NcfLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+    old_final = db.Column(db.Integer)
+    old_fiscal = db.Column(db.Integer)
+    new_final = db.Column(db.Integer)
+    new_fiscal = db.Column(db.Integer)
+    changed_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    changed_at = db.Column(db.DateTime, default=dom_now)

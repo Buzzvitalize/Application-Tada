@@ -12,10 +12,11 @@
     <input name="street" value="{{ company.street }}" placeholder="Calle" class="input" required>
     <input name="sector" value="{{ company.sector }}" placeholder="Sector" class="input" required>
     <input name="province" value="{{ company.province }}" placeholder="Provincia" class="input" required>
-      <div class="flex items-center space-x-2">
-        <input type="file" name="logo" class="input">
+      <div class="space-y-2">
+        <input type="file" name="logo" id="logo-input" class="input">
+        <img id="logo-preview" src="{% if company.logo %}{{ url_for('static', filename=company.logo) }}{% endif %}" class="h-16">
         {% if company.logo %}
-        <span class="text-sm text-gray-600">{{ company.logo }}</span>
+        <button name="remove_logo" value="1" class="btn-secondary" onclick="return confirm('¿Eliminar logo?')">Eliminar logo</button>
         {% endif %}
       </div>
     <input name="ncf_final" value="{{ company.ncf_final }}" placeholder="NCF Consumidor Final" class="input">
@@ -23,4 +24,21 @@
   </div>
   <button class="btn-primary">Guardar</button>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const input=document.getElementById('logo-input');
+const preview=document.getElementById('logo-preview');
+if(input){
+  input.addEventListener('change', e=>{
+    const file=e.target.files[0];
+    if(file){
+      const reader=new FileReader();
+      reader.onload=ev=>{preview.src=ev.target.result;};
+      reader.readAsDataURL(file);
+    }
+  });
+}
+</script>
 {% endblock %}

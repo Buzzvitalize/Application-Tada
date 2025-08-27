@@ -48,6 +48,7 @@ from models import (
     User,
     AccountRequest,
     ExportLog,
+    NcfLog,
     dom_now,
 )
 from io import BytesIO, StringIO
@@ -425,6 +426,16 @@ def admin_only(f):
         return f(*args, **kwargs)
     return wrapper
 
+
+def manager_only(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if session.get('role') not in ('admin', 'manager'):
+            flash('Acceso restringido')
+            return redirect(url_for('list_quotations'))
+        return f(*args, **kwargs)
+    return wrapper
+
 @app.route('/')
 def index():
     if 'user_id' not in session:
@@ -779,7 +790,7 @@ def edit_quotation(quotation_id):
 
 
 @app.route('/ajustes', methods=['GET', 'POST'])
-@admin_only
+@manager_only
 def settings():
     company = CompanyInfo.query.get(current_company_id())
     if not company:
@@ -793,16 +804,60 @@ def settings():
         company.phone = request.form['phone']
         company.rnc = request.form['rnc']
         company.website = request.form.get('website')
-        file = request.files.get('logo')
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            upload_dir = os.path.join(app.static_folder, 'uploads')
-            os.makedirs(upload_dir, exist_ok=True)
-            path = os.path.join(upload_dir, filename)
-            file.save(path)
-            company.logo = f'uploads/{filename}'
-        company.ncf_final = _to_int(request.form.get('ncf_final')) or company.ncf_final
-        company.ncf_fiscal = _to_int(request.form.get('ncf_fiscal')) or company.ncf_fiscal
+
+        if request.form.get('remove_logo'):
+            if company.logo:
+                try:
+                    os.remove(os.path.join(app.static_folder, company.logo))
+                except FileNotFoundError:
+                    pass
+            company.logo = None
+        else:
+            file = request.files.get('logo')
+            if file and file.filename:
+                filename = secure_filename(file.filename)
+                ext = os.path.splitext(filename)[1].lower()
+                if ext not in {'.png', '.jpg', '.jpeg'}:
+                    flash('Formato de logo inválido')
+                    return redirect(url_for('settings'))
+                file.seek(0, os.SEEK_END)
+                size = file.tell()
+                file.seek(0)
+                if size > 1 * 1024 * 1024:
+                    flash('Logo demasiado grande (máximo 1MB)')
+                    return redirect(url_for('settings'))
+                upload_dir = os.path.join(app.static_folder, 'uploads')
+                os.makedirs(upload_dir, exist_ok=True)
+                path = os.path.join(upload_dir, filename)
+                file.save(path)
+                company.logo = f'uploads/{filename}'
+
+        old_final = company.ncf_final
+        old_fiscal = company.ncf_fiscal
+        new_final = _to_int(request.form.get('ncf_final'))
+        new_fiscal = _to_int(request.form.get('ncf_fiscal'))
+        if new_final is not None and new_final < old_final:
+            flash('NCF Consumidor Final no puede ser menor que el actual')
+            return redirect(url_for('settings'))
+        if new_fiscal is not None and new_fiscal < old_fiscal:
+            flash('NCF Comprobante Fiscal no puede ser menor que el actual')
+            return redirect(url_for('settings'))
+        if new_final is not None:
+            company.ncf_final = new_final
+        if new_fiscal is not None:
+            company.ncf_fiscal = new_fiscal
+
+        if old_final != company.ncf_final or old_fiscal != company.ncf_fiscal:
+            log = NcfLog(
+                company_id=company.id,
+                old_final=old_final,
+                old_fiscal=old_fiscal,
+                new_final=company.ncf_final,
+                new_fiscal=company.ncf_fiscal,
+                changed_by=session.get('user_id'),
+            )
+            db.session.add(log)
+
         db.session.commit()
         flash('Ajustes guardados')
         return redirect(url_for('settings'))
