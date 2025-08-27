@@ -43,6 +43,8 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
+    stock = db.Column(db.Integer, default=0)
+    min_stock = db.Column(db.Integer, default=0)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
 class Quotation(db.Model):
@@ -141,6 +143,32 @@ class InvoiceItem(db.Model):
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+
+
+class InventoryMovement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    movement_type = db.Column(db.String(10), nullable=False)  # entrada o salida
+    reference_type = db.Column(db.String(20))
+    reference_id = db.Column(db.Integer)
+    timestamp = db.Column(db.DateTime, default=dom_now)
+    product = db.relationship('Product')
+
+
+class Warehouse(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+    stocks = db.relationship('ProductStock', cascade='all, delete-orphan')
+
+
+class ProductStock(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=False)
+    stock = db.Column(db.Integer, default=0)
+    min_stock = db.Column(db.Integer, default=0)
 
 
 class CompanyInfo(db.Model):

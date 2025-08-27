@@ -46,6 +46,9 @@ from models import (
     OrderItem,
     Invoice,
     InvoiceItem,
+    InventoryMovement,
+    Warehouse,
+    ProductStock,
     CompanyInfo,
     User,
     AccountRequest,
@@ -814,6 +817,12 @@ def delete_product(product_id):
     flash('Producto eliminado')
     return redirect(url_for('products'))
 
+
+@app.route('/inventario')
+def inventory_report():
+    products = company_query(Product).order_by(Product.name).all()
+    return render_template('inventario.html', products=products)
+
 @app.route('/productos/edit/<int:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
     product = company_get(Product, product_id)
@@ -1047,6 +1056,11 @@ def quotation_to_order(quotation_id):
     if dom_now() > quotation.date + timedelta(days=30):
         flash('La cotización ha expirado')
         return redirect(url_for('list_quotations'))
+    for item in quotation.items:
+        product = company_query(Product).filter_by(code=item.code).first()
+        if product and product.stock < item.quantity:
+            flash(f'Stock insuficiente para {product.name}')
+            return redirect(url_for('list_quotations'))
     order = Order(
         client_id=quotation.client_id,
         quotation_id=quotation.id,
@@ -1076,6 +1090,17 @@ def quotation_to_order(quotation_id):
             company_id=current_company_id(),
         )
         db.session.add(o_item)
+        product = company_query(Product).filter_by(code=item.code).first()
+        if product:
+            product.stock -= item.quantity
+            mov = InventoryMovement(
+                product_id=product.id,
+                quantity=item.quantity,
+                movement_type='salida',
+                reference_type='Order',
+                reference_id=order.id,
+            )
+            db.session.add(mov)
     db.session.commit()
     flash('Pedido creado')
     return redirect(url_for('list_orders'))

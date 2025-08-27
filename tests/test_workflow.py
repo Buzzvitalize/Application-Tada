@@ -13,6 +13,7 @@ from models import (
     QuotationItem,
     Order,
     Invoice,
+    InventoryMovement,
 )
 
 
@@ -38,7 +39,7 @@ def client(tmp_path):
         cl2 = Client(name='BobCorp', is_final_consumer=False, company_id=c2.id)
         db.session.add_all([cl1, cl2])
         db.session.flush()
-        prod = Product(code='P1', name='Prod', unit='Unidad', price=100, company_id=c1.id)
+        prod = Product(code='P1', name='Prod', unit='Unidad', price=100, stock=10, min_stock=2, company_id=c1.id)
         db.session.add(prod)
         q = Quotation(
             client_id=cl1.id,
@@ -91,9 +92,14 @@ def test_conversion_and_pdf(client):
     client.get('/cotizaciones/1/convertir')
     with app.app_context():
         order = Order.query.first()
-    client.get(f'/pedidos/{order.id}/facturar')
+        order_id = order.id
+    client.get(f'/pedidos/{order_id}/facturar')
     with app.app_context():
         invoice = Invoice.query.first()
+        product = Product.query.filter_by(code='P1').first()
+        movement = InventoryMovement.query.filter_by(product_id=product.id, reference_type='Order', reference_id=order_id).first()
+    assert product.stock == 9
+    assert movement is not None
     resp = client.get(f'/facturas/{invoice.id}/pdf')
     assert resp.status_code == 200
     assert resp.headers['Content-Type'] == 'application/pdf'

@@ -20,7 +20,7 @@ def _setup_db(db_path):
         u1 = User(username='u1', role='company', company_id=c1.id); u1.set_password('pass')
         acc = User(username='acc', role='contabilidad', company_id=c1.id); acc.set_password('pass')
         db.session.add_all([admin, u1, acc])
-        prod = Product(code='A', name='ProdA', unit='Unidad', price=10, category='Servicios', company_id=c1.id)
+        prod = Product(code='A', name='ProdA', unit='Unidad', price=10, category='Servicios', stock=100, min_stock=0, company_id=c1.id)
         db.session.add(prod)
         cli1 = Client(name='Alice', company_id=c1.id)
         cli2 = Client(name='Bob', company_id=c2.id)

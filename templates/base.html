@@ -23,6 +23,7 @@
       <a href="{{ url_for('list_invoices') }}" class="nav-link">Facturas</a>
       <a href="{{ url_for('clients') }}" class="nav-link">Clientes</a>
       <a href="{{ url_for('products') }}" class="nav-link">Productos</a>
+      <a href="{{ url_for('inventory_report') }}" class="nav-link">Inventario</a>
       <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
       <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
       {% if session.get('role') == 'admin' %}
