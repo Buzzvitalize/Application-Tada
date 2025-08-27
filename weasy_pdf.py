@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from uuid import uuid4
 import os
 
 from flask import current_app
@@ -11,11 +10,6 @@ try:
     from weasyprint import HTML
 except ModuleNotFoundError:  # pragma: no cover
     HTML = None
-
-try:  # optional dependency
-    import qrcode
-except ModuleNotFoundError:  # pragma: no cover
-    qrcode = None
 
 BLUE = "#1e3a8a"
 STYLE = f"""
@@ -38,7 +32,6 @@ body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
 .notes {{ margin-top:30px; font-size:12px; }}
 .seller-pay {{ display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; }}
 .footer {{ position:absolute; bottom:80px; left:20px; font-size:12px; }}
-.qr {{ position:absolute; bottom:20px; right:20px; width:80px; }}
 """
 
 def _fmt_money(value: float) -> str:
@@ -109,7 +102,6 @@ def build_html(title: str, company: dict, client: dict, items: list,
     if meta.get('payment_method'):
         pay_html = f"<div>Método de pago: {meta['payment_method']}{' - '+meta['bank'] if meta.get('bank') else ''}</div>"
     seller_block = f"<div class='seller-pay'>{seller_html}{pay_html}</div>" if (seller_html or pay_html) else ""
-    qr_html = f"<img src='{meta['qr_path']}' class='qr'>" if meta.get('qr_path') else ""
     footer_html = f"<div class='footer'>{meta['footer']}</div>" if meta.get('footer') else ""
     email_line = f"Correo: {client.get('email','')}<br>" if client.get('email') else ""
     return f"""<!DOCTYPE html>
@@ -149,7 +141,7 @@ def build_html(title: str, company: dict, client: dict, items: list,
   <tr><td>ITBIS (18%)</td><td style='text-align:right'>{_fmt_money(itbis)}</td></tr>
 <tr><td>Total</td><td style='text-align:right'>{_fmt_money(total)}</td></tr>
  </table>
- {note_html}{footer_html}{qr_html}
+ {note_html}{footer_html}
 </body>
 </html>
 """
@@ -160,7 +152,7 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
                  bank: str | None = None, order_number: int | None = None,
                  doc_number: int | None = None, invoice_type: str | None = None,
                  note: str | None = None, output_path: str | Path | None = None,
-                 qr_url: str | None = None, date: datetime | None = None,
+                 date: datetime | None = None,
                  valid_until: datetime | None = None, footer: str | None = None) -> str:
     meta = {
         'doc_number': doc_number,
@@ -175,11 +167,7 @@ def generate_pdf(title: str, company: dict, client: dict, items: list,
         'valid_until': valid_until,
         'footer': footer,
     }
-    if qr_url and qrcode:
-        os.makedirs(os.path.join(current_app.static_folder, 'qrcodes'), exist_ok=True)
-        qr_path = os.path.join(current_app.static_folder, 'qrcodes', f"{uuid4().hex}.png")
-        qrcode.make(qr_url).save(qr_path)
-        meta['qr_path'] = qr_path
+    # QR codes disabled
     item_dicts = [_item_to_dict(i) for i in items]
     discount_total = sum(i.get('discount', 0.0) for i in item_dicts)
     client_dict = _client_to_dict(client)

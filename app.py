@@ -991,14 +991,13 @@ def quotation_pdf(quotation_id):
     filename = f'cotizacion_{quotation_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
     valid_until = quotation.date + timedelta(days=30)
     app.logger.info("Generating quotation PDF %s", quotation_id)
     generate_pdf('Cotización', company, quotation.client, quotation.items,
                  quotation.subtotal, quotation.itbis, quotation.total,
                  seller=quotation.seller, payment_method=quotation.payment_method,
                  bank=quotation.bank, doc_number=quotation.id, note=quotation.note,
-                 output_path=pdf_path, qr_url=qr_url,
+                 output_path=pdf_path,
                  date=quotation.date, valid_until=valid_until,
                  footer=("Condiciones: Esta cotización es válida por 30 días a partir de la fecha de emisión. "
                          "Los precios están sujetos a cambios sin previo aviso. "
@@ -1117,13 +1116,12 @@ def order_pdf(order_id):
     filename = f'pedido_{order_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
     app.logger.info("Generating order PDF %s", order_id)
     generate_pdf('Pedido', company, order.client, order.items,
                  order.subtotal, order.itbis, order.total,
                  seller=order.seller, payment_method=order.payment_method,
                  bank=order.bank, doc_number=order.id, note=order.note,
-                 output_path=pdf_path, qr_url=qr_url,
+                 output_path=pdf_path,
                 date=order.date,
                 footer=("Este pedido será procesado tras la confirmación de pago. "
                         "Tiempo estimado de entrega: 3 a 5 días hábiles."))
@@ -1155,7 +1153,6 @@ def invoice_pdf(invoice_id):
     filename = f'factura_{invoice_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-    qr_url = request.url_root.rstrip('/') + url_for('serve_pdf', filename=filename)
     app.logger.info("Generating invoice PDF %s", invoice_id)
     generate_pdf('Factura', company, invoice.client, invoice.items,
                  invoice.subtotal, invoice.itbis, invoice.total,
@@ -1163,7 +1160,7 @@ def invoice_pdf(invoice_id):
                  payment_method=invoice.payment_method, bank=invoice.bank,
                  order_number=invoice.order_id, doc_number=invoice.id,
                  invoice_type=invoice.invoice_type, note=invoice.note,
-                 output_path=pdf_path, qr_url=qr_url, date=invoice.date,
+                 output_path=pdf_path, date=invoice.date,
                  footer=("Factura generada electrónicamente, válida sin firma ni sello. "
                          "Para reclamaciones favor comunicarse dentro de las 48 horas siguientes a la emisión. "
                          "Gracias por su preferencia."))
