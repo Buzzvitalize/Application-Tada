@@ -91,33 +91,45 @@
   </div>
 </div>
 
-<div class="grid md:grid-cols-2 gap-6 mb-6">
-  <div class="card p-4 flex flex-col items-center">
-    <h3 class="text-sm mb-2">Ventas por categoría</h3>
-    <canvas id="catChart" class="w-full h-64"></canvas>
+<div class="grid gap-6 mb-6 md:grid-cols-2">
+  <div class="card p-4">
+    <h3 class="text-sm mb-2 text-center">Ventas por categoría</h3>
+    <div class="relative w-full h-72">
+      <canvas id="catChart"></canvas>
+    </div>
   </div>
-  <div class="card p-4 flex flex-col items-center">
-    <h3 class="text-sm mb-2">Ventas en el tiempo</h3>
-    <canvas id="timeChart" class="w-full h-64"></canvas>
-  </div>
-</div>
-<div class="grid md:grid-cols-3 gap-6 mb-6">
-  <div class="card p-4 flex flex-col items-center">
-    <h3 class="text-sm mb-2">Estado de facturas</h3>
-    <canvas id="statusChart" class="w-full h-64"></canvas>
-  </div>
-  <div class="card p-4 flex flex-col items-center">
-    <h3 class="text-sm mb-2">Ventas por mes</h3>
-    <canvas id="monthlyChart" class="w-full h-64"></canvas>
-  </div>
-  <div class="card p-4 flex flex-col items-center">
-    <h3 class="text-sm mb-2">Métodos de pago</h3>
-    <canvas id="methodChart" class="w-full h-64"></canvas>
+  <div class="card p-4">
+    <h3 class="text-sm mb-2 text-center">Ventas en el tiempo</h3>
+    <div class="relative w-full h-72">
+      <canvas id="timeChart"></canvas>
+    </div>
   </div>
 </div>
-<div class="card p-4 mb-6 flex flex-col items-center">
-  <h3 class="text-sm mb-2">Tendencia 24 meses</h3>
-  <canvas id="trendChart" class="w-full h-64"></canvas>
+<div class="grid gap-6 mb-6 md:grid-cols-3">
+  <div class="card p-4">
+    <h3 class="text-sm mb-2 text-center">Estado de facturas</h3>
+    <div class="relative w-full h-72">
+      <canvas id="statusChart"></canvas>
+    </div>
+  </div>
+  <div class="card p-4">
+    <h3 class="text-sm mb-2 text-center">Ventas por mes</h3>
+    <div class="relative w-full h-72">
+      <canvas id="monthlyChart"></canvas>
+    </div>
+  </div>
+  <div class="card p-4">
+    <h3 class="text-sm mb-2 text-center">Métodos de pago</h3>
+    <div class="relative w-full h-72">
+      <canvas id="methodChart"></canvas>
+    </div>
+  </div>
+</div>
+<div class="card p-4 mb-6">
+  <h3 class="text-sm mb-2 text-center">Tendencia 24 meses</h3>
+  <div class="relative w-full h-72">
+    <canvas id="trendChart"></canvas>
+  </div>
 </div>
 
 <div class="card overflow-x-auto mb-6">
