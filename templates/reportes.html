@@ -3,22 +3,31 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Reportes</h1>
 
-<div class="grid md:grid-cols-5 gap-4 mb-6">
+<form class="card mb-6 grid md:grid-cols-4 gap-4" method="get" action="{{ url_for('reportes') }}">
+  <input type="date" name="fecha_inicio" value="{{ filters.fecha_inicio }}" class="input">
+  <input type="date" name="fecha_fin" value="{{ filters.fecha_fin }}" class="input">
+  <input type="text" name="estado" placeholder="Estado" value="{{ filters.estado }}" class="input">
+  <select name="categoria" class="input">
+    <option value="">Todas las categorías</option>
+    {% for c in categories %}
+    <option value="{{ c }}" {% if filters.categoria==c %}selected{% endif %}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <div class="md:col-span-4 flex gap-2 mt-2">
+    <button class="btn" type="submit">Filtrar</button>
+    <a class="btn" href="{{ url_for('export_reportes', formato='csv', **filters) }}">Descargar CSV</a>
+    <a class="btn" href="{{ url_for('export_reportes', formato='pdf', **filters) }}" target="_blank">Descargar PDF</a>
+  </div>
+</form>
+
+<div class="grid md:grid-cols-3 gap-4 mb-6">
   <div class="card text-center">
-    <div class="text-sm text-gray-500">Clientes</div>
-    <div class="text-2xl font-bold">{{ stats.clients }}</div>
+    <div class="text-sm text-gray-500">Ventas Totales</div>
+    <div class="text-2xl font-bold">{{ stats.total_sales | money }}</div>
   </div>
   <div class="card text-center">
-    <div class="text-sm text-gray-500">Productos</div>
-    <div class="text-2xl font-bold">{{ stats.products }}</div>
-  </div>
-  <div class="card text-center">
-    <div class="text-sm text-gray-500">Cotizaciones</div>
-    <div class="text-2xl font-bold">{{ stats.quotations }}</div>
-  </div>
-  <div class="card text-center">
-    <div class="text-sm text-gray-500">Pedidos</div>
-    <div class="text-2xl font-bold">{{ stats.orders }}</div>
+    <div class="text-sm text-gray-500">Clientes Únicos</div>
+    <div class="text-2xl font-bold">{{ stats.unique_clients }}</div>
   </div>
   <div class="card text-center">
     <div class="text-sm text-gray-500">Facturas</div>
@@ -26,28 +35,81 @@
   </div>
 </div>
 
-<div class="card mb-6">
-  <div class="text-sm text-gray-500">Ventas Totales</div>
-  <div class="text-2xl font-bold">{{ total_sales | money }}</div>
+<div class="grid md:grid-cols-2 gap-6 mb-6">
+  <canvas id="catChart" class="card p-4"></canvas>
+  <canvas id="timeChart" class="card p-4"></canvas>
 </div>
 
-<div class="card overflow-x-auto">
+<div class="card overflow-x-auto mb-6">
   <h2 class="text-xl font-semibold mb-2">Ventas por Categoría</h2>
   <table class="min-w-full text-sm">
     <thead class="bg-gray-100">
       <tr>
         <th class="p-2 text-left">Categoría</th>
+        <th class="p-2 text-right">Cantidad</th>
+        <th class="p-2 text-right">Promedio</th>
         <th class="p-2 text-right">Total</th>
       </tr>
     </thead>
     <tbody>
-      {% for cat, amount in sales_by_category %}
+      {% for cat, qty, avg, total in sales_by_category %}
       <tr class="border-t">
         <td class="p-2">{{ cat or 'Sin categoría' }}</td>
-        <td class="p-2 text-right">{{ amount | money }}</td>
+        <td class="p-2 text-right">{{ qty }}</td>
+        <td class="p-2 text-right">{{ avg | money }}</td>
+        <td class="p-2 text-right">{{ total | money }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+<div class="card overflow-x-auto">
+  <h2 class="text-xl font-semibold mb-2">Detalle de Facturas</h2>
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Cliente</th>
+        <th class="p-2 text-left">Fecha</th>
+        <th class="p-2 text-left">Estado</th>
+        <th class="p-2 text-right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr class="border-t">
+        <td class="p-2">{{ inv.client.name }}</td>
+        <td class="p-2">{{ inv.date.strftime('%Y-%m-%d') }}</td>
+        <td class="p-2">{{ inv.invoice_type }}</td>
+        <td class="p-2 text-right">{{ inv.total | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 {% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const catCtx = document.getElementById('catChart');
+new Chart(catCtx, {
+  type: 'bar',
+  data: {
+    labels: {{ cat_labels|tojson }},
+    datasets: [{ label: 'Ventas por categoría', data: {{ cat_totals|tojson }}, backgroundColor: '#1e3a8a' }]
+  }
+});
+const timeCtx = document.getElementById('timeChart');
+new Chart(timeCtx, {
+  type: 'line',
+  data: {
+    labels: {{ date_labels|tojson }},
+    datasets: [{ label: 'Ventas en el tiempo', data: {{ date_totals|tojson }}, borderColor: '#1e3a8a', fill:false }]
+  }
+});
+</script>
+{% endblock %}
+

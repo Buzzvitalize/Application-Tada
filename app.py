@@ -41,10 +41,11 @@ from models import (
     AccountRequest,
     dom_now,
 )
-from io import BytesIO
+from io import BytesIO, StringIO
+import csv
 from datetime import datetime, timedelta
 from sqlalchemy import func, inspect
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import load_only, joinedload
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
 import os
@@ -856,22 +857,160 @@ def invoice_pdf(invoice_id):
 def serve_pdf(filename):
     return send_from_directory(os.path.join(app.static_folder, 'pdfs'), filename)
 
+def _filtered_invoice_query(fecha_inicio, fecha_fin, estado, categoria):
+    q = company_query(Invoice)
+    if fecha_inicio:
+        try:
+            start = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+            q = q.filter(Invoice.date >= start)
+        except ValueError:
+            pass
+    if fecha_fin:
+        try:
+            end = datetime.strptime(fecha_fin, '%Y-%m-%d')
+            q = q.filter(Invoice.date <= end)
+        except ValueError:
+            pass
+    if estado:
+        q = q.filter(Invoice.invoice_type == estado)
+    if categoria:
+        q = q.join(Invoice.items).filter(InvoiceItem.category == categoria)
+    return q
+
+
 @app.route('/reportes')
 def reportes():
-    total_invoices = company_query(Invoice).count()
-    total_sales = company_query(Invoice).with_entities(func.sum(Invoice.total)).scalar() or 0
-    sales_by_category = company_query(InvoiceItem).with_entities(
-        InvoiceItem.category,
-        func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount)
-    ).group_by(InvoiceItem.category).all()
+    fecha_inicio = request.args.get('fecha_inicio')
+    fecha_fin = request.args.get('fecha_fin')
+    estado = request.args.get('estado')
+    categoria = request.args.get('categoria')
+
+    q = _filtered_invoice_query(fecha_inicio, fecha_fin, estado, categoria)
+    invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+
+    total_sales = sum(i.total for i in invoices)
+    unique_clients = len({i.client_id for i in invoices})
+
+    item_query = company_query(InvoiceItem).join(Invoice)
+    if fecha_inicio:
+        try:
+            start = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+            item_query = item_query.filter(Invoice.date >= start)
+        except ValueError:
+            pass
+    if fecha_fin:
+        try:
+            end = datetime.strptime(fecha_fin, '%Y-%m-%d')
+            item_query = item_query.filter(Invoice.date <= end)
+        except ValueError:
+            pass
+    if estado:
+        item_query = item_query.filter(Invoice.invoice_type == estado)
+    if categoria:
+        item_query = item_query.filter(InvoiceItem.category == categoria)
+
+    sales_by_category = (
+        item_query.with_entities(
+            InvoiceItem.category,
+            func.count(InvoiceItem.id),
+            func.avg((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount),
+            func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount),
+        ).group_by(InvoiceItem.category).all()
+    )
+
+    sales_over_time = (
+        q.with_entities(func.date(Invoice.date), func.sum(Invoice.total))
+        .group_by(func.date(Invoice.date))
+        .order_by(func.date(Invoice.date))
+        .all()
+    )
+
     stats = {
-        'clients': company_query(Client).count(),
-        'products': company_query(Product).count(),
-        'quotations': company_query(Quotation).count(),
-        'orders': company_query(Order).count(),
-        'invoices': total_invoices,
+        'total_sales': total_sales,
+        'unique_clients': unique_clients,
+        'invoices': len(invoices),
     }
-    return render_template('reportes.html', total_sales=total_sales, sales_by_category=sales_by_category, stats=stats)
+
+    cat_labels = [c or 'Sin categoría' for c, *_ in sales_by_category]
+    cat_totals = [s or 0 for *_1, _2, s in sales_by_category]
+    date_labels = [d.strftime('%Y-%m-%d') for d, _ in sales_over_time]
+    date_totals = [t or 0 for _, t in sales_over_time]
+
+    filters = {
+        'fecha_inicio': fecha_inicio or '',
+        'fecha_fin': fecha_fin or '',
+        'estado': estado or '',
+        'categoria': categoria or '',
+    }
+
+    return render_template(
+        'reportes.html',
+        invoices=invoices,
+        sales_by_category=sales_by_category,
+        stats=stats,
+        cat_labels=cat_labels,
+        cat_totals=cat_totals,
+        date_labels=date_labels,
+        date_totals=date_totals,
+        filters=filters,
+        categories=CATEGORIES,
+    )
+
+
+@app.route('/reportes/export')
+def export_reportes():
+    formato = request.args.get('formato', 'csv')
+    fecha_inicio = request.args.get('fecha_inicio')
+    fecha_fin = request.args.get('fecha_fin')
+    estado = request.args.get('estado')
+    categoria = request.args.get('categoria')
+
+    q = _filtered_invoice_query(fecha_inicio, fecha_fin, estado, categoria)
+    invoices = q.options(joinedload(Invoice.client), load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.invoice_type)).all()
+
+    if formato == 'csv':
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+        for inv in invoices:
+            writer.writerow([
+                inv.client.name if inv.client else '',
+                inv.date.strftime('%Y-%m-%d'),
+                inv.invoice_type or '',
+                f"{inv.total:.2f}",
+            ])
+        mem = BytesIO()
+        mem.write(output.getvalue().encode('utf-8'))
+        mem.seek(0)
+        return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='reportes.csv')
+
+    if formato == 'pdf':
+        items = [
+            {
+                'code': inv.id,
+                'reference': inv.client.name if inv.client else '',
+                'product_name': '',
+                'unit': '',
+                'unit_price': inv.total,
+                'quantity': 1,
+                'discount': 0,
+            }
+            for inv in invoices
+        ]
+        subtotal = sum(inv.total for inv in invoices)
+        pdf_path = generate_pdf(
+            'Reporte de Facturas',
+            get_company_info(),
+            {'name': '', 'address': '', 'phone': ''},
+            items,
+            subtotal,
+            0,
+            subtotal,
+            output_path='reportes.pdf'
+        )
+        return send_file(pdf_path, as_attachment=True, download_name='reportes.pdf')
+
+    return redirect(url_for('reportes'))
 
 
 @app.route('/contabilidad')
