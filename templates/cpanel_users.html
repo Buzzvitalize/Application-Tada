@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-xl mb-4">Usuarios</h1>
+<table class="min-w-full bg-white">
+  <thead><tr class="bg-gray-100"><th class="p-2 text-left">Usuario</th><th class="p-2 text-left">Rol</th><th></th></tr></thead>
+  <tbody>
+  {% for u in users %}
+  <tr class="border-t">
+    <td class="p-2">{{ u.username }}</td>
+    <td class="p-2">
+      <form method="post" action="{{ url_for('cpanel_user_role', user_id=u.id) }}" class="flex gap-2">
+        <select name="role" class="border p-1 rounded">
+          {% for r in ['admin','manager','company'] %}
+          <option value="{{ r }}" {% if u.role==r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+        <button class="bg-blue-600 text-white px-2 rounded" type="submit">Guardar</button>
+      </form>
+    </td>
+    <td class="p-2">
+      <form method="post" action="{{ url_for('cpanel_user_delete', user_id=u.id) }}">
+        <button class="text-red-600" onclick="return confirm('Eliminar?')">Eliminar</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

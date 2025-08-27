@@ -537,6 +537,95 @@ def reject_request(req_id):
     flash('Solicitud rechazada')
     return redirect(url_for('admin_requests'))
 
+
+# --- CPanel ---
+
+
+@app.route('/cpaneltx')
+@admin_only
+def cpanel_home():
+    return render_template('cpaneltx.html')
+
+
+@app.route('/cpaneltx/users')
+@admin_only
+def cpanel_users():
+    users = User.query.all()
+    return render_template('cpanel_users.html', users=users)
+
+
+@app.post('/cpaneltx/users/<int:user_id>/role')
+@admin_only
+def cpanel_user_role(user_id):
+    user = User.query.get_or_404(user_id)
+    role = request.form.get('role')
+    if role in ('admin', 'manager', 'company'):
+        user.role = role
+        db.session.commit()
+        flash('Rol actualizado')
+    return redirect(url_for('cpanel_users'))
+
+
+@app.post('/cpaneltx/users/<int:user_id>/delete')
+@admin_only
+def cpanel_user_delete(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash('Usuario eliminado')
+    return redirect(url_for('cpanel_users'))
+
+
+@app.route('/cpaneltx/companies')
+@admin_only
+def cpanel_companies():
+    companies = CompanyInfo.query.all()
+    return render_template('cpanel_companies.html', companies=companies)
+
+
+@app.post('/cpaneltx/companies/<int:cid>/delete')
+@admin_only
+def cpanel_company_delete(cid):
+    company = CompanyInfo.query.get_or_404(cid)
+    db.session.delete(company)
+    db.session.commit()
+    flash('Empresa eliminada')
+    return redirect(url_for('cpanel_companies'))
+
+
+@app.route('/cpaneltx/orders')
+@admin_only
+def cpanel_orders():
+    orders = Order.query.options(joinedload(Order.client)).all()
+    return render_template('cpanel_orders.html', orders=orders)
+
+
+@app.post('/cpaneltx/orders/<int:oid>/delete')
+@admin_only
+def cpanel_order_delete(oid):
+    order = Order.query.get_or_404(oid)
+    db.session.delete(order)
+    db.session.commit()
+    flash('Pedido eliminado')
+    return redirect(url_for('cpanel_orders'))
+
+
+@app.route('/cpaneltx/invoices')
+@admin_only
+def cpanel_invoices():
+    invoices = Invoice.query.options(joinedload(Invoice.client)).all()
+    return render_template('cpanel_invoices.html', invoices=invoices)
+
+
+@app.post('/cpaneltx/invoices/<int:iid>/delete')
+@admin_only
+def cpanel_invoice_delete(iid):
+    inv = Invoice.query.get_or_404(iid)
+    db.session.delete(inv)
+    db.session.commit()
+    flash('Factura eliminada')
+    return redirect(url_for('cpanel_invoices'))
+
 # Clients CRUD
 @app.route('/clientes', methods=['GET', 'POST'])
 def clients():

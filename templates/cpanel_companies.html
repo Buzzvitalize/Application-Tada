@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-xl mb-4">Empresas</h1>
+<table class="min-w-full bg-white">
+  <thead><tr class="bg-gray-100"><th class="p-2 text-left">Nombre</th><th></th></tr></thead>
+  <tbody>
+  {% for c in companies %}
+  <tr class="border-t">
+    <td class="p-2">{{ c.name }}</td>
+    <td class="p-2 text-right">
+      <form method="post" action="{{ url_for('cpanel_company_delete', cid=c.id) }}">
+        <button class="text-red-600" onclick="return confirm('Eliminar?')">Eliminar</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

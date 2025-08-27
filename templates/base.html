@@ -26,6 +26,7 @@
       <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
       <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
       {% if session.get('role') == 'admin' %}
+      <a href="{{ url_for('cpanel_home') }}" class="nav-link">CPanel</a>
       <a href="{{ url_for('admin_companies') }}" class="nav-link">Empresas</a>
       <a href="{{ url_for('admin_requests') }}" class="nav-link">Solicitudes</a>
       {% endif %}
