@@ -37,8 +37,8 @@ body {{ font-family: Helvetica, Arial, sans-serif; margin:0; }}
 .totals tr:last-child td {{ font-size:16px; font-weight:bold; color:{BLUE}; border-top:2px solid {BLUE}; }}
 .notes {{ margin-top:30px; font-size:12px; }}
 .seller-pay {{ display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; }}
-.qr {{ position:absolute; bottom:60px; right:20px; width:80px; }}
-.footer {{ position:absolute; bottom:20px; left:20px; font-size:12px; }}
+.footer {{ position:absolute; bottom:80px; left:20px; font-size:12px; }}
+.qr {{ position:absolute; bottom:20px; right:20px; width:80px; }}
 """
 
 def _fmt_money(value: float) -> str:
@@ -148,8 +148,8 @@ def build_html(title: str, company: dict, client: dict, items: list,
   <tr><td>Descuento</td><td style='text-align:right'>{_fmt_money(discount)}</td></tr>
   <tr><td>ITBIS (18%)</td><td style='text-align:right'>{_fmt_money(itbis)}</td></tr>
 <tr><td>Total</td><td style='text-align:right'>{_fmt_money(total)}</td></tr>
-</table>
-{note_html}{qr_html}{footer_html}
+ </table>
+ {note_html}{footer_html}{qr_html}
 </body>
 </html>
 """

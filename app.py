@@ -1585,8 +1585,8 @@ def export_reportes():
             {
                 'code': inv.id,
                 'reference': inv.client.name if inv.client else '',
-                'product_name': '',
-                'unit': '',
+                'product_name': inv.date.strftime('%d/%m/%Y'),
+                'unit': inv.status or '',
                 'unit_price': inv.total,
                 'quantity': 1,
                 'discount': 0,
@@ -1594,7 +1594,12 @@ def export_reportes():
             for inv in invoices
         ]
         subtotal = sum(inv.total for inv in invoices)
-        note = f"Rango: {(fecha_inicio or 'Todas')} - {(fecha_fin or 'Todas')} | Usuario: {user}"
+        note = (
+            f"Rango: {(fecha_inicio or 'Todas')} - {(fecha_fin or 'Todas')} | "
+            f"Estado: {(estado or 'Todos')} | "
+            f"Categoría: {(categoria or 'Todas')} | "
+            f"Usuario: {user} | Facturas: {len(invoices)}"
+        )
         pdf_path = generate_pdf(
             'Reporte de Facturas',
             company,
@@ -1607,7 +1612,7 @@ def export_reportes():
             output_path='reportes.pdf'
         )
         log_export(user, formato, tipo, filtros, 'success', file_path=pdf_path)
-    return send_file(pdf_path, as_attachment=True, download_name='reportes.pdf')
+        return send_file(pdf_path, as_attachment=True, download_name='reportes.pdf')
 
     return redirect(url_for('reportes'))
 
