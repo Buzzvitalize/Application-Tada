@@ -816,10 +816,9 @@ def order_pdf(order_id):
                  seller=order.seller, payment_method=order.payment_method,
                  bank=order.bank, doc_number=order.id, note=order.note,
                  output_path=pdf_path, qr_url=qr_url,
-                 date=order.date,
-                 footer=("Este pedido será procesado tras la confirmación de pago. "
-                         "Tiempo estimado de entrega: 3 a 5 días hábiles. "
-                         f"Para cualquier consulta contacte a {company.get('email','correo@empresa.com')} de la empresa del sistema"))
+                date=order.date,
+                footer=("Este pedido será procesado tras la confirmación de pago. "
+                        "Tiempo estimado de entrega: 3 a 5 días hábiles."))
     return send_file(pdf_path, download_name=filename, as_attachment=True)
 
 # Invoices
