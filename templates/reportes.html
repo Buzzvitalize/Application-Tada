@@ -272,8 +272,8 @@ const trendCtx = document.getElementById('trendChart');
 new Chart(trendCtx, {
   type: 'line',
   data: {
-    labels: {{ (trend_24|default([], true))|map(attribute='month')|list|tojson }},
-    datasets: [{label:'Últimos 24 meses', data: {{ (trend_24|default([], true))|map(attribute='total')|list|tojson }}, borderColor:'#1e3a8a', fill:false}]
+    labels: {{ (trend_24|default([], true))|map(attribute='month', default='')|list|tojson }},
+    datasets: [{label:'Últimos 24 meses', data: {{ (trend_24|default([], true))|map(attribute='total', default=0)|list|tojson }}, borderColor:'#1e3a8a', fill:false}]
   }
 });
 
