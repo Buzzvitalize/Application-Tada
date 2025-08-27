@@ -1,11 +1,37 @@
 from __future__ import annotations
 import random
-from datetime import datetime
-from faker import Faker
+from datetime import datetime, timedelta
 from app import app, db, Invoice, InvoiceItem, Client, Product
 from models import CompanyInfo
 
-fake = Faker()
+# Minimal stand-in for ``faker`` to avoid external dependency.
+WORDS = [
+    "alpha",
+    "bravo",
+    "charlie",
+    "delta",
+    "echo",
+    "foxtrot",
+]
+
+
+class SimpleFaker:
+    """Very small subset of Faker interface used for seeding tests."""
+
+    def word(self) -> str:
+        return random.choice(WORDS)
+
+    def name(self) -> str:
+        return f"Cliente {random.randint(1, 9999)}"
+
+    def date_time_between(self, start_date: str = "-2y", end_date: str = "now"):
+        end = datetime.now()
+        start = end - timedelta(days=730)
+        delta = end - start
+        return start + timedelta(seconds=random.randint(0, int(delta.total_seconds())))
+
+
+fake = SimpleFaker()
 
 
 def seed_invoices(n: int = 100_000) -> None:

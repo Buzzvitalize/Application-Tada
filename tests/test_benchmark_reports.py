@@ -2,6 +2,11 @@ import os
 import sys
 import pytest
 
+try:  # Skip entire module if plugin unavailable
+    import pytest_benchmark  # noqa: F401
+except Exception:  # pragma: no cover
+    pytest.skip("pytest-benchmark not installed", allow_module_level=True)
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app import app, db
 from models import Invoice

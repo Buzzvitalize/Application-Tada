@@ -6,7 +6,6 @@ python-dotenv
 qrcode
 WeasyPrint
 openpyxl
-Faker
 pytest
 pytest-benchmark
 pytest-cov
