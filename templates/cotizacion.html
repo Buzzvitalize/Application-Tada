@@ -211,14 +211,21 @@ window.addEventListener('load', () => {
       row.remove();
     });
   }
-
+  const productContainer = document.getElementById('productos');
   const templateRow = document.querySelector('.product-row').cloneNode(true);
-  document.getElementById('add-product').addEventListener('click', function() {
-    const container = document.getElementById('productos');
+  function addProductRow() {
     const row = templateRow.cloneNode(true);
     row.querySelectorAll('input').forEach(i => i.value = '');
-    container.appendChild(row);
+    productContainer.appendChild(row);
     bindProduct(row);
+  }
+  document.getElementById('add-product').addEventListener('click', addProductRow);
+
+  // Reset product rows when changing client to avoid mixing items
+  const clientSelect=document.querySelector('select[name="client_id"]');
+  clientSelect.addEventListener('change',()=>{
+    productContainer.innerHTML='';
+    addProductRow();
   });
 
   document.querySelectorAll('.product-row').forEach(bindProduct);

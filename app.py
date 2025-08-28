@@ -155,9 +155,9 @@ if 'csrf_token' not in app.jinja_env.globals:
     app.jinja_env.globals['csrf_token'] = lambda: ''
 app.register_blueprint(auth_bp)
 
-# Ensure tables exist when running without explicit migrations
-with app.app_context():
-    db.create_all()
+# The database schema is managed via Flask-Migrate.  Tables should be
+# created with ``flask db upgrade`` instead of ``db.create_all`` to avoid
+# diverging from migrations.
 
 if Queue and Redis:
     redis_conn = Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
@@ -262,7 +262,6 @@ def _migrate_legacy_schema():
 
 def ensure_admin():  # pragma: no cover - optional helper for deployments
     with app.app_context():
-        db.create_all()
         _migrate_legacy_schema()
         if not User.query.filter_by(username='admin').first():
             admin = User(username='admin', role='admin', first_name='Admin', last_name='')
