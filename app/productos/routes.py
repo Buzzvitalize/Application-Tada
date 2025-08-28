@@ -4,7 +4,7 @@ from ..forms import ProductForm
 
 productos_bp = Blueprint('productos', __name__, url_prefix='/productos', template_folder='../../templates')
 
-UNITS = ['Unidad', 'Metro', 'Onza']
+UNITS = ['Unidad', 'Metro', 'Onza', 'Libra']
 CATEGORIES = ['Servicios', 'Consumo', 'Líquido']
 
 @productos_bp.route('/nuevo', methods=['GET', 'POST'])

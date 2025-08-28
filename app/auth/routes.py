@@ -12,6 +12,7 @@ def login():
     if form.validate_on_submit():
         if form.username.data == 'admin' and form.password.data == '363636':
             session['user'] = form.username.data
+            session['role'] = 'admin'
             return redirect(url_for('clientes.index'))
         flash('Credenciales inválidas', 'login')
     return render_template('login.html', form=form, company=company)

@@ -20,7 +20,17 @@ def test_auth(client):
     assert client.get('/login').status_code == 200
 
 def test_menu_has_links(client):
+    with client.session_transaction() as sess:
+        sess['role']='admin'
     res = client.get('/clientes/')
     page = res.get_data(as_text=True)
-    for text in ['Cotizaciones','Pedidos','Facturas','Clientes','Productos','Inventario','Reportes','Contabilidad']:
+    for text in ['Cotizaciones','Pedidos','Facturas','Clientes','Productos','Inventario','Reportes','Contabilidad','CPanel','Ajustes']:
         assert text in page
+
+
+def test_product_form_choices(client):
+    res = client.get('/productos/nuevo')
+    page = res.get_data(as_text=True)
+    assert 'Servicios' in page and 'Consumo' in page
+    for unit in ['Unidad','Metro','Onza','Libra']:
+        assert unit in page
