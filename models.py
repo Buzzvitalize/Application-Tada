@@ -47,6 +47,11 @@ class Product(db.Model):
     min_stock = db.Column(db.Integer, default=0)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
+    @property
+    def needs_restock(self) -> bool:
+        """Return True if product stock is at or below its minimum level."""
+        return self.stock <= self.min_stock
+
 class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)

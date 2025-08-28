@@ -421,7 +421,17 @@ def load_company():
 
 @app.context_processor
 def inject_company():
-    return {'company': getattr(g, 'company', None)}
+    low_stock = []
+    try:
+        if 'user_id' in session and current_company_id():
+            low_stock = (
+                company_query(Product)
+                .filter(Product.stock <= Product.min_stock, Product.min_stock > 0)
+                .all()
+            )
+    except Exception:
+        low_stock = []
+    return {'company': getattr(g, 'company', None), 'low_stock_products': low_stock}
 
 
 def get_company_info():
@@ -822,6 +832,69 @@ def delete_product(product_id):
 def inventory_report():
     products = company_query(Product).order_by(Product.name).all()
     return render_template('inventario.html', products=products)
+
+
+@app.route('/inventario/ajustar', methods=['GET', 'POST'])
+def inventory_adjust():
+    products = company_query(Product).order_by(Product.name).all()
+    if request.method == 'POST':
+        pid = int(request.form['product_id'])
+        qty = _to_int(request.form['quantity'])
+        mtype = request.form['movement_type']
+        product = company_get(Product, pid)
+        if mtype == 'entrada':
+            product.stock += qty
+            mov_qty = qty
+        elif mtype == 'salida':
+            product.stock -= qty
+            mov_qty = qty
+        else:  # ajuste
+            mov_qty = abs(product.stock - qty)
+            product.stock = qty
+        mov = InventoryMovement(
+            product_id=product.id,
+            quantity=mov_qty,
+            movement_type=mtype,
+        )
+        db.session.add(mov)
+        db.session.commit()
+        flash('Inventario actualizado')
+        return redirect(url_for('inventory_report'))
+    return render_template('inventario_ajuste.html', products=products)
+
+
+@app.route('/inventario/importar', methods=['GET', 'POST'])
+def inventory_import():
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if file and file.filename:
+            stream = StringIO(file.stream.read().decode('utf-8'))
+            reader = csv.DictReader(stream)
+            count = 0
+            for row in reader:
+                code = row.get('code')
+                if not code:
+                    continue
+                product = company_query(Product).filter_by(code=code).first()
+                if not product:
+                    continue
+                stock = _to_int(row.get('stock'))
+                min_stock = _to_int(row.get('min_stock'))
+                product.stock = stock
+                if min_stock:
+                    product.min_stock = min_stock
+                mov = InventoryMovement(
+                    product_id=product.id,
+                    quantity=stock,
+                    movement_type='entrada',
+                    reference_type='import',
+                )
+                db.session.add(mov)
+                count += 1
+            db.session.commit()
+            flash(f'Se importaron {count} productos')
+            return redirect(url_for('inventory_report'))
+    return render_template('inventario_importar.html')
 
 @app.route('/productos/edit/<int:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):

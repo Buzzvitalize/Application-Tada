@@ -55,6 +55,12 @@
             </div>
           {% endif %}
         {% endwith %}
+        {% if low_stock_products %}
+          <div class="mb-4 bg-red-100 text-red-800 p-2">
+            Hay {{ low_stock_products|length }} productos con stock bajo.
+            <a href="{{ url_for('inventory_report') }}" class="underline">Ver inventario</a>
+          </div>
+        {% endif %}
         {% block content %}{% endblock %}
       </div>
     </section>
