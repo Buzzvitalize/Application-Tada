@@ -23,6 +23,6 @@ def logout():
     return redirect(url_for('auth.login'))
 
 
-@auth_bp.route('/solicitar-cuenta')
+@auth_bp.route('/solicitar')
 def request_account():
-    return 'solicitar'
+    return render_template('solicitar_cuenta.html')

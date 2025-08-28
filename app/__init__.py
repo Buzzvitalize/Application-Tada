@@ -55,6 +55,7 @@ def create_app():
     from .cotizaciones.routes import cotizaciones_bp
     from .facturas.routes import facturas_bp
     from .reportes.routes import reportes_bp
+    from .misc.routes import misc_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(clientes_bp)
@@ -62,6 +63,7 @@ def create_app():
     app.register_blueprint(cotizaciones_bp)
     app.register_blueprint(facturas_bp)
     app.register_blueprint(reportes_bp)
+    app.register_blueprint(misc_bp)
 
     @app.route('/')
     def index():

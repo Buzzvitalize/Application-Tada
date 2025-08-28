@@ -6,6 +6,9 @@ create_app = importlib.import_module('app.__init__').create_app
 def client():
     app = create_app()
     app.config['TESTING'] = True
+    from app.models import db
+    with app.app_context():
+        db.create_all()
     with app.test_client() as client:
         yield client
 
@@ -26,3 +29,8 @@ def test_reportes(client):
 
 def test_auth(client):
     assert client.get('/login').status_code == 200
+
+
+def test_misc_pages(client):
+    for url in ['/solicitar', '/cpanel', '/pedido', '/ajustes', '/notificaciones', '/inventario', '/contabilidad']:
+        assert client.get(url).status_code == 200
