@@ -45,6 +45,11 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
+    # Ensure database tables exist for development/testing environments where
+    # migrations may not have been executed yet. In production deployments
+    # migrations should be run explicitly.
+    with app.app_context():  # pragma: no cover - simple existence check
+        db.create_all()
     app.jinja_env.filters.setdefault('money', lambda v: f"{v:.2f}")
     app.jinja_env.filters.setdefault('id_doc', lambda v: v)
     app.jinja_env.filters.setdefault('phone', lambda v: v)
