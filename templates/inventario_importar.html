@@ -4,6 +4,11 @@
 <form method="post" enctype="multipart/form-data" class="space-y-4 max-w-md">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="file" name="file" accept=".csv" class="input" required>
+  <select name="warehouse_id" class="input" required>
+    {% for w in warehouses %}
+    <option value="{{ w.id }}">{{ w.name }}</option>
+    {% endfor %}
+  </select>
   <button class="btn-primary">Importar</button>
 </form>
 <p class="mt-4 text-sm text-gray-600">Formato: code,stock,min_stock</p>

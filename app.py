@@ -921,6 +921,11 @@ def inventory_adjust():
         if not stock:
             stock = ProductStock(product_id=pid, warehouse_id=wid, company_id=current_company_id())
             db.session.add(stock)
+        # ensure numeric defaults
+        if stock.stock is None:
+            stock.stock = 0
+        if product.stock is None:
+            product.stock = 0
         if mtype == 'entrada':
             stock.stock += qty
             product.stock += qty
@@ -952,7 +957,14 @@ def inventory_adjust():
 
 @app.route('/inventario/importar', methods=['GET', 'POST'])
 def inventory_import():
+    warehouses = company_query(Warehouse).order_by(Warehouse.name).all()
+    if not warehouses:
+        default = Warehouse(name='Principal', company_id=current_company_id())
+        db.session.add(default)
+        db.session.commit()
+        warehouses = [default]
     if request.method == 'POST':
+        wid = int(request.form['warehouse_id'])
         file = request.files.get('file')
         if file and file.filename:
             stream = StringIO(file.stream.read().decode('utf-8'))
@@ -965,24 +977,35 @@ def inventory_import():
                 product = company_query(Product).filter_by(code=code).first()
                 if not product:
                     continue
-                stock = _to_int(row.get('stock'))
+                stock_qty = _to_int(row.get('stock'))
                 min_stock = _to_int(row.get('min_stock'))
-                product.stock = stock
+                product.stock = stock_qty
+                ps = (
+                    company_query(ProductStock)
+                    .filter_by(product_id=product.id, warehouse_id=wid)
+                    .first()
+                )
+                if not ps:
+                    ps = ProductStock(product_id=product.id, warehouse_id=wid, company_id=current_company_id())
+                    db.session.add(ps)
+                ps.stock = stock_qty
                 if min_stock:
+                    ps.min_stock = min_stock
                     product.min_stock = min_stock
                 mov = InventoryMovement(
                     product_id=product.id,
-                    quantity=stock,
+                    quantity=stock_qty,
                     movement_type='entrada',
                     reference_type='import',
+                    warehouse_id=wid,
                     company_id=current_company_id(),
                 )
                 db.session.add(mov)
                 count += 1
             db.session.commit()
             flash(f'Se importaron {count} productos')
-            return redirect(url_for('inventory_report'))
-    return render_template('inventario_importar.html')
+            return redirect(url_for('inventory_report', warehouse_id=wid))
+    return render_template('inventario_importar.html', warehouses=warehouses)
 
 
 @app.route('/inventario/transferir', methods=['GET', 'POST'])

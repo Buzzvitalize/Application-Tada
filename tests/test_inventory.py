@@ -84,13 +84,16 @@ def test_inventory_adjust_entry(client):
 def test_inventory_import_csv(client):
     data = 'code,stock,min_stock\nP1,20,8\n'
     resp = client.post('/inventario/importar', data={
-        'file': (BytesIO(data.encode('utf-8')), 's.csv')
+        'file': (BytesIO(data.encode('utf-8')), 's.csv'),
+        'warehouse_id': '1'
     }, follow_redirects=True)
     assert resp.status_code == 200
     with app.app_context():
         prod = Product.query.get(1)
+        ps = ProductStock.query.filter_by(product_id=1, warehouse_id=1).first()
         assert prod.stock == 20
-        assert prod.min_stock == 8
+        assert ps.stock == 20
+        assert ps.min_stock == 8
         assert InventoryMovement.query.count() == 1
 
 
