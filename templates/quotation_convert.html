@@ -6,7 +6,7 @@
   <p class="mb-2">Seleccione el almacén origen para los productos.</p>
   <select name="warehouse_id" class="input" required>
     {% for w in warehouses %}
-    <option value="{{ w.id }}">{{ w.name }}</option>
+    <option value="{{ w.id }}" {% if quotation.warehouse_id == w.id %}selected{% endif %}>{{ w.name }}</option>
     {% endfor %}
   </select>
   <button type="submit" class="btn-primary">Convertir</button>

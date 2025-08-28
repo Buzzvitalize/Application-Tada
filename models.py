@@ -64,9 +64,11 @@ class Quotation(db.Model):
     bank = db.Column(db.String(50))
     note = db.Column(db.Text)
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
 
     client = db.relationship('Client')
     items = db.relationship('QuotationItem', cascade='all, delete-orphan')
+    warehouse = db.relationship('Warehouse')
 
 class QuotationItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)

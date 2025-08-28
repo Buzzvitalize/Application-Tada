@@ -80,6 +80,14 @@ def test_low_stock_alert(client):
     assert b'stock bajo' in resp.data
 
 
+def test_update_min_stock(client):
+    resp = client.post('/inventario/1/minimo', data={'min_stock': '7'}, follow_redirects=True)
+    assert resp.status_code == 200
+    with app.app_context():
+        ps = ProductStock.query.get(1)
+        assert ps.min_stock == 7
+
+
 def test_transfer_between_warehouses(client):
     resp = client.post('/inventario/transferir', data={
         'product_id': '1',

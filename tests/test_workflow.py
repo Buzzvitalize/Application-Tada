@@ -55,6 +55,7 @@ def client(tmp_path):
             total=118,
             seller='Vendedor',
             payment_method='Efectivo',
+            warehouse_id=w.id,
             company_id=c1.id,
         )
         db.session.add(q)
@@ -96,7 +97,7 @@ def test_multi_tenant_isolation(client):
 
 def test_conversion_and_pdf(client):
     login(client, 'user1', 'pass')
-    client.post('/cotizaciones/1/convertir', data={'warehouse_id': '1'})
+    client.post('/cotizaciones/1/convertir')
     with app.app_context():
         order = Order.query.first()
         order_id = order.id
@@ -115,12 +116,12 @@ def test_conversion_and_pdf(client):
 def test_unique_ncf_generation(client):
     login(client, 'user1', 'pass')
     # first conversion
-    client.post('/cotizaciones/1/convertir', data={'warehouse_id': '1'})
+    client.post('/cotizaciones/1/convertir')
     with app.app_context():
         order1 = Order.query.first()
     client.get(f'/pedidos/{order1.id}/facturar')
     # second conversion of same quotation creates new order
-    client.post('/cotizaciones/1/convertir', data={'warehouse_id': '1'})
+    client.post('/cotizaciones/1/convertir')
     with app.app_context():
         order2 = Order.query.order_by(Order.id.desc()).first()
     client.get(f'/pedidos/{order2.id}/facturar')
@@ -138,3 +139,23 @@ def test_role_validation(client):
     login(client, 'admin', '363636')
     resp = client.get('/admin/companies')
     assert resp.status_code == 200
+
+
+def test_new_quotation_with_warehouse(client):
+    login(client, 'user1', 'pass')
+    client.post('/cotizaciones/nueva', data={
+        'client_id': '1',
+        'seller': 'Vend',
+        'payment_method': 'Efectivo',
+        'warehouse_id': '1',
+        'product_id[]': ['1'],
+        'product_quantity[]': ['2'],
+        'product_discount[]': ['0'],
+    })
+    with app.app_context():
+        q = Quotation.query.order_by(Quotation.id.desc()).first()
+        assert q.warehouse_id == 1
+    client.post(f'/cotizaciones/{q.id}/convertir')
+    with app.app_context():
+        ps = ProductStock.query.filter_by(product_id=1, warehouse_id=1).first()
+        assert ps.stock == 8

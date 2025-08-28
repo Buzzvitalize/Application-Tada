@@ -33,7 +33,7 @@
       </div>
     </div>
   </div>
-  <div class="grid md:grid-cols-3 gap-4">
+  <div class="grid md:grid-cols-4 gap-4">
     <input name="seller" placeholder="Vendedor" class="input" required>
     <select name="payment_method" id="payment-method" class="input">
       <option value="Efectivo">Efectivo</option>
@@ -45,6 +45,12 @@
       <option>Banco BHD</option>
       <option>Banco Banreservas</option>
       <option>Banesco</option>
+    </select>
+    <select name="warehouse_id" class="input" required>
+      <option value="">Seleccione almacén</option>
+      {% for w in warehouses %}
+      <option value="{{ w.id }}">{{ w.name }}</option>
+      {% endfor %}
     </select>
   </div>
   <div>

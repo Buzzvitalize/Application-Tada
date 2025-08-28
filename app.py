@@ -865,6 +865,15 @@ def inventory_report():
     )
 
 
+@app.post('/inventario/<int:stock_id>/minimo')
+def update_min_stock(stock_id):
+    stock = company_get(ProductStock, stock_id)
+    stock.min_stock = _to_int(request.form.get('min_stock'))
+    db.session.commit()
+    flash('Mínimo actualizado')
+    return redirect(url_for('inventory_report', warehouse_id=stock.warehouse_id))
+
+
 @app.route('/inventario/ajustar', methods=['GET', 'POST'])
 def inventory_adjust():
     products = company_query(Product).order_by(Product.name).all()
@@ -1047,6 +1056,10 @@ def new_quotation():
             flash('Debe seleccionar un cliente registrado')
             return redirect(url_for('new_quotation'))
         client = company_get(Client, client_id)
+        wid = request.form.get('warehouse_id')
+        if not wid:
+            flash('Seleccione un almacén')
+            return redirect(url_for('new_quotation'))
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('product_quantity[]')
         discounts = request.form.getlist('product_discount[]')
@@ -1060,6 +1073,7 @@ def new_quotation():
         quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total,
                                seller=request.form.get('seller'), payment_method=payment_method,
                                bank=bank, note=request.form.get('note'),
+                               warehouse_id=int(wid),
                                company_id=current_company_id())
         db.session.add(quotation)
         db.session.flush()
@@ -1075,7 +1089,8 @@ def new_quotation():
     products = company_query(Product).options(
         load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)
     ).all()
-    return render_template('cotizacion.html', clients=clients, products=products)
+    warehouses = company_query(Warehouse).order_by(Warehouse.name).all()
+    return render_template('cotizacion.html', clients=clients, products=products, warehouses=warehouses)
 
 @app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
 def edit_quotation(quotation_id):
@@ -1243,7 +1258,12 @@ def quotation_to_order(quotation_id):
     warehouses = company_query(Warehouse).all()
     if request.method == 'GET':
         return render_template('quotation_convert.html', quotation=quotation, warehouses=warehouses)
-    wid = int(request.form['warehouse_id'])
+    wid = request.form.get('warehouse_id', quotation.warehouse_id)
+    if not wid:
+        flash('Seleccione un almacén')
+        return redirect(url_for('quotation_to_order', quotation_id=quotation_id))
+    wid = int(wid)
+    quotation.warehouse_id = wid
     if dom_now() > quotation.date + timedelta(days=30):
         flash('La cotización ha expirado')
         return redirect(url_for('list_quotations'))
