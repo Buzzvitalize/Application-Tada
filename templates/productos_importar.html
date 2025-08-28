@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Importar productos</h1>
+<div class="card p-4 mb-4">
+  <p>Sube un archivo CSV con columnas <code>code,name,unit,price,category,has_itbis</code>. Usa 1 en <code>has_itbis</code> para productos con ITBIS. Esta herramienta facilita migrar productos desde otros sistemas.</p>
+</div>
+<form method="post" enctype="multipart/form-data" class="space-y-4 max-w-md">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="file" name="file" accept=".csv" class="input" required>
+  <button class="btn-primary">Importar</button>
+</form>
+{% endblock %}

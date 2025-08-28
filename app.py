@@ -819,6 +819,34 @@ def products():
     products = query.all()
     return render_template('productos.html', products=products, units=UNITS, categories=CATEGORIES, current_cat=cat)
 
+
+@app.route('/productos/importar', methods=['GET', 'POST'])
+@manager_only
+def products_import():
+    if request.method == 'POST':
+        file = request.files['file']
+        rows = file.stream.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(rows)
+        for row in reader:
+            code = row.get('code')
+            if not code:
+                continue
+            prod = company_query(Product).filter_by(code=code).first()
+            if not prod:
+                prod = Product(code=code, company_id=current_company_id())
+                db.session.add(prod)
+            prod.name = row.get('name') or prod.name
+            prod.unit = row.get('unit') or prod.unit
+            prod.price = _to_float(row.get('price')) or prod.price
+            cat = row.get('category')
+            if cat in CATEGORIES:
+                prod.category = cat
+            prod.has_itbis = row.get('has_itbis', '').strip().lower() in ('1', 'true', 'si', 'sí', 'yes')
+        db.session.commit()
+        flash('Productos importados')
+        return redirect(url_for('products'))
+    return render_template('productos_importar.html')
+
 @app.route('/productos/delete/<int:product_id>')
 def delete_product(product_id):
     product = company_get(Product, product_id)
@@ -1008,6 +1036,7 @@ def inventory_transfer():
 
 
 @app.route('/almacenes', methods=['GET', 'POST'])
+@manager_only
 def warehouses():
     if request.method == 'POST':
         name = request.form['name']
@@ -1018,6 +1047,15 @@ def warehouses():
         return redirect(url_for('warehouses'))
     ws = company_query(Warehouse).order_by(Warehouse.name).all()
     return render_template('almacenes.html', warehouses=ws)
+
+
+@app.post('/almacenes/<int:w_id>/delete')
+@manager_only
+def delete_warehouse(w_id):
+    w = company_get(Warehouse, w_id)
+    db.session.delete(w)
+    db.session.commit()
+    return redirect(url_for('warehouses'))
 
 @app.route('/productos/edit/<int:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
