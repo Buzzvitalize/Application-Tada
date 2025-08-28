@@ -3,24 +3,24 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Editar Producto</h1>
 <form method="post" class="card space-y-4 max-w-4xl mx-auto">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {{ form.hidden_tag()|safe }}
   <div class="grid md:grid-cols-7 gap-4 items-center">
-    <input id="name" name="name" value="{{ product.name }}" placeholder="Nombre" class="input" required>
+    <input id="name" name="name" value="{{ form.name.data or '' }}" placeholder="Nombre" class="input" required>
     <select name="unit" class="input" required>
       {% for u in units %}
-      <option value="{{ u }}" {% if product.unit == u %}selected{% endif %}>{{ u }}</option>
+      <option value="{{ u }}" {% if form.unit.data == u %}selected{% endif %}>{{ u }}</option>
       {% endfor %}
     </select>
-    <input name="code" value="{{ product.code }}" placeholder="Código" class="input" required>
-    <input id="reference" name="reference" value="{{ product.reference }}" placeholder="Referencia" class="input" readonly>
-    <input name="price" value="{{ '%.2f'|format(product.price) }}" placeholder="Precio" class="input" required>
+    <input name="code" value="{{ form.code.data or '' }}" placeholder="Código" class="input" required>
+    <input id="reference" name="reference" value="{{ form.reference.data or '' }}" placeholder="Referencia" class="input" readonly>
+    <input name="price" value="{{ form.price.data or '' }}" placeholder="Precio" class="input" required>
     <select name="category" class="input" required>
       {% for c in categories %}
-      <option value="{{ c }}" {% if product.category == c %}selected{% endif %}>{{ c }}</option>
+      <option value="{{ c }}" {% if form.category.data == c %}selected{% endif %}>{{ c }}</option>
       {% endfor %}
     </select>
     <label class="flex items-center space-x-2">
-      <input type="checkbox" name="has_itbis" {% if product.has_itbis %}checked{% endif %}>
+      <input type="checkbox" name="has_itbis" {% if form.has_itbis.data %}checked{% endif %}>
       <span>Aplicar ITBIS</span>
     </label>
   </div>
