@@ -271,7 +271,16 @@ def ensure_admin():  # pragma: no cover - optional helper for deployments
 # Utility constants
 ITBIS_RATE = 0.18
 UNITS = ('Unidad', 'Metro', 'Onza', 'Libra', 'Kilogramo', 'Litro')
-CATEGORIES = ('Servicios', 'Consumo', 'Liquido', 'Otros')
+CATEGORIES = (
+    'Alimentos y Bebidas',
+    'Productos Industriales / Materiales',
+    'Minerales',
+    'Salud y Cuidado Personal',
+    'Electrónica y Tecnología',
+    'Hogar y Construcción',
+    'Energía Renovable',
+    'Otros',
+)
 INVOICE_STATUSES = ('Pendiente', 'Pagada')
 MAX_EXPORT_ROWS = 50000
 
@@ -302,6 +311,22 @@ def _to_int(value):
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def generate_reference(name: str) -> str:
+    """Generate a unique reference based on product name."""
+    prefix = ''.join(ch for ch in (name or '').upper() if ch.isalnum())[:3]
+    if not prefix:
+        prefix = 'REF'
+    existing = company_query(Product).filter(Product.reference.like(f"{prefix}%")).all()
+    numbers = []
+    for p in existing:
+        if p.reference and p.reference.startswith(prefix):
+            suf = p.reference[len(prefix):]
+            if suf.isdigit():
+                numbers.append(int(suf))
+    next_no = (max(numbers) + 1) if numbers else 1
+    return f"{prefix}{next_no:03d}"
 
 
 def _parse_report_params(fecha_inicio, fecha_fin, estado, categoria):
@@ -799,13 +824,20 @@ def api_create_client():
     db.session.commit()
     return {'id': client.id, 'name': client.name, 'identifier': client.identifier}
 
+
+@app.get('/api/reference')
+def api_reference():
+    name = request.args.get('name', '')
+    return {'reference': generate_reference(name)}
+
 # Products CRUD
 @app.route('/productos', methods=['GET', 'POST'])
 def products():
     if request.method == 'POST':
+        reference = request.form.get('reference') or generate_reference(request.form['name'])
         product = Product(
             code=request.form['code'],
-            reference=request.form.get('reference'),
+            reference=reference,
             name=request.form['name'],
             unit=request.form['unit'],
             price=_to_float(request.form['price']),
@@ -847,6 +879,8 @@ def products_import():
             if cat in CATEGORIES:
                 prod.category = cat
             prod.has_itbis = row.get('has_itbis', '').strip().lower() in ('1', 'true', 'si', 'sí', 'yes')
+            if not prod.reference:
+                prod.reference = generate_reference(prod.name)
         db.session.commit()
         flash('Productos importados')
         return redirect(url_for('products'))
@@ -1090,7 +1124,7 @@ def edit_product(product_id):
     product = company_get(Product, product_id)
     if request.method == 'POST':
         product.code = request.form['code']
-        product.reference = request.form.get('reference')
+        product.reference = request.form.get('reference') or generate_reference(request.form['name'])
         product.name = request.form['name']
         product.unit = request.form['unit']
         product.price = _to_float(request.form['price'])

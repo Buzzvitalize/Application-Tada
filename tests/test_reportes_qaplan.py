@@ -20,7 +20,7 @@ def _setup_db(db_path):
         u1 = User(username='u1', first_name='U', last_name='One', role='company', company_id=c1.id); u1.set_password('pass')
         acc = User(username='acc', first_name='Ac', last_name='Ct', role='contabilidad', company_id=c1.id); acc.set_password('pass')
         db.session.add_all([admin, u1, acc])
-        prod = Product(code='A', name='ProdA', unit='Unidad', price=10, category='Servicios', stock=100, min_stock=0, company_id=c1.id)
+        prod = Product(code='A', name='ProdA', unit='Unidad', price=10, category='Alimentos y Bebidas', stock=100, min_stock=0, company_id=c1.id)
         db.session.add(prod)
         cli1 = Client(name='Alice', company_id=c1.id)
         cli2 = Client(name='Bob', company_id=c2.id)
@@ -41,7 +41,7 @@ def _setup_db(db_path):
             db.session.add(inv)
             db.session.flush()
             db.session.add(InvoiceItem(invoice_id=inv.id, code='A', product_name='ProdA', unit='Unidad',
-                                       unit_price=10, quantity=1, category='Servicios', company_id=c1.id))
+                                   unit_price=10, quantity=1, category='Alimentos y Bebidas', company_id=c1.id))
         # one invoice for company2
         inv2 = Invoice(
             client_id=cli2.id,
@@ -56,7 +56,7 @@ def _setup_db(db_path):
         )
         db.session.add(inv2); db.session.flush()
         db.session.add(InvoiceItem(invoice_id=inv2.id, code='A', product_name='ProdA', unit='Unidad',
-                                   unit_price=10, quantity=1, category='Servicios', company_id=c2.id))
+                                   unit_price=10, quantity=1, category='Alimentos y Bebidas', company_id=c2.id))
         db.session.commit()
 
 
@@ -106,7 +106,7 @@ def test_export_summary_and_pdf(client):
     client.get('/admin/companies/select/1')
     app.config['MAX_EXPORT_ROWS'] = 100000
     resp = client.get('/reportes/export?formato=csv&tipo=resumen')
-    assert b'Servicios' in resp.data
+    assert b'Alimentos y Bebidas' in resp.data
     resp = client.get('/reportes/export?formato=pdf')
     assert resp.mimetype == 'application/pdf'
     client.get('/logout')

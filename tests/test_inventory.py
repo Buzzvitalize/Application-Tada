@@ -131,7 +131,7 @@ def test_transfer_between_warehouses(client):
 
 
 def test_product_import_csv(manager_client):
-    data = 'code,name,unit,price,category,has_itbis\nP2,Prod2,Unidad,12.5,Servicios,1\n'
+    data = 'code,name,unit,price,category,has_itbis\nP2,Prod2,Unidad,12.5,Alimentos y Bebidas,1\n'
     resp = manager_client.post('/productos/importar', data={'file': (BytesIO(data.encode('utf-8')), 'p.csv')}, follow_redirects=True)
     assert resp.status_code == 200
     with app.app_context():
@@ -139,7 +139,8 @@ def test_product_import_csv(manager_client):
         assert p is not None
         assert p.name == 'Prod2'
         assert p.unit == 'Unidad'
-        assert p.category == 'Servicios'
+        assert p.category == 'Alimentos y Bebidas'
+        assert p.reference == 'PRO001'
         assert p.has_itbis is True
 
 

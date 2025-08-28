@@ -8,12 +8,12 @@
 <form method="post" class="card mb-6 space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="grid md:grid-cols-7 gap-4 items-center">
-    <input name="code" placeholder="Código" class="input" required>
-    <input name="reference" placeholder="Referencia" class="input">
-    <input name="name" placeholder="Nombre" class="input" required>
+    <input id="name" name="name" placeholder="Nombre" class="input" required>
     <select name="unit" class="input" required>
       {% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
     </select>
+    <input name="code" placeholder="Código" class="input" required>
+    <input id="reference" name="reference" placeholder="Referencia" class="input" readonly>
     <input name="price" placeholder="Precio" class="input" required>
     <select name="category" class="input" required>
       {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
@@ -69,4 +69,16 @@
     </tbody>
   </table>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('name').addEventListener('blur', async function(){
+  const name = this.value;
+  if(!name) return;
+  const res = await fetch('/api/reference?name=' + encodeURIComponent(name));
+  const data = await res.json();
+  document.getElementById('reference').value = data.reference;
+});
+</script>
 {% endblock %}

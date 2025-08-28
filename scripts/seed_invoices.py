@@ -48,7 +48,7 @@ def seed_invoices(n: int = 100_000) -> None:
         if not products:
             for i in range(10):
                 p = Product(code=f'P{i}', name=fake.word(), unit='Unidad', price=random.uniform(5, 100),
-                            category='Servicios', company_id=company.id)
+                            category='Alimentos y Bebidas', company_id=company.id)
                 db.session.add(p)
             db.session.commit()
             products = Product.query.filter_by(company_id=company.id).all()

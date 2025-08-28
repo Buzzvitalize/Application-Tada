@@ -36,7 +36,7 @@ def client(tmp_path):
         )
         db.session.add(inv); db.session.flush()
         item = InvoiceItem(invoice_id=inv.id, code='P1', product_name='Prod', unit='Unidad', unit_price=100,
-                           quantity=1, category='Servicios', company_id=comp.id)
+                           quantity=1, category='Alimentos y Bebidas', company_id=comp.id)
         db.session.add(item); db.session.commit()
     with app.test_client() as client:
         yield client
@@ -78,7 +78,7 @@ def multi_client(tmp_path):
                 date=datetime.utcnow() - timedelta(days=i),
             )
             db.session.add(inv); db.session.flush()
-            item = InvoiceItem(invoice_id=inv.id, code='P1', product_name='Prod', unit='Unidad', unit_price=100, quantity=1, category='Servicios', company_id=comp1.id)
+            item = InvoiceItem(invoice_id=inv.id, code='P1', product_name='Prod', unit='Unidad', unit_price=100, quantity=1, category='Alimentos y Bebidas', company_id=comp1.id)
             db.session.add(item)
         cli2 = Client(name='Other', company_id=comp2.id)
         db.session.add(cli2); db.session.flush()
@@ -97,7 +97,7 @@ def multi_client(tmp_path):
             date=datetime.utcnow(),
         )
         db.session.add(inv2); db.session.flush()
-        item2 = InvoiceItem(invoice_id=inv2.id, code='P1', product_name='Prod', unit='Unidad', unit_price=50, quantity=1, category='Servicios', company_id=comp2.id)
+        item2 = InvoiceItem(invoice_id=inv2.id, code='P1', product_name='Prod', unit='Unidad', unit_price=50, quantity=1, category='Alimentos y Bebidas', company_id=comp2.id)
         db.session.add(item2); db.session.commit()
     with app.test_client() as c:
         yield c
@@ -111,7 +111,7 @@ def login(c, username, password):
 
 def test_report_filters(client):
     login(client, 'user', 'pass')
-    resp = client.get('/reportes?estado=Pagada&categoria=Servicios&ajax=1')
+    resp = client.get('/reportes?estado=Pagada&categoria=Alimentos%20y%20Bebidas&ajax=1')
     data = resp.get_json()
     assert len(data['invoices']) == 1
     assert data['invoices'][0]['estado'] == 'Pagada'

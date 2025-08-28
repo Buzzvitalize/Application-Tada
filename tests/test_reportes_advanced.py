@@ -9,7 +9,7 @@ def setup_module(module):
         db.drop_all(); db.create_all()
         company = CompanyInfo(name='C', street='s', sector='s', province='p', phone='1', rnc='1')
         db.session.add(company); db.session.commit()
-        prod = Product(code='P', name='Prod', unit='Unidad', price=10, category='Servicios', stock=100, min_stock=0, company_id=company.id)
+        prod = Product(code='P', name='Prod', unit='Unidad', price=10, category='Alimentos y Bebidas', stock=100, min_stock=0, company_id=company.id)
         client = Client(name='A', company_id=company.id)
         db.session.add_all([prod, client]); db.session.commit()
         for i in range(10000):
