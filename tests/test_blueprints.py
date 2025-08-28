@@ -32,5 +32,5 @@ def test_auth(client):
 
 
 def test_misc_pages(client):
-    for url in ['/solicitar', '/cpanel', '/pedido', '/ajustes', '/notificaciones', '/inventario', '/contabilidad']:
+    for url in ['/solicitar', '/cpanel', '/pedido', '/pedidos', '/ajustes', '/adjustes', '/notificaciones', '/inventario', '/contabilidad']:
         assert client.get(url).status_code == 200

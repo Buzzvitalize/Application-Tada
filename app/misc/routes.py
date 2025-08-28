@@ -23,10 +23,12 @@ def cpanel_invoices():
     return render_template('cpanel_invoices.html')
 
 @misc_bp.route('/pedido')
+@misc_bp.route('/pedidos')
 def pedido():
     return render_template('pedido.html')
 
 @misc_bp.route('/ajustes')
+@misc_bp.route('/adjustes')
 def ajustes():
     return render_template('ajustes_empresa.html', company={})
 
