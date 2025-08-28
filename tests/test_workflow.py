@@ -30,11 +30,11 @@ def client(tmp_path):
         c2 = CompanyInfo(name='CompB', street='', sector='', province='', phone='', rnc='')
         db.session.add_all([c1, c2])
         db.session.flush()
-        u1 = User(username='user1', role='company', company_id=c1.id)
+        u1 = User(username='user1', first_name='User', last_name='One', role='company', company_id=c1.id)
         u1.set_password('pass')
-        u2 = User(username='user2', role='company', company_id=c2.id)
+        u2 = User(username='user2', first_name='User', last_name='Two', role='company', company_id=c2.id)
         u2.set_password('pass')
-        admin = User(username='admin', role='admin')
+        admin = User(username='admin', first_name='Ad', last_name='Min', role='admin')
         admin.set_password('363636')
         db.session.add_all([u1, u2, admin])
         cl1 = Client(name='Alice', company_id=c1.id)
@@ -53,7 +53,7 @@ def client(tmp_path):
             subtotal=100,
             itbis=18,
             total=118,
-            seller='Vendedor',
+            seller='User One',
             payment_method='Efectivo',
             warehouse_id=w.id,
             company_id=c1.id,
@@ -145,7 +145,7 @@ def test_new_quotation_with_warehouse(client):
     login(client, 'user1', 'pass')
     client.post('/cotizaciones/nueva', data={
         'client_id': '1',
-        'seller': 'Vend',
+        'seller': 'User One',
         'payment_method': 'Efectivo',
         'warehouse_id': '1',
         'product_id[]': ['1'],

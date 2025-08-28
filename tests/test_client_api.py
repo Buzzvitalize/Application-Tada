@@ -17,7 +17,7 @@ def client(tmp_path):
         comp = CompanyInfo(name='Comp', street='', sector='', province='', phone='', rnc='')
         db.session.add(comp)
         db.session.flush()
-        u = User(username='user', role='company', company_id=comp.id)
+        u = User(username='user', first_name='U', last_name='One', role='company', company_id=comp.id)
         u.set_password('pass')
         db.session.add(u)
         db.session.commit()

@@ -34,7 +34,12 @@
     </div>
   </div>
   <div class="grid md:grid-cols-4 gap-4">
-    <input name="seller" placeholder="Vendedor" class="input" required>
+    <select name="seller" class="input" required>
+      {% for s in sellers %}
+      {% set full = s.first_name + (' ' + s.last_name if s.last_name else '') %}
+      <option value="{{ full }}" {% if s.id==session.get('user_id') %}selected{% endif %}>{{ full }}</option>
+      {% endfor %}
+    </select>
     <select name="payment_method" id="payment-method" class="input">
       <option value="Efectivo">Efectivo</option>
       <option value="Transferencia">Transferencia bancaria</option>

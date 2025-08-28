@@ -14,7 +14,7 @@ def client(tmp_path):
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     with app.app_context():
         db.create_all()
-        u = User(username='admin', role='admin')
+        u = User(username='admin', first_name='Ad', last_name='Min', role='admin')
         u.set_password('363636')
         db.session.add(u)
         db.session.commit()

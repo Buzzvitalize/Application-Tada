@@ -19,7 +19,12 @@
     </div>
   </div>
   <div class="grid md:grid-cols-3 gap-4">
-    <input name="seller" value="{{ quotation.seller }}" placeholder="Vendedor" class="input" required>
+    <select name="seller" class="input" required>
+      {% for s in sellers %}
+      {% set full = s.first_name + (' ' + s.last_name if s.last_name else '') %}
+      <option value="{{ full }}" {% if quotation.seller==full %}selected{% endif %}>{{ full }}</option>
+      {% endfor %}
+    </select>
     <select name="payment_method" id="payment-method" class="input">
       <option value="Efectivo" {% if quotation.payment_method=='Efectivo' %}selected{% endif %}>Efectivo</option>
       <option value="Transferencia" {% if quotation.payment_method=='Transferencia' %}selected{% endif %}>Transferencia bancaria</option>

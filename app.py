@@ -246,6 +246,10 @@ def _migrate_legacy_schema():
     user_cols = {c['name'] for c in inspector.get_columns('user')}
     if 'email' not in user_cols:
         statements.append("ALTER TABLE user ADD COLUMN email VARCHAR(120)")
+    if 'first_name' not in user_cols:
+        statements.append("ALTER TABLE user ADD COLUMN first_name VARCHAR(120) DEFAULT ''")
+    if 'last_name' not in user_cols:
+        statements.append("ALTER TABLE user ADD COLUMN last_name VARCHAR(120) DEFAULT ''")
 
     for stmt in statements:
         db.session.execute(db.text(stmt))
@@ -258,7 +262,7 @@ def ensure_admin():  # pragma: no cover - optional helper for deployments
         db.create_all()
         _migrate_legacy_schema()
         if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', role='admin')
+            admin = User(username='admin', role='admin', first_name='Admin', last_name='')
             admin.set_password(os.environ.get('ADMIN_PASSWORD', '363636'))
             db.session.add(admin)
             db.session.commit()
@@ -567,7 +571,8 @@ def approve_request(req_id):
     )
     db.session.add(company)
     db.session.flush()
-    user = User(username=username, password=password, role=role, company_id=company.id)
+    user = User(username=username, first_name=req.first_name, last_name=req.last_name, role=role, company_id=company.id)
+    user.set_password(password)
     db.session.add(user)
     db.session.delete(req)
     db.session.commit()
@@ -1128,7 +1133,8 @@ def new_quotation():
         load_only(Product.id, Product.code, Product.name, Product.unit, Product.price)
     ).all()
     warehouses = company_query(Warehouse).order_by(Warehouse.name).all()
-    return render_template('cotizacion.html', clients=clients, products=products, warehouses=warehouses)
+    sellers = company_query(User).options(load_only(User.id, User.first_name, User.last_name)).all()
+    return render_template('cotizacion.html', clients=clients, products=products, warehouses=warehouses, sellers=sellers)
 
 @app.route('/cotizaciones/editar/<int:quotation_id>', methods=['GET', 'POST'])
 def edit_quotation(quotation_id):
@@ -1186,11 +1192,13 @@ def edit_quotation(quotation_id):
             'unit': it.unit,
             'price': it.unit_price,
         })
+    sellers = company_query(User).options(load_only(User.id, User.first_name, User.last_name)).all()
     return render_template(
         'cotizacion_edit.html',
         quotation=quotation,
         products=products,
         items=items,
+        sellers=sellers,
     )
 
 
@@ -1202,6 +1210,24 @@ def settings():
         flash('Seleccione una empresa')
         return redirect(url_for('admin_companies'))
     if request.method == 'POST':
+        if request.form.get('action') == 'create_user':
+            if session.get('role') == 'manager':
+                count = User.query.filter_by(company_id=company.id, role='company').count()
+                if count >= 2:
+                    flash('Los managers solo pueden crear 2 usuarios')
+                    return redirect(url_for('settings'))
+            user = User(
+                username=request.form['username'],
+                first_name=request.form['first_name'],
+                last_name=request.form['last_name'],
+                role='company',
+                company_id=company.id,
+            )
+            user.set_password(request.form['password'])
+            db.session.add(user)
+            db.session.commit()
+            flash('Usuario creado')
+            return redirect(url_for('settings'))
         role = session.get('role')
         if role != 'manager':
             company.name = request.form.get('name', company.name)

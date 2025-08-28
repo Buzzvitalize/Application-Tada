@@ -17,7 +17,7 @@ def client(tmp_path):
         company = CompanyInfo(name='Comp', street='s', sector='s', province='p', phone='1', rnc='1')
         db.session.add(company)
         db.session.flush()
-        u = User(username='mgr', role='manager', company_id=company.id)
+        u = User(username='mgr', first_name='Man', last_name='Ager', role='manager', company_id=company.id)
         u.set_password('pass')
         db.session.add(u)
         db.session.commit()
@@ -66,4 +66,11 @@ def test_manager_cannot_change_other_fields(client):
         c = CompanyInfo.query.first()
         assert c.name == original_name
         assert c.phone == original_phone
+
+
+def test_manager_user_limit(client):
+    client.post('/ajustes', data={'action': "create_user", "first_name": "A", "last_name": "B", "username": "u1", "password": "p"})
+    client.post('/ajustes', data={'action': "create_user", "first_name": "C", "last_name": "D", "username": "u2", "password": "p"})
+    resp = client.post('/ajustes', data={'action': "create_user", "first_name": "E", "last_name": "F", "username": "u3", "password": "p"}, follow_redirects=True)
+    assert b'Los managers solo pueden crear 2 usuarios' in resp.data
 
