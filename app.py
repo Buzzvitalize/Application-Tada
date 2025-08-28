@@ -167,9 +167,11 @@ else:  # pragma: no cover
 
 
 def enqueue_export(fn, *args):
+    """Enqueue an export job using RQ if available or fallback to threading."""
+    app_obj = current_app._get_current_object()
     if export_queue:
-        return export_queue.enqueue(fn, *args)
-    t = threading.Thread(target=fn, args=args, daemon=True)
+        return export_queue.enqueue(fn, app_obj, *args)
+    t = threading.Thread(target=fn, args=(app_obj, *args), daemon=True)
     t.start()
     return t
 
@@ -191,9 +193,9 @@ def log_export(user, formato, tipo, filtros, status, message='', file_path=None)
         return entry.id
 
 
-def _export_job(company_id, user, start, end, estado, categoria, formato, tipo, entry_id):  # pragma: no cover - background
-    with app.app_context():
-        session['company_id'] = company_id
+def _export_job(app_obj, company_id, user, start, end, estado, categoria, formato, tipo, entry_id):  # pragma: no cover - background
+    """Background task that builds the export file for the given company."""
+    with app_obj.app_context():
         filtros = {
             'fecha_inicio': start.strftime('%Y-%m-%d') if start else '',
             'fecha_fin': end.strftime('%Y-%m-%d') if end else '',
@@ -201,7 +203,18 @@ def _export_job(company_id, user, start, end, estado, categoria, formato, tipo, 
             'categoria': categoria or '',
         }
         try:
-            q = _filtered_invoice_query(start, end, estado, categoria)
+            if os.path.isfile('maint'):
+                os.remove('maint')
+            os.makedirs('maint', exist_ok=True)
+            q = Invoice.query.filter_by(company_id=company_id)
+            if start:
+                q = q.filter(Invoice.date >= start)
+            if end:
+                q = q.filter(Invoice.date <= end)
+            if estado:
+                q = q.filter(Invoice.status == estado)
+            if categoria:
+                q = q.join(Invoice.items).filter(InvoiceItem.category == categoria)
             invoices = q.options(
                 joinedload(Invoice.client),
                 load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
@@ -222,7 +235,7 @@ def _export_job(company_id, user, start, end, estado, categoria, formato, tipo, 
             entry.status = 'success'
             entry.file_path = path
             db.session.commit()
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - hard to simulate failures
             entry = ExportLog.query.get(entry_id)
             entry.status = 'fail'
             entry.message = str(exc)
@@ -2030,6 +2043,7 @@ def export_reportes():
             tipo,
             entry_id,
         )
+        flash('Reporte en proceso, vuelva a revisar en unos minutos')
         return jsonify({'job': entry_id})
 
     invoices = q.options(
