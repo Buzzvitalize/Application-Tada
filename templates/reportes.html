@@ -3,10 +3,10 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Reportes</h1>
 <div class="mb-4">
-  <a href="{{ url_for('account_statement_clients') }}" class="text-blue-600 underline">Estados de cuentas por clientes</a>
+  <a href="{{ url_for('reportes.account_statement_clients') }}" class="text-blue-600 underline">Estados de cuentas por clientes</a>
 </div>
 
-<form id="filters" class="card mb-6 grid md:grid-cols-5 gap-4" method="get" action="{{ url_for('reportes') }}">
+<form id="filters" class="card mb-6 grid md:grid-cols-5 gap-4" method="get" action="{{ url_for('reportes.ver_reportes') }}">
   <input type="date" name="fecha_inicio" value="{{ filters.fecha_inicio }}" class="input">
   <input type="date" name="fecha_fin" value="{{ filters.fecha_fin }}" class="input">
   <select name="estado" class="input">
@@ -43,8 +43,8 @@
       <button type="button" data-range="year" class="btn text-xs">Año</button>
     </div>
     <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
-    <a href="{{ url_for('export_inventory') }}" class="btn">Inventario</a>
-    <a href="{{ url_for('export_history') }}" class="btn ml-auto">Historial</a>
+    <a href="{{ url_for('reportes.export_inventory') }}" class="btn">Inventario</a>
+    <a href="{{ url_for('reportes.export_history') }}" class="btn ml-auto">Historial</a>
   </div>
 </form>
 
@@ -216,10 +216,10 @@
   </table>
   <div class="flex justify-end gap-2 mt-2">
     {% if pagination.page > 1 %}
-    <a class="btn" href="{{ url_for('reportes', page=pagination.page-1, **filters) }}">Anterior</a>
+    <a class="btn" href="{{ url_for('reportes.ver_reportes', page=pagination.page-1, **filters) }}">Anterior</a>
     {% endif %}
     {% if pagination.page < pagination.pages %}
-    <a class="btn" href="{{ url_for('reportes', page=pagination.page+1, **filters) }}">Siguiente</a>
+    <a class="btn" href="{{ url_for('reportes.ver_reportes', page=pagination.page+1, **filters) }}">Siguiente</a>
     {% endif %}
   </div>
 </div>
@@ -342,14 +342,14 @@ exportMenu.querySelectorAll('a').forEach(a => {
     e.preventDefault();
     spinner.classList.remove('hidden');
     const params = new URLSearchParams(new FormData(document.getElementById('filters')));
-    window.location = `{{ url_for('export_reportes') }}?formato=${a.dataset.format}&tipo=${exportTipo.value}&` + params.toString();
+    window.location = `{{ url_for('reportes.export_reportes') }}?formato=${a.dataset.format}&tipo=${exportTipo.value}&` + params.toString();
     setTimeout(() => spinner.classList.add('hidden'), 3000);
     exportMenu.classList.add('hidden');
   });
 });
 
 document.getElementById('resetFilters').addEventListener('click', () => {
-  window.location = '{{ url_for('reportes') }}';
+  window.location = '{{ url_for('reportes.ver_reportes') }}';
 });
 document.querySelectorAll('[data-range]').forEach(btn => {
   btn.addEventListener('click', () => {

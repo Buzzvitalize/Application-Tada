@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for
 from ..models import db, Client, CompanyInfo
 from ..forms import ClientForm
 
-clientes_bp = Blueprint('clientes', __name__, url_prefix='/clientes')
+clientes_bp = Blueprint('clientes', __name__, url_prefix='/clientes', template_folder='../../templates')
 
 @clientes_bp.route('/nuevo', methods=['GET', 'POST'])
 def nuevo():

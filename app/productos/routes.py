@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for
 from ..models import db, Product, CompanyInfo
 from ..forms import ProductForm
 
-productos_bp = Blueprint('productos', __name__, url_prefix='/productos')
+productos_bp = Blueprint('productos', __name__, url_prefix='/productos', template_folder='../../templates')
 
 UNITS = ['Unidad', 'Metro', 'Onza']
 CATEGORIES = ['Servicios', 'Consumo', 'Líquido']
