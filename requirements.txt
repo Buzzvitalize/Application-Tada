@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-WTF
+python-dotenv
+WeasyPrint
+openpyxl
+pytest
+pytest-benchmark
+pytest-cov
+pytest-xdist
+locust

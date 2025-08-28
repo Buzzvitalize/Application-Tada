@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: pip install pytest-benchmark pytest-cov locust
+      - name: Run tests with coverage and benchmarks
+        run: SECRET_KEY=test pytest --cov=. --benchmark-json=benchmark.json
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: coverage.xml
+      - name: Upload benchmarks
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmarks
+          path: benchmark.json
+      - name: Start server
+        run: |
+          flask --app app run &
+          echo $! > flask.pid
+        env:
+          SECRET_KEY: test
+      - name: Load test
+        run: locust -f tests/locustfile.py --headless -u 50 -r 10 -t 1m --host=http://localhost:5000 --csv=loadtest || true
+      - name: Upload load results
+        uses: actions/upload-artifact@v3
+        with:
+          name: loadtest
+          path: loadtest*
+      - name: Stop server
+        run: kill $(cat flask.pid)
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {"text":"CI failed for ${{ github.repository }} @ ${{ github.sha }}"}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

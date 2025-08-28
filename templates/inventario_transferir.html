@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Transferencia de Inventario</h1>
+<form method="post" class="space-y-4 max-w-md">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <label class="block mb-1">Producto</label>
+    <select name="product_id" class="input" required>
+      {% for p in products %}
+      <option value="{{ p.id }}">{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block mb-1">Desde</label>
+    <select name="origin_id" class="input" required>
+      {% for w in warehouses %}
+      <option value="{{ w.id }}">{{ w.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block mb-1">Hacia</label>
+    <select name="dest_id" class="input" required>
+      {% for w in warehouses %}
+      <option value="{{ w.id }}">{{ w.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block mb-1">Cantidad</label>
+    <input type="number" name="quantity" class="input" required>
+  </div>
+  <button type="submit" class="btn-primary">Transferir</button>
+</form>
+{% endblock %}

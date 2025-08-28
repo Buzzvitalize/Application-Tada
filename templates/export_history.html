@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Historial de Exportaciones{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Historial de Exportaciones</h1>
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr><th class="p-2">Fecha</th><th class="p-2">Usuario</th><th class="p-2">Formato</th><th class="p-2">Estado</th><th class="p-2">Archivo</th></tr>
+    </thead>
+    <tbody>
+    {% for e in logs %}
+      <tr class="border-t">
+        <td class="p-2">{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td class="p-2">{{ e.user }}</td>
+        <td class="p-2">{{ e.formato }}</td>
+        <td class="p-2">{{ e.status }}</td>
+        <td class="p-2">
+          {% if e.file_path %}<a class="link" href="/{{ e.file_path }}" download>Descargar</a>{% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr class="border-t"><td class="p-2 text-center" colspan="5">Sin datos</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
