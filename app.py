@@ -292,6 +292,12 @@ def current_company_id():
     return session.get('company_id')
 
 
+def notify(message):
+    if current_company_id():
+        db.session.add(Notification(company_id=current_company_id(), message=message))
+        db.session.commit()
+
+
 def company_query(model):
     cid = current_company_id()
     if session.get('role') == 'admin' and cid is None:
@@ -453,7 +459,6 @@ def load_company():
 
 @app.context_processor
 def inject_company():
-    low_stock = []
     notif_count = 0
     try:
         if 'user_id' in session and current_company_id():
@@ -463,7 +468,7 @@ def inject_company():
                 .all()
             )
             for ps in low_stock:
-                msg = f"Stock bajo: {ps.product.name} en {ps.warehouse.name}"
+                msg = f"Stock bajo: {ps.product.name}"
                 if not Notification.query.filter_by(company_id=current_company_id(), message=msg).first():
                     db.session.add(Notification(company_id=current_company_id(), message=msg))
             if low_stock:
@@ -471,7 +476,7 @@ def inject_company():
             notif_count = Notification.query.filter_by(company_id=current_company_id(), is_read=False).count()
     except Exception:
         pass
-    return {'company': getattr(g, 'company', None), 'low_stock_products': low_stock, 'notification_count': notif_count}
+    return {'company': getattr(g, 'company', None), 'notification_count': notif_count}
 
 
 def get_company_info():
@@ -772,6 +777,7 @@ def clients():
         db.session.add(client)
         db.session.commit()
         flash('Cliente agregado')
+        notify('Cliente agregado')
         return redirect(url_for('clients'))
     clients = company_query(Client).all()
     return render_template('clientes.html', clients=clients)
@@ -859,6 +865,7 @@ def products():
         db.session.add(product)
         db.session.commit()
         flash('Producto agregado')
+        notify('Producto agregado')
         return redirect(url_for('products'))
     cat = request.args.get('cat')
     query = company_query(Product)
@@ -1193,6 +1200,7 @@ def new_quotation():
             db.session.add(q_item)
         db.session.commit()
         flash('Cotización guardada')
+        notify('Cotización guardada')
         return redirect(url_for('list_quotations'))
     clients = company_query(Client).options(
         load_only(Client.id, Client.name, Client.identifier)
@@ -1495,6 +1503,7 @@ def quotation_to_order(quotation_id):
             db.session.add(mov)
     db.session.commit()
     flash('Pedido creado')
+    notify('Pedido creado')
     return redirect(url_for('list_orders'))
 
 # Orders
@@ -1562,6 +1571,7 @@ def order_to_invoice(order_id):
     order.status = 'Entregado'
     db.session.commit()
     flash('Factura generada')
+    notify('Factura generada')
     return redirect(url_for('list_invoices'))
 
 @app.route('/pedidos/<int:order_id>/pdf')
@@ -1978,10 +1988,10 @@ def export_reportes():
     tipo = request.args.get('tipo', 'detalle')
     if role == 'contabilidad':
         if formato not in {'csv', 'xlsx'} or tipo != 'resumen':
-            log_export(session.get('username'), formato, tipo, {}, 'fail', 'permiso')
+            log_export(session.get('full_name') or session.get('username'), formato, tipo, {}, 'fail', 'permiso')
             return '', 403
     elif role not in ('admin', 'manager'):
-        log_export(session.get('username'), formato, tipo, {}, 'fail', 'permiso')
+        log_export(session.get('full_name') or session.get('username'), formato, tipo, {}, 'fail', 'permiso')
         return '', 403
 
     fecha_inicio = request.args.get('fecha_inicio')
@@ -1993,7 +2003,7 @@ def export_reportes():
     q = _filtered_invoice_query(start, end, estado, categoria)
     count = q.count()
     filtros = {'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'estado': estado, 'categoria': categoria}
-    user = session.get('username')
+    user = session.get('full_name') or session.get('username')
 
     max_rows = current_app.config.get('MAX_EXPORT_ROWS', MAX_EXPORT_ROWS)
     if count > max_rows and request.args.get('async') != '1':

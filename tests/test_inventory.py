@@ -6,8 +6,8 @@ import pytest
 from io import BytesIO
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from app import app, db
-from models import CompanyInfo, User, Product, InventoryMovement, Warehouse, ProductStock
+from app import app, db, notify
+from models import CompanyInfo, User, Product, InventoryMovement, Warehouse, ProductStock, Notification
 
 
 @pytest.fixture
@@ -102,8 +102,9 @@ def test_low_stock_alert(client):
         ps = ProductStock.query.filter_by(product_id=1, warehouse_id=1).first()
         ps.stock = 2
         db.session.commit()
-    resp = client.get('/cotizaciones')
-    assert b'stock bajo' in resp.data
+        notify(f'Stock bajo: {ps.product.name}')
+    resp = client.get('/notificaciones')
+    assert b'Stock bajo' in resp.data
 
 
 def test_update_min_stock(client):

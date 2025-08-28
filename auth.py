@@ -15,6 +15,8 @@ def login():
             session['user_id'] = user.id
             session['role'] = user.role
             session['company_id'] = user.company_id
+            session['username'] = user.username
+            session['full_name'] = f"{user.first_name} {user.last_name}".strip()
             return redirect(url_for('index'))
         flash('Credenciales inválidas', 'login')
     return render_template('login.html', form=form, company=None)
