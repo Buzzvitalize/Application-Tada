@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">Estado de cuenta</h1>
+<div class="mb-4">
+  <p class="font-semibold">{{ client.name }}</p>
+  {% if client.identifier %}<p>RNC: {{ client.identifier }}</p>{% endif %}
+  <p>{{ client.street }} {{ client.sector }} {{ client.province }}</p>
+  <p>{{ client.phone }} {{ client.email }}</p>
+</div>
+<table class="min-w-full bg-white mb-4">
+  <thead>
+    <tr class="bg-gray-200 text-left">
+      <th class="px-2 py-1">Documento</th>
+      <th class="px-2 py-1">Pedido</th>
+      <th class="px-2 py-1">Fecha</th>
+      <th class="px-2 py-1">Vence</th>
+      <th class="px-2 py-1">Info</th>
+      <th class="px-2 py-1">Importe</th>
+      <th class="px-2 py-1">Saldo</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr class="border-b">
+      <td class="px-2 py-1">{{ r.document }}</td>
+      <td class="px-2 py-1">{{ r.order }}</td>
+      <td class="px-2 py-1">{{ r.date }}</td>
+      <td class="px-2 py-1">{{ r.due }}</td>
+      <td class="px-2 py-1">{{ r.info }}</td>
+      <td class="px-2 py-1 text-right">{{ r.amount | money }}</td>
+      <td class="px-2 py-1 text-right">{{ r.balance | money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="text-right font-semibold">Total: {{ total | money }}</p>
+<p class="text-right text-sm">% vencido: {{ overdue_pct|round(2) }}%</p>
+<a href="{{ url_for('account_statement_detail', client_id=client.id, pdf=1) }}" class="btn-primary mt-2 inline-block">Exportar PDF</a>
+{% endblock %}

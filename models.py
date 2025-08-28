@@ -140,6 +140,15 @@ class Invoice(db.Model):
     client = db.relationship('Client')
     order = db.relationship('Order')
     items = db.relationship('InvoiceItem', cascade='all, delete-orphan')
+    payments = db.relationship('Payment', cascade='all, delete-orphan', back_populates='invoice')
+
+class Payment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoice.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    date = db.Column(db.DateTime, default=dom_now)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+    invoice = db.relationship('Invoice', back_populates='payments')
 
 class InvoiceItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)

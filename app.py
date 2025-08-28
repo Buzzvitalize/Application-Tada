@@ -46,6 +46,7 @@ from models import (
     OrderItem,
     Invoice,
     InvoiceItem,
+    Payment,
     InventoryMovement,
     Warehouse,
     ProductStock,
@@ -73,6 +74,7 @@ import re
 import json
 from ai import recommend_products
 from weasy_pdf import generate_pdf
+from account_pdf import generate_account_statement_pdf
 from functools import wraps
 from auth import auth_bp
 from config import DevelopmentConfig
@@ -1894,6 +1896,79 @@ def reportes():
         categories=CATEGORIES,
         statuses=INVOICE_STATUSES,
     )
+
+
+@app.get('/reportes/estado-cuentas')
+def account_statement_clients():
+    clients = company_query(Client).order_by(Client.name).all()
+    return render_template('estado_cuentas.html', clients=clients)
+
+
+def _invoice_balance(inv):
+    return inv.total - sum(p.amount for p in inv.payments)
+
+
+@app.get('/reportes/estado-cuentas/<int:client_id>')
+def account_statement_detail(client_id):
+    client = company_get(Client, client_id)
+    invoices = (
+        company_query(Invoice)
+        .filter_by(client_id=client.id)
+        .options(joinedload(Invoice.order), joinedload(Invoice.payments))
+        .all()
+    )
+    rows = []
+    totals = 0
+    aging = {'0-30': 0, '31-60': 0, '61-90': 0, '91-120': 0, '121+': 0}
+    now = datetime.utcnow()
+    for inv in invoices:
+        balance = _invoice_balance(inv)
+        if balance <= 0:
+            continue
+        due = inv.date + timedelta(days=30)
+        rows.append({
+            'document': inv.ncf or f'FAC-{inv.id}',
+            'order': inv.order.customer_po if inv.order and inv.order.customer_po else inv.order_id,
+            'date': inv.date.strftime('%d/%m/%Y'),
+            'due': due.strftime('%d/%m/%Y'),
+            'info': inv.note or '',
+            'amount': inv.total,
+            'balance': balance,
+        })
+        totals += balance
+        age = (now - inv.date).days
+        if age <= 30:
+            aging['0-30'] += balance
+        elif age <= 60:
+            aging['31-60'] += balance
+        elif age <= 90:
+            aging['61-90'] += balance
+        elif age <= 120:
+            aging['91-120'] += balance
+        else:
+            aging['121+'] += balance
+    overdue = sum(r['balance'] for r in rows if datetime.strptime(r['due'], '%d/%m/%Y') < now)
+    overdue_pct = (overdue / totals * 100) if totals else 0
+    if request.args.get('pdf') == '1':
+        company = {
+            'name': g.company.name,
+            'street': g.company.street,
+            'phone': g.company.phone,
+            'rnc': g.company.rnc,
+            'logo': g.company.logo,
+        }
+        client_dict = {
+            'name': client.name,
+            'identifier': client.identifier,
+            'street': client.street,
+            'sector': client.sector,
+            'province': client.province,
+            'phone': client.phone,
+            'email': client.email,
+        }
+        pdf_path = generate_account_statement_pdf(company, client_dict, rows, totals, aging, overdue_pct)
+        return send_file(pdf_path, as_attachment=True, download_name=f'estado_cuenta_{client.id}.pdf')
+    return render_template('estado_cuenta_detalle.html', client=client, rows=rows, total=totals, aging=aging, overdue_pct=overdue_pct)
 
 
 @app.route('/reportes/export')

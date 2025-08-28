@@ -10,3 +10,4 @@ pytest-benchmark
 pytest-cov
 pytest-xdist
 locust
+fpdf2

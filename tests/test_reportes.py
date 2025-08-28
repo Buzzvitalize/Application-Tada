@@ -211,3 +211,21 @@ def test_multi_tenant_isolation(multi_client):
     resp = multi_client.get('/reportes/export?formato=csv')
     assert resp.status_code == 403
     multi_client.get('/logout')
+
+
+def test_account_statement_pdf(client):
+    login(client, 'user', 'pass')
+    with app.app_context():
+        comp = CompanyInfo.query.first()
+        cli = Client.query.first()
+        cid = cli.id
+        order = Order(client_id=cid, subtotal=50, itbis=9, total=59, company_id=comp.id)
+        db.session.add(order); db.session.flush()
+        inv = Invoice(client_id=cid, order_id=order.id, subtotal=50, itbis=9, total=59,
+                      invoice_type='Consumidor Final', status='Pendiente', payment_method='Efectivo', company_id=comp.id)
+        db.session.add(inv); db.session.commit()
+    resp = client.get('/reportes/estado-cuentas')
+    assert resp.status_code == 200
+    resp = client.get(f'/reportes/estado-cuentas/{cid}?pdf=1')
+    assert resp.status_code == 200
+    client.get('/logout')
