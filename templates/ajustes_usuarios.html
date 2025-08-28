@@ -23,7 +23,11 @@
         <input form="f{{u.id}}" name="last_name" value="{{ u.last_name }}" class="input" required>
       </td>
       <td class="p-2">
-        <input form="f{{u.id}}" name="username" value="{{ u.username }}" class="input" required>
+        <input form="f{{u.id}}" name="username" value="{{ u.username }}" class="input mb-2" required>
+        <select form="f{{u.id}}" name="role" class="input">
+          <option value="company" {% if u.role=='company' %}selected{% endif %}>Usuario</option>
+          <option value="manager" {% if u.role=='manager' %}selected{% endif %}>Manager</option>
+        </select>
       </td>
       <td class="p-2">
         <form id="f{{u.id}}" method="post" class="space-y-2">

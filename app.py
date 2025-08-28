@@ -1398,10 +1398,17 @@ def settings_manage_users():
         user.first_name = request.form.get('first_name', user.first_name)
         user.last_name = request.form.get('last_name', user.last_name)
         user.username = request.form.get('username', user.username)
+        new_role = request.form.get('role', user.role)
+        if new_role in ('company', 'manager'):
+            user.role = new_role
         db.session.commit()
         flash('Usuario actualizado')
         return redirect(url_for('settings_manage_users'))
-    users = User.query.filter_by(company_id=company_id, role='company').all()
+    users = (
+        User.query.filter_by(company_id=company_id)
+        .filter(User.id != session.get('user_id'))
+        .all()
+    )
     return render_template('ajustes_usuarios.html', users=users)
 
 @app.route('/cotizaciones/<int:quotation_id>/pdf')
@@ -2165,6 +2172,37 @@ def export_reportes():
         return send_file(pdf_path, as_attachment=True, download_name='reportes.pdf')
 
     return redirect(url_for('reportes'))
+
+
+@app.route('/reportes/inventario/export')
+def export_inventory():
+    role = session.get('role')
+    if role not in ('admin', 'manager', 'contabilidad'):
+        return '', 403
+    company_id = current_company_id()
+    rows = (
+        db.session.query(
+            Product.code,
+            Product.name,
+            Warehouse.name,
+            ProductStock.stock,
+            ProductStock.min_stock,
+        )
+        .join(ProductStock, Product.id == ProductStock.product_id)
+        .join(Warehouse, ProductStock.warehouse_id == Warehouse.id)
+        .filter(ProductStock.company_id == company_id)
+        .order_by(Product.name)
+        .all()
+    )
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Código', 'Producto', 'Almacén', 'Stock', 'Mínimo'])
+    for code, name, wh, stock, min_stock in rows:
+        writer.writerow([code or '', name or '', wh or '', stock, min_stock])
+    mem = BytesIO()
+    mem.write(output.getvalue().encode('utf-8'))
+    mem.seek(0)
+    return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='inventario.csv')
 
 
 @app.route('/reportes/exportes')

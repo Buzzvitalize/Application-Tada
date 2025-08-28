@@ -43,6 +43,7 @@
       <button type="button" data-range="year" class="btn text-xs">Año</button>
     </div>
     <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
+    <a href="{{ url_for('export_inventory') }}" class="btn">Inventario</a>
     <a href="{{ url_for('export_history') }}" class="btn ml-auto">Historial</a>
   </div>
 </form>

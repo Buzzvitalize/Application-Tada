@@ -2,7 +2,7 @@ import os, sys, pytest
 from datetime import datetime, timedelta
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app import app, db
-from models import CompanyInfo, User, Client, Order, Invoice, InvoiceItem
+from models import CompanyInfo, User, Client, Order, Invoice, InvoiceItem, Product, Warehouse, ProductStock
 
 @pytest.fixture
 def client(tmp_path):
@@ -122,6 +122,22 @@ def test_export_permissions(client):
     resp = client.get('/reportes/export?formato=csv')
     assert resp.status_code == 403
     client.get('/logout')
+
+
+def test_inventory_export(client):
+    login(client, 'mgr', 'pass')
+    with app.app_context():
+        comp = CompanyInfo.query.first()
+        prod = Product(code='P1', name='Prod', unit='Unidad', price=10, company_id=comp.id)
+        wh = Warehouse(name='Principal', company_id=comp.id)
+        db.session.add_all([prod, wh])
+        db.session.flush()
+        ps = ProductStock(product_id=prod.id, warehouse_id=wh.id, stock=5, min_stock=1, company_id=comp.id)
+        db.session.add(ps)
+        db.session.commit()
+    resp = client.get('/reportes/inventario/export')
+    assert resp.status_code == 200
+    assert b'P1' in resp.data
     login(client, 'mgr', 'pass')
     resp = client.get('/reportes/export?formato=csv', follow_redirects=True)
     assert resp.status_code == 200

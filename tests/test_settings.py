@@ -74,3 +74,12 @@ def test_manager_user_limit(client):
     resp = client.post('/ajustes/usuarios/agregar', data={"first_name": "E", "last_name": "F", "username": "u3", "password": "p"}, follow_redirects=True)
     assert b'Los managers solo pueden crear 2 usuarios' in resp.data
 
+
+def test_manager_can_promote_user(client):
+    client.post('/ajustes/usuarios/agregar', data={"first_name": "A", "last_name": "B", "username": "u1", "password": "p"})
+    with app.app_context():
+        uid = User.query.filter_by(username='u1').first().id
+    client.post('/ajustes/usuarios', data={"user_id": uid, "first_name": "A", "last_name": "B", "username": "u1", "role": "manager", "action": "update"})
+    with app.app_context():
+        assert User.query.get(uid).role == 'manager'
+
