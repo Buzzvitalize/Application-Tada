@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">Estados de cuentas por cliente</h1>
+<table class="min-w-full bg-white">
+  <thead>
+    <tr class="bg-gray-200 text-left">
+      <th class="px-2 py-1">Nombre</th>
+      <th class="px-2 py-1">RNC</th>
+      <th class="px-2 py-1">Dirección</th>
+      <th class="px-2 py-1">Teléfono</th>
+      <th class="px-2 py-1">Email</th>
+      <th class="px-2 py-1"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for c in clients %}
+    <tr class="border-b">
+      <td class="px-2 py-1">{{ c.name }}</td>
+      <td class="px-2 py-1">{{ c.identifier or '' }}</td>
+      <td class="px-2 py-1">{{ c.street or '' }}</td>
+      <td class="px-2 py-1">{{ c.phone or '' }}</td>
+      <td class="px-2 py-1">{{ c.email or '' }}</td>
+      <td class="px-2 py-1">
+        <a href="{{ url_for('account_statement_detail', client_id=c.id) }}" class="text-blue-600">Ver</a>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

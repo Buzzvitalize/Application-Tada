@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Editar Producto{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Editar Producto</h1>
+<form method="post" class="card space-y-4 max-w-4xl mx-auto">
+  {{ form.hidden_tag()|safe }}
+  <div class="grid md:grid-cols-7 gap-4 items-center">
+    <input id="name" name="name" value="{{ form.name.data or '' }}" placeholder="Nombre" class="input" required>
+    <select name="unit" class="input" required>
+      {% for u in units %}
+      <option value="{{ u }}" {% if form.unit.data == u %}selected{% endif %}>{{ u }}</option>
+      {% endfor %}
+    </select>
+    <input name="code" value="{{ form.code.data or '' }}" placeholder="Código" class="input" required>
+    <input id="reference" name="reference" value="{{ form.reference.data or '' }}" placeholder="Referencia" class="input" readonly>
+    <input name="price" value="{{ form.price.data or '' }}" placeholder="Precio" class="input" required>
+    <select name="category" class="input" required>
+      {% for c in categories %}
+      <option value="{{ c }}" {% if form.category.data == c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+    <label class="flex items-center space-x-2">
+      <input type="checkbox" name="has_itbis" {% if form.has_itbis.data %}checked{% endif %}>
+      <span>Aplicar ITBIS</span>
+    </label>
+  </div>
+  <button class="btn-primary">Guardar</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('name').addEventListener('blur', async function(){
+  const name = this.value;
+  if(!name) return;
+  const res = await fetch('/api/reference?name=' + encodeURIComponent(name));
+  const data = await res.json();
+  document.getElementById('reference').value = data.reference;
+});
+</script>
+{% endblock %}
+

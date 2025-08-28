@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Inventario</h1>
+<div class="mb-4 space-x-2 flex flex-wrap items-center">
+  <span class="btn-primary">Registrar movimiento</span>
+  <span class="btn-secondary">Transferir</span>
+  <span class="btn-secondary">Almacenes</span>
+  <span class="btn-secondary">Importar CSV</span>
+</div>
+{% if sales_total %}
+<div class="mb-4">Ventas registradas: {{ sales_total | money }}</div>
+{% endif %}
+<table class="min-w-full bg-white shadow">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="px-4 py-2 text-left">Producto</th>
+      <th class="px-4 py-2 text-right">Stock</th>
+      <th class="px-4 py-2 text-right">Mínimo</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in stocks %}
+    <tr class="border-t {% if s.stock <= s.min_stock %}bg-red-50{% endif %}">
+      <td class="px-4 py-2">{{ s.product.name }}</td>
+      <td class="px-4 py-2 text-right">{{ s.stock }}</td>
+      <td class="px-4 py-2 text-right">{{ s.min_stock }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">Sin productos</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
