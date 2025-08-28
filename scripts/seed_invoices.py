@@ -2,7 +2,7 @@ from __future__ import annotations
 import random
 from datetime import datetime, timedelta
 from app import app, db, Invoice, InvoiceItem, Client, Product
-from models import CompanyInfo
+from app.models import CompanyInfo
 
 # Minimal stand-in for ``faker`` to avoid external dependency.
 WORDS = [

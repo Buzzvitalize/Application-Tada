@@ -1,4 +1,4 @@
-from models import db, OrderItem
+from app.models import db, OrderItem
 from sqlalchemy import func
 
 
