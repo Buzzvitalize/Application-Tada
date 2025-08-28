@@ -18,21 +18,11 @@
       </button>
     </div>
     <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
-      <a href="{{ url_for('list_quotations') }}" class="nav-link">Cotizaciones</a>
-      <a href="{{ url_for('list_orders') }}" class="nav-link">Pedidos</a>
-      <a href="{{ url_for('list_invoices') }}" class="nav-link">Facturas</a>
-      <a href="{{ url_for('clients') }}" class="nav-link">Clientes</a>
-      <a href="{{ url_for('products') }}" class="nav-link">Productos</a>
-      <a href="{{ url_for('inventory_report') }}" class="nav-link">Inventario</a>
-      <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
-      <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
-      {% if session.get('role') == 'admin' %}
-      <a href="{{ url_for('cpanel_home') }}" class="nav-link">CPanel</a>
-      <a href="{{ url_for('admin_requests') }}" class="nav-link">Solicitudes</a>
-      {% endif %}
-      {% if session.get('role') in ['admin', 'manager'] %}
-      <a href="{{ url_for('settings_company') }}" class="nav-link">Ajustes</a>
-      {% endif %}
+      <a href="{{ url_for('cotizaciones.lista_cotizaciones') }}" class="nav-link">Cotizaciones</a>
+      <a href="{{ url_for('facturas.lista_facturas') }}" class="nav-link">Facturas</a>
+      <a href="{{ url_for('clientes.lista') }}" class="nav-link">Clientes</a>
+      <a href="{{ url_for('productos.lista') }}" class="nav-link">Productos</a>
+      <a href="{{ url_for('reportes.ver_reportes') }}" class="nav-link">Reportes</a>
     </nav>
       <div class="p-4 border-t border-gray-700"><a href="{{ url_for('auth.logout') }}" class="nav-link">Salir</a></div>
     </aside>
@@ -43,19 +33,9 @@
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
       </button>
       <span class="ml-2 font-semibold">Tiendix</span>
-      <a href="{{ url_for('notifications_view') }}" class="ml-auto relative">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-        {% if notification_count %}<span class="absolute -top-1 -right-1 bg-red-600 rounded-full text-xs w-4 h-4 flex items-center justify-center">{{ notification_count }}</span>{% endif %}
-      </a>
     </header>
     <section class="flex-1 p-4 md:p-6 overflow-y-auto">
-      <div class="flex justify-end mb-2 hidden md:flex">
-        <a href="{{ url_for('notifications_view') }}" class="relative">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-          {% if notification_count %}<span class="absolute -top-1 -right-1 bg-red-600 rounded-full text-xs w-4 h-4 flex items-center justify-center">{{ notification_count }}</span>{% endif %}
-        </a>
-      </div>
-      <div class="max-w-7xl mx-auto">
+    <div class="max-w-7xl mx-auto">
         {% with messages = get_flashed_messages() %}
           {% if messages %}
             <div class="mb-4">

@@ -3,7 +3,7 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Productos</h1>
 <div class="mb-4">
-  <a href="{{ url_for('products_import') }}" class="btn-secondary">Importar CSV</a>
+<span class="text-sm text-gray-600">&nbsp;</span>
 </div>
 <form method="post" class="card mb-6 space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -60,10 +60,7 @@
         <td class="p-2">{{ p.price | money }}</td>
         <td class="p-2">{{ p.category }}</td>
         <td class="p-2">{{ 'Sí' if p.has_itbis else 'No' }}</td>
-        <td class="p-2 space-x-2">
-          <a class="text-blue-500" href="{{ url_for('edit_product', product_id=p.id) }}">Editar</a>
-          <a class="text-red-500" href="{{ url_for('delete_product', product_id=p.id) }}">Eliminar</a>
-        </td>
+        <td class="p-2"></td>
       </tr>
     {% endfor %}
     </tbody>

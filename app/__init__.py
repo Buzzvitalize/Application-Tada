@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, redirect, url_for
 from .models import db
 try:
     from flask_migrate import Migrate
@@ -47,6 +47,7 @@ def create_app():
     csrf.init_app(app)
     app.jinja_env.filters.setdefault('money', lambda v: f"{v:.2f}")
     app.jinja_env.filters.setdefault('id_doc', lambda v: v)
+    app.jinja_env.filters.setdefault('phone', lambda v: v)
 
     from .auth.routes import auth_bp
     from .clientes.routes import clientes_bp
@@ -64,6 +65,6 @@ def create_app():
 
     @app.route('/')
     def index():
-        return 'OK'
+        return redirect(url_for('auth.login'))
 
     return app

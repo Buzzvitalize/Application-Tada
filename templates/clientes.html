@@ -38,10 +38,7 @@
         <td class="p-2">{{ c.identifier|id_doc }}</td>
         <td class="p-2">{{ c.phone|phone }}</td>
         <td class="p-2">{{ 'Final' if c.is_final_consumer else 'Fiscal' }}</td>
-        <td class="p-2 space-x-2">
-          <a class="text-blue-500" href="{{ url_for('edit_client', client_id=c.id) }}">Editar</a>
-          <a class="text-red-500" href="{{ url_for('delete_client', client_id=c.id) }}">Eliminar</a>
-        </td>
+        <td class="p-2"></td>
       </tr>
     {% endfor %}
     </tbody>
