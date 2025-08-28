@@ -63,6 +63,8 @@ def create_app():
     from .inventario.routes import inventario_bp
     from .reportes.routes import reportes_bp
     from .contabilidad.routes import contabilidad_bp
+    from .cpanel.routes import cpanel_bp
+    from .ajustes.routes import ajustes_bp
     from .misc.routes import misc_bp
 
     app.register_blueprint(auth_bp)
@@ -74,6 +76,8 @@ def create_app():
     app.register_blueprint(inventario_bp)
     app.register_blueprint(reportes_bp)
     app.register_blueprint(contabilidad_bp)
+    app.register_blueprint(cpanel_bp)
+    app.register_blueprint(ajustes_bp)
     app.register_blueprint(misc_bp)
 
     @app.route('/')

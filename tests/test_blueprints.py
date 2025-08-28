@@ -17,7 +17,7 @@ def test_index_pages(client):
         assert client.get(url).status_code == 200
 
 def test_auth(client):
-    assert client.get('/login').status_code == 200
+    assert client.get('/auth/').status_code == 200
 
 def test_menu_has_links(client):
     with client.session_transaction() as sess:

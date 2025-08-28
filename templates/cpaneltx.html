@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="p-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-  <a href="{{ url_for('misc.cpanel_companies') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Empresas</a>
-  <a href="{{ url_for('misc.cpanel_users') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Usuarios</a>
-  <a href="{{ url_for('misc.cpanel_orders') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Pedidos</a>
-  <a href="{{ url_for('misc.cpanel_invoices') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Facturas</a>
+  <a href="{{ url_for('cpanel.companies') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Empresas</a>
+  <a href="{{ url_for('cpanel.users') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Usuarios</a>
+  <a href="{{ url_for('cpanel.orders') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Pedidos</a>
+  <a href="{{ url_for('cpanel.invoices') }}" class="bg-white p-4 rounded shadow hover:bg-gray-50">Facturas</a>
 </div>
 {% endblock %}

@@ -2,10 +2,11 @@ from flask import Blueprint, render_template, redirect, url_for, session, reques
 from ..forms import LoginForm
 from ..models import CompanyInfo
 
-auth_bp = Blueprint('auth', __name__, template_folder='../../templates')
+auth_bp = Blueprint('auth', __name__, url_prefix='/auth',
+                    template_folder='../../templates')
 
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/', methods=['GET', 'POST'])
 def login():
     company = CompanyInfo.query.first()
     form = LoginForm()
@@ -24,6 +25,6 @@ def logout():
     return redirect(url_for('auth.login'))
 
 
-@auth_bp.route('/solicitar')
+@auth_bp.route('/solicitar-cuenta')
 def request_account():
     return render_template('solicitar_cuenta.html')
