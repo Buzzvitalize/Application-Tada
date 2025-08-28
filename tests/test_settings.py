@@ -34,7 +34,7 @@ def test_manager_can_update_ncf_and_log(client):
     with app.app_context():
         company = CompanyInfo.query.first()
         old_final = company.ncf_final
-    resp = client.post('/ajustes', data={
+    resp = client.post('/ajustes/empresa', data={
         'name': 'Comp', 'rnc': '1', 'phone': '1', 'street': 's', 'sector': 's', 'province': 'p',
         'ncf_final': str(old_final + 5), 'ncf_fiscal': '1'
     })
@@ -49,7 +49,7 @@ def test_ncf_cannot_decrease(client):
     with app.app_context():
         company = CompanyInfo.query.first()
         current = company.ncf_final
-    resp = client.post('/ajustes', data={
+    resp = client.post('/ajustes/empresa', data={
         'name': 'Comp', 'rnc': '1', 'phone': '1', 'street': 's', 'sector': 's', 'province': 'p',
         'ncf_final': str(current - 1), 'ncf_fiscal': '1'
     }, follow_redirects=True)
@@ -61,7 +61,7 @@ def test_manager_cannot_change_other_fields(client):
         company = CompanyInfo.query.first()
         original_name = company.name
         original_phone = company.phone
-    client.post('/ajustes', data={'name': 'Nuevo', 'phone': '999', 'ncf_final': '5', 'ncf_fiscal': '1'})
+    client.post('/ajustes/empresa', data={'name': 'Nuevo', 'phone': '999', 'ncf_final': '5', 'ncf_fiscal': '1'})
     with app.app_context():
         c = CompanyInfo.query.first()
         assert c.name == original_name
@@ -69,8 +69,8 @@ def test_manager_cannot_change_other_fields(client):
 
 
 def test_manager_user_limit(client):
-    client.post('/ajustes', data={'action': "create_user", "first_name": "A", "last_name": "B", "username": "u1", "password": "p"})
-    client.post('/ajustes', data={'action': "create_user", "first_name": "C", "last_name": "D", "username": "u2", "password": "p"})
-    resp = client.post('/ajustes', data={'action': "create_user", "first_name": "E", "last_name": "F", "username": "u3", "password": "p"}, follow_redirects=True)
+    client.post('/ajustes/usuarios/agregar', data={"first_name": "A", "last_name": "B", "username": "u1", "password": "p"})
+    client.post('/ajustes/usuarios/agregar', data={"first_name": "C", "last_name": "D", "username": "u2", "password": "p"})
+    resp = client.post('/ajustes/usuarios/agregar', data={"first_name": "E", "last_name": "F", "username": "u3", "password": "p"}, follow_redirects=True)
     assert b'Los managers solo pueden crear 2 usuarios' in resp.data
 

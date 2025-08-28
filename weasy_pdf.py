@@ -88,8 +88,8 @@ def build_html(title: str, company: dict, client: dict, items: list,
     if meta.get('doc_number'):
         label = meta.get('doc_label', title)
         meta_block.append(f"{label} N° {meta['doc_number']}")
-    if meta.get('order_number'):
-        meta_block.append(f"Orden de pedido: N° {meta['order_number']}")
+    if meta.get('purchase_order'):
+        meta_block.append(f"Orden de compra por cliente: {meta['purchase_order']}")
     meta_block.append(date.strftime('%d/%m/%Y %I:%M %p'))
     if meta.get('ncf'):
         meta_block.append(f"NCF: {meta['ncf']}")
@@ -149,14 +149,14 @@ def build_html(title: str, company: dict, client: dict, items: list,
 def generate_pdf(title: str, company: dict, client: dict, items: list,
                  subtotal: float, itbis: float, total: float, ncf: str | None = None,
                  seller: str | None = None, payment_method: str | None = None,
-                 bank: str | None = None, order_number: int | None = None,
+                 bank: str | None = None, purchase_order: str | None = None,
                  doc_number: int | None = None, invoice_type: str | None = None,
                  note: str | None = None, output_path: str | Path | None = None,
                  date: datetime | None = None,
                  valid_until: datetime | None = None, footer: str | None = None) -> str:
     meta = {
         'doc_number': doc_number,
-        'order_number': order_number,
+        'purchase_order': purchase_order,
         'doc_label': title,
         'ncf': ncf,
         'seller': seller,

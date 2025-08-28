@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Notificaciones{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Notificaciones</h1>
+<ul class="space-y-2">
+  {% for n in notifications %}
+  <li class="card flex justify-between items-center">
+    <span>{{ n.message }}</span>
+    {% if not n.is_read %}
+    <form method="post" action="{{ url_for('notifications_read', nid=n.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn-secondary">Marcar como leída</button>
+    </form>
+    {% endif %}
+  </li>
+  {% else %}
+  <li>No hay notificaciones.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

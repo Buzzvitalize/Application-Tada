@@ -98,6 +98,7 @@ class Order(db.Model):
     payment_method = db.Column(db.String(20))
     bank = db.Column(db.String(50))
     note = db.Column(db.Text)
+    customer_po = db.Column(db.String(120))
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
@@ -137,6 +138,7 @@ class Invoice(db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
 
     client = db.relationship('Client')
+    order = db.relationship('Order')
     items = db.relationship('InvoiceItem', cascade='all, delete-orphan')
 
 class InvoiceItem(db.Model):
@@ -256,3 +258,11 @@ class NcfLog(db.Model):
     new_fiscal = db.Column(db.Integer)
     changed_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     changed_at = db.Column(db.DateTime, default=dom_now)
+
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+    message = db.Column(db.String(200), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=dom_now)

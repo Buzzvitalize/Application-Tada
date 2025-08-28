@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Gestionar Usuarios{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Ajustes</h1>
+<div class="mb-4 space-x-4">
+  <a href="{{ url_for('settings_company') }}" class="btn-secondary">Empresa</a>
+  <a href="{{ url_for('settings_add_user') }}" class="btn-secondary">Agregar Usuarios</a>
+  <a href="{{ url_for('settings_manage_users') }}" class="btn-secondary">Gestionar Usuarios</a>
+</div>
+<table class="table-auto w-full bg-white shadow">
+  <thead>
+    <tr class="bg-gray-200 text-left">
+      <th class="p-2">Nombre</th>
+      <th class="p-2">Usuario</th>
+      <th class="p-2">Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr class="border-t">
+      <td class="p-2">
+        <input form="f{{u.id}}" name="first_name" value="{{ u.first_name }}" class="input mb-2" required>
+        <input form="f{{u.id}}" name="last_name" value="{{ u.last_name }}" class="input" required>
+      </td>
+      <td class="p-2">
+        <input form="f{{u.id}}" name="username" value="{{ u.username }}" class="input" required>
+      </td>
+      <td class="p-2">
+        <form id="f{{u.id}}" method="post" class="space-y-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <div class="flex space-x-2">
+            <button name="action" value="update" class="btn-primary">Guardar</button>
+            <button name="action" value="delete" class="btn-secondary" onclick="return confirm('¿Eliminar usuario?')">Eliminar</button>
+          </div>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -9,6 +9,7 @@
     <option value="{{ w.id }}" {% if quotation.warehouse_id == w.id %}selected{% endif %}>{{ w.name }}</option>
     {% endfor %}
   </select>
+  <input name="customer_po" placeholder="Orden de compra del cliente" class="input" value="{{ quotation.order.customer_po if quotation.order else '' }}">
   <button type="submit" class="btn-primary">Convertir</button>
 </form>
 {% endblock %}

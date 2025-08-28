@@ -54,6 +54,7 @@ from models import (
     AccountRequest,
     ExportLog,
     NcfLog,
+    Notification,
     dom_now,
 )
 from io import BytesIO, StringIO
@@ -451,6 +452,7 @@ def load_company():
 @app.context_processor
 def inject_company():
     low_stock = []
+    notif_count = 0
     try:
         if 'user_id' in session and current_company_id():
             low_stock = (
@@ -458,9 +460,16 @@ def inject_company():
                 .filter(ProductStock.stock <= ProductStock.min_stock, ProductStock.min_stock > 0)
                 .all()
             )
+            for ps in low_stock:
+                msg = f"Stock bajo: {ps.product.name} en {ps.warehouse.name}"
+                if not Notification.query.filter_by(company_id=current_company_id(), message=msg).first():
+                    db.session.add(Notification(company_id=current_company_id(), message=msg))
+            if low_stock:
+                db.session.commit()
+            notif_count = Notification.query.filter_by(company_id=current_company_id(), is_read=False).count()
     except Exception:
-        low_stock = []
-    return {'company': getattr(g, 'company', None), 'low_stock_products': low_stock}
+        pass
+    return {'company': getattr(g, 'company', None), 'low_stock_products': low_stock, 'notification_count': notif_count}
 
 
 def get_company_info():
@@ -1259,32 +1268,20 @@ def edit_quotation(quotation_id):
     )
 
 
-@app.route('/ajustes', methods=['GET', 'POST'])
+@app.route('/ajustes')
 @manager_only
 def settings():
+    return redirect(url_for('settings_company'))
+
+
+@app.route('/ajustes/empresa', methods=['GET', 'POST'])
+@manager_only
+def settings_company():
     company = CompanyInfo.query.get(current_company_id())
     if not company:
         flash('Seleccione una empresa')
         return redirect(url_for('admin_companies'))
     if request.method == 'POST':
-        if request.form.get('action') == 'create_user':
-            if session.get('role') == 'manager':
-                count = User.query.filter_by(company_id=company.id, role='company').count()
-                if count >= 2:
-                    flash('Los managers solo pueden crear 2 usuarios')
-                    return redirect(url_for('settings'))
-            user = User(
-                username=request.form['username'],
-                first_name=request.form['first_name'],
-                last_name=request.form['last_name'],
-                role='company',
-                company_id=company.id,
-            )
-            user.set_password(request.form['password'])
-            db.session.add(user)
-            db.session.commit()
-            flash('Usuario creado')
-            return redirect(url_for('settings'))
         role = session.get('role')
         if role != 'manager':
             company.name = request.form.get('name', company.name)
@@ -1294,7 +1291,6 @@ def settings():
             company.phone = request.form.get('phone', company.phone)
             company.rnc = request.form.get('rnc', company.rnc)
             company.website = request.form.get('website') or None
-
         if request.form.get('remove_logo'):
             if company.logo:
                 try:
@@ -1309,34 +1305,32 @@ def settings():
                 ext = os.path.splitext(filename)[1].lower()
                 if ext not in {'.png', '.jpg', '.jpeg'}:
                     flash('Formato de logo inválido')
-                    return redirect(url_for('settings'))
+                    return redirect(url_for('settings_company'))
                 file.seek(0, os.SEEK_END)
                 size = file.tell()
                 file.seek(0)
                 if size > 1 * 1024 * 1024:
                     flash('Logo demasiado grande (máximo 1MB)')
-                    return redirect(url_for('settings'))
+                    return redirect(url_for('settings_company'))
                 upload_dir = os.path.join(app.static_folder, 'uploads')
                 os.makedirs(upload_dir, exist_ok=True)
                 path = os.path.join(upload_dir, filename)
                 file.save(path)
                 company.logo = f'uploads/{filename}'
-
         old_final = company.ncf_final
         old_fiscal = company.ncf_fiscal
         new_final = _to_int(request.form.get('ncf_final'))
         new_fiscal = _to_int(request.form.get('ncf_fiscal'))
         if new_final is not None and new_final < old_final:
             flash('NCF Consumidor Final no puede ser menor que el actual')
-            return redirect(url_for('settings'))
+            return redirect(url_for('settings_company'))
         if new_fiscal is not None and new_fiscal < old_fiscal:
             flash('NCF Comprobante Fiscal no puede ser menor que el actual')
-            return redirect(url_for('settings'))
+            return redirect(url_for('settings_company'))
         if new_final is not None:
             company.ncf_final = new_final
         if new_fiscal is not None:
             company.ncf_fiscal = new_fiscal
-
         if old_final != company.ncf_final or old_fiscal != company.ncf_fiscal:
             log = NcfLog(
                 company_id=company.id,
@@ -1347,11 +1341,58 @@ def settings():
                 changed_by=session.get('user_id'),
             )
             db.session.add(log)
-
         db.session.commit()
         flash('Ajustes guardados')
-        return redirect(url_for('settings'))
-    return render_template('ajustes.html', company=company)
+        return redirect(url_for('settings_company'))
+    return render_template('ajustes_empresa.html', company=company)
+
+
+@app.route('/ajustes/usuarios/agregar', methods=['GET', 'POST'])
+@manager_only
+def settings_add_user():
+    company = CompanyInfo.query.get(current_company_id())
+    if request.method == 'POST':
+        if session.get('role') == 'manager':
+            count = User.query.filter_by(company_id=company.id, role='company').count()
+            if count >= 2:
+                flash('Los managers solo pueden crear 2 usuarios')
+                return redirect(url_for('settings_add_user'))
+        user = User(
+            username=request.form['username'],
+            first_name=request.form['first_name'],
+            last_name=request.form['last_name'],
+            role='company',
+            company_id=company.id,
+        )
+        user.set_password(request.form['password'])
+        db.session.add(user)
+        db.session.commit()
+        flash('Usuario creado')
+        return redirect(url_for('settings_manage_users'))
+    return render_template('ajustes_usuario_form.html')
+
+
+@app.route('/ajustes/usuarios', methods=['GET', 'POST'])
+@manager_only
+def settings_manage_users():
+    company_id = current_company_id()
+    if request.method == 'POST':
+        uid = int(request.form['user_id'])
+        user = company_get(User, uid)
+        action = request.form.get('action')
+        if action == 'delete':
+            db.session.delete(user)
+            db.session.commit()
+            flash('Usuario eliminado')
+            return redirect(url_for('settings_manage_users'))
+        user.first_name = request.form.get('first_name', user.first_name)
+        user.last_name = request.form.get('last_name', user.last_name)
+        user.username = request.form.get('username', user.username)
+        db.session.commit()
+        flash('Usuario actualizado')
+        return redirect(url_for('settings_manage_users'))
+    users = User.query.filter_by(company_id=company_id, role='company').all()
+    return render_template('ajustes_usuarios.html', users=users)
 
 @app.route('/cotizaciones/<int:quotation_id>/pdf')
 def quotation_pdf(quotation_id):
@@ -1385,6 +1426,7 @@ def quotation_to_order(quotation_id):
         return redirect(url_for('quotation_to_order', quotation_id=quotation_id))
     wid = int(wid)
     quotation.warehouse_id = wid
+    customer_po = request.form.get('customer_po') or None
     if dom_now() > quotation.date + timedelta(days=30):
         flash('La cotización ha expirado')
         return redirect(url_for('list_quotations'))
@@ -1408,6 +1450,7 @@ def quotation_to_order(quotation_id):
         payment_method=quotation.payment_method,
         bank=quotation.bank,
         note=quotation.note,
+        customer_po=customer_po,
         warehouse_id=wid,
         company_id=current_company_id(),
     )
@@ -1556,6 +1599,20 @@ def pay_invoice(invoice_id):
     flash('Factura marcada como pagada')
     return redirect(url_for('list_invoices'))
 
+
+@app.route('/notificaciones')
+def notifications_view():
+    notifs = company_query(Notification).order_by(Notification.created_at.desc()).all()
+    return render_template('notifications.html', notifications=notifs)
+
+
+@app.post('/notificaciones/<int:nid>/leer')
+def notifications_read(nid):
+    notif = company_get(Notification, nid)
+    notif.is_read = True
+    db.session.commit()
+    return redirect(url_for('notifications_view'))
+
 @app.route('/facturas/<int:invoice_id>/pdf')
 def invoice_pdf(invoice_id):
     invoice = company_get(Invoice, invoice_id)
@@ -1568,7 +1625,8 @@ def invoice_pdf(invoice_id):
                  invoice.subtotal, invoice.itbis, invoice.total,
                  ncf=invoice.ncf, seller=invoice.seller,
                  payment_method=invoice.payment_method, bank=invoice.bank,
-                 order_number=invoice.order_id, doc_number=invoice.id,
+                 purchase_order=invoice.order.customer_po if invoice.order else None,
+                 doc_number=invoice.id,
                  invoice_type=invoice.invoice_type, note=invoice.note,
                  output_path=pdf_path, date=invoice.date,
                  footer=("Factura generada electrónicamente, válida sin firma ni sello. "
