@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Convertir Cotización</h1>
+<form method="post" class="space-y-4 max-w-md">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p class="mb-2">Seleccione el almacén origen para los productos.</p>
+  <select name="warehouse_id" class="input" required>
+    {% for w in warehouses %}
+    <option value="{{ w.id }}" {% if quotation.warehouse_id == w.id %}selected{% endif %}>{{ w.name }}</option>
+    {% endfor %}
+  </select>
+  <input name="customer_po" placeholder="Orden de compra del cliente" class="input" value="{{ quotation.order.customer_po if quotation.order else '' }}">
+  <button type="submit" class="btn-primary">Convertir</button>
+</form>
+{% endblock %}

@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% block title %}Nueva Cotización{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Nueva Cotización</h1>
+<form method="post" action="{{ url_for('cotizaciones.nueva_cotizacion') }}" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="space-y-2">
+    <select name="client_id" class="input" required>
+      <option value="">Seleccione cliente</option>
+      {% for c in clients %}
+      <option value="{{ c.id }}">{{ c.name }} - {{ c.identifier }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" id="toggle-client" class="text-sm text-blue-600 hover:underline">Agregar cliente</button>
+    <div id="client-panel" class="hidden p-4 border rounded space-y-2">
+      <div class="flex space-x-4">
+        <label><input type="radio" name="new_client_type" value="final" checked> Personal</label>
+        <label><input type="radio" name="new_client_type" value="fiscal"> Empresarial</label>
+      </div>
+      <input id="new-client-name" name="new_client_name" class="input" placeholder="Nombre" required>
+      <input id="new-client-last" name="new_client_last" class="input hidden" placeholder="Apellido">
+      <input id="new-client-id" name="new_client_id" class="input id-mask" placeholder="Cédula">
+      <input id="new-client-phone" name="new_client_phone" class="input phone-mask" placeholder="Teléfono">
+      <input id="new-client-email" name="new_client_email" class="input" placeholder="Email">
+      <div class="grid md:grid-cols-3 gap-2">
+        <input id="new-client-street" name="new_client_street" class="input" placeholder="Calle">
+        <input id="new-client-sector" name="new_client_sector" class="input" placeholder="Sector">
+        <input id="new-client-province" name="new_client_province" class="input" placeholder="Provincia">
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button type="button" id="cancel-client" class="btn-secondary">Cancelar</button>
+        <button type="button" id="save-client" class="btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-4 gap-4">
+    <select name="seller" class="input" required>
+      {% for s in sellers %}
+      {% set full = s.first_name + (' ' + s.last_name if s.last_name else '') %}
+      <option value="{{ full }}" {% if s.id==session.get('user_id') %}selected{% endif %}>{{ full }}</option>
+      {% endfor %}
+    </select>
+    <select name="payment_method" id="payment-method" class="input">
+      <option value="Efectivo">Efectivo</option>
+      <option value="Transferencia">Transferencia bancaria</option>
+    </select>
+    <select name="bank" id="bank-select" class="input hidden">
+      <option value="">Seleccione banco</option>
+      <option>Banco Popular</option>
+      <option>Banco BHD</option>
+      <option>Banco Banreservas</option>
+      <option>Banesco</option>
+    </select>
+    <select name="warehouse_id" class="input" required>
+      <option value="">Seleccione almacén</option>
+      {% for w in warehouses %}
+      <option value="{{ w.id }}">{{ w.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <h2 class="text-xl font-semibold mb-2">Productos</h2>
+    <datalist id="product-options">
+      {% for p in products %}
+      <option data-id="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}" value="{{ p.code }} - {{ p.name }}"></option>
+      {% endfor %}
+    </datalist>
+    <div id="productos">
+      <div class="grid grid-cols-1 sm:grid-cols-7 gap-2 mb-2 product-row">
+        <input class="input product-input" list="product-options" placeholder="Producto">
+        <input type="hidden" name="product_id[]" class="product-id">
+        <input class="input unit-field" placeholder="Unidad" readonly>
+        <input class="input price-field" placeholder="Precio" readonly>
+        <input name="product_quantity[]" placeholder="Cantidad" class="input qty-field" required>
+        <input name="product_discount[]" placeholder="Desc. %" class="input disc-field">
+        <input class="input total-field" placeholder="Total" readonly>
+        <button type="button" class="btn-secondary remove-product">Eliminar</button>
+      </div>
+    </div>
+    <button type="button" id="add-product" class="btn-secondary mt-2">Agregar Producto</button>
+  </div>
+  <textarea name="note" placeholder="Nota" class="input w-full"></textarea>
+  <button type="submit" class="btn-primary">Guardar</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.addEventListener('load', () => {
+  const paySelect=document.getElementById('payment-method');
+  const bankSelect=document.getElementById('bank-select');
+  paySelect.addEventListener('change',()=>{
+    bankSelect.classList.toggle('hidden', paySelect.value!=='Transferencia');
+  });
+
+  const clientPanel=document.getElementById('client-panel');
+  const toggleClient=document.getElementById('toggle-client');
+  const cancelClient=document.getElementById('cancel-client');
+  const idField=document.getElementById('new-client-id');
+  const lastField=document.getElementById('new-client-last');
+  const phoneField=document.getElementById('new-client-phone');
+
+  function setClientInputsEnabled(enabled){
+    clientPanel.querySelectorAll('input').forEach(i=>i.disabled=!enabled);
+  }
+  toggleClient.addEventListener('click',()=>{
+    const hidden = clientPanel.classList.toggle('hidden');
+    setClientInputsEnabled(!hidden);
+  });
+  cancelClient.addEventListener('click',()=>{
+    clientPanel.classList.add('hidden');
+    setClientInputsEnabled(false);
+  });
+  setClientInputsEnabled(false);
+
+  const typeRadios=document.querySelectorAll('input[name="new_client_type"]');
+  function toggleType(){
+    if(document.querySelector('input[name="new_client_type"]:checked').value==='final'){
+      lastField.classList.remove('hidden');
+      idField.placeholder='Cédula';
+      idField.dataset.docType='cedula';
+      idField.required=false;
+    }else{
+      lastField.classList.add('hidden');
+      idField.placeholder='RNC *';
+      idField.dataset.docType='rnc';
+      idField.required=true;
+    }
+    applyDocMask(idField);
+  }
+  typeRadios.forEach(r=>r.addEventListener('change',toggleType));
+  toggleType();
+
+  phoneField.addEventListener('input',e=>{ e.target.value=formatPhone(e.target.value); });
+  idField.addEventListener('input',e=>applyDocMask(e.target));
+  idField.addEventListener('blur',e=>{
+    if(e.target.dataset.docType==='rnc'){
+      const r=e.target.value.replace(/-/g,'');
+      fetch(`/api/rnc/${r}`).then(r=>r.json()).then(data=>{
+        const nameField=document.getElementById('new-client-name');
+        if(data.name && !nameField.value){ nameField.value=data.name; }
+      });
+    }
+  });
+
+  document.getElementById('save-client').addEventListener('click', async () => {
+    const payload={
+      type: document.querySelector('input[name="new_client_type"]:checked').value,
+      name: document.getElementById('new-client-name').value,
+      last_name: document.getElementById('new-client-last').value,
+      identifier: idField.value,
+      phone: phoneField.value,
+      email: document.getElementById('new-client-email').value,
+      street: document.getElementById('new-client-street').value,
+      sector: document.getElementById('new-client-sector').value,
+      province: document.getElementById('new-client-province').value
+    };
+    const resp=await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await resp.json();
+    if(data.id){
+      const select=document.querySelector('select[name="client_id"]');
+      const opt=new Option(`${data.name}${data.identifier?` - ${data.identifier}`:''}`, data.id);
+      select.appendChild(opt);
+      select.value=data.id;
+      clientPanel.classList.add('hidden');
+      setClientInputsEnabled(false);
+      document.getElementById('new-client-name').value='';
+      document.getElementById('new-client-last').value='';
+      idField.value='';
+      phoneField.value='';
+      document.getElementById('new-client-email').value='';
+      document.getElementById('new-client-street').value='';
+      document.getElementById('new-client-sector').value='';
+      document.getElementById('new-client-province').value='';
+    } else {
+      alert(data.error || 'Error');
+    }
+  });
+
+  function bindProduct(row) {
+    const input = row.querySelector('.product-input');
+    const idField = row.querySelector('.product-id');
+    const unit = row.querySelector('.unit-field');
+    const price = row.querySelector('.price-field');
+    const qty = row.querySelector('.qty-field');
+    const disc = row.querySelector('.disc-field');
+    const total = row.querySelector('.total-field');
+    const removeBtn = row.querySelector('.remove-product');
+    function calc(){
+      const p=parseFloat(price.value)||0;
+      const q=parseFloat(qty.value)||0;
+      const d=parseFloat(disc.value)||0;
+      total.value=(p*q*(1-d/100)).toFixed(2);
+    }
+    input.addEventListener('input', function() {
+      const opt = document.querySelector(`#product-options option[value="${input.value}"]`);
+      if(opt){
+        idField.value = opt.dataset.id;
+        unit.value = opt.dataset.unit || '';
+        price.value = opt.dataset.price ? parseFloat(opt.dataset.price).toFixed(2) : '';
+      }else{
+        idField.value='';
+        unit.value='';
+        price.value='';
+      }
+      calc();
+    });
+    qty.addEventListener('input', calc);
+    disc.addEventListener('input', calc);
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+    });
+  }
+  const productContainer = document.getElementById('productos');
+  const templateRow = document.querySelector('.product-row').cloneNode(true);
+  function addProductRow() {
+    const row = templateRow.cloneNode(true);
+    row.querySelectorAll('input').forEach(i => i.value = '');
+    productContainer.appendChild(row);
+    bindProduct(row);
+  }
+  document.getElementById('add-product').addEventListener('click', addProductRow);
+
+  // Reset product rows when changing client to avoid mixing items
+  const clientSelect=document.querySelector('select[name="client_id"]');
+  clientSelect.addEventListener('change',()=>{
+    productContainer.innerHTML='';
+    addProductRow();
+  });
+
+  document.querySelectorAll('.product-row').forEach(bindProduct);
+});
+</script>
+{% endblock %}
