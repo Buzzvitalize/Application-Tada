@@ -911,7 +911,7 @@ def clients():
     clients = query.order_by(Client.id).paginate(page=page, per_page=25, error_out=False)
     return render_template('clientes.html', clients=clients, q=q)
 
-@app.route('/clientes/delete/<int:client_id>')
+@app.route('/clientes/delete/<int:client_id>', methods=['POST'])
 def delete_client(client_id):
     client = company_get(Client, client_id)
     db.session.delete(client)
