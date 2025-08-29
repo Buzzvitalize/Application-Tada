@@ -63,4 +63,6 @@ def test_terms_recorded(client):
 def test_terminos_page(client):
     resp = client.get('/terminos')
     assert resp.status_code == 200
-    assert 'Términos y Condiciones de Uso – Tiendix' in resp.get_data(as_text=True)
+    body = resp.get_data(as_text=True)
+    assert 'Términos y Condiciones de Uso – Tiendix' in body
+    assert 'actualmente gratuito' in body
