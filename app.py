@@ -323,6 +323,16 @@ def _migrate_legacy_schema():
         if 'last_name' not in user_cols:
             statements.append("ALTER TABLE user ADD COLUMN last_name VARCHAR(120) DEFAULT ''")
 
+    if inspector.has_table('inventory_movement'):
+        try:
+            im_cols = {c['name'] for c in inspector.get_columns('inventory_movement')}
+        except NoSuchTableError:  # pragma: no cover - sqlite reflection race
+            im_cols = set()
+        if 'executed_by' not in im_cols:
+            statements.append(
+                "ALTER TABLE inventory_movement ADD COLUMN executed_by INTEGER REFERENCES user(id)"
+            )
+
     for stmt in statements:
         db.session.execute(db.text(stmt))
     if statements:
