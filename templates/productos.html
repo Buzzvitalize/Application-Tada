@@ -1,20 +1,84 @@
 {% extends 'base.html' %}
 {% block title %}Productos{% endblock %}
 {% block content %}
-<h1 class="text-2xl mb-4">Productos</h1>
-<form method="post" class="mb-4 space-y-2">
-  <input name="name" placeholder="Nombre" class="border p-2 w-full" required>
-  <input name="price" placeholder="Precio" class="border p-2 w-full" required>
-  <button class="bg-blue-500 text-white px-4 py-2">Agregar</button>
+<h1 class="text-2xl font-semibold mb-4">Productos</h1>
+<div class="mb-4">
+  <a href="{{ url_for('products_import') }}" class="btn-secondary">Importar CSV</a>
+</div>
+<form method="post" class="card mb-6 space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid md:grid-cols-7 gap-4 items-center">
+    <input id="name" name="name" placeholder="Nombre" class="input" required>
+    <select name="unit" class="input" required>
+      {% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+    </select>
+    <input name="code" placeholder="Código" class="input" required>
+    <input id="reference" name="reference" placeholder="Referencia" class="input" readonly>
+    <input name="price" placeholder="Precio" class="input" required>
+    <select name="category" class="input" required>
+      {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    </select>
+    <label class="flex items-center space-x-2">
+      <input type="checkbox" name="has_itbis" checked>
+      <span>ITBIS</span>
+    </label>
+  </div>
+  <button class="btn-primary">Agregar</button>
 </form>
-<table class="w-full border">
-  <tr class="bg-gray-100"><th class="border p-2">Nombre</th><th class="border p-2">Precio</th><th class="border p-2">Acciones</th></tr>
-  {% for p in products %}
-  <tr>
-    <td class="border p-2">{{ p.name }}</td>
-    <td class="border p-2">{{ '%.2f'|format(p.price) }}</td>
-    <td class="border p-2"><a class="text-red-500" href="{{ url_for('delete_product', product_id=p.id) }}">Eliminar</a></td>
-  </tr>
-  {% endfor %}
-</table>
+
+<form method="get" class="mb-4 flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
+  <select name="cat" class="input">
+    <option value="">Todas las categorías</option>
+    {% for c in categories %}
+    <option value="{{ c }}" {% if current_cat == c %}selected{% endif %}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn-secondary">Filtrar</button>
+</form>
+
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Código</th>
+        <th class="p-2 text-left">Referencia</th>
+        <th class="p-2 text-left">Nombre</th>
+        <th class="p-2 text-left">Unidad</th>
+        <th class="p-2 text-left">Precio</th>
+        <th class="p-2 text-left">Categoría</th>
+        <th class="p-2 text-left">ITBIS</th>
+        <th class="p-2 text-left">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in products %}
+      <tr class="border-t">
+        <td class="p-2">{{ p.code }}</td>
+        <td class="p-2">{{ p.reference }}</td>
+        <td class="p-2">{{ p.name }}</td>
+        <td class="p-2">{{ p.unit }}</td>
+        <td class="p-2">{{ p.price | money }}</td>
+        <td class="p-2">{{ p.category }}</td>
+        <td class="p-2">{{ 'Sí' if p.has_itbis else 'No' }}</td>
+        <td class="p-2 space-x-2">
+          <a class="text-blue-500" href="{{ url_for('edit_product', product_id=p.id) }}">Editar</a>
+          <a class="text-red-500" href="{{ url_for('delete_product', product_id=p.id) }}">Eliminar</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('name').addEventListener('blur', async function(){
+  const name = this.value;
+  if(!name) return;
+  const res = await fetch('/api/reference?name=' + encodeURIComponent(name));
+  const data = await res.json();
+  document.getElementById('reference').value = data.reference;
+});
+</script>
 {% endblock %}

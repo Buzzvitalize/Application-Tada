@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Editar Cliente{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Editar Cliente</h1>
+<form method="post" class="card space-y-4 max-w-4xl mx-auto">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid md:grid-cols-2 gap-4">
+    <input id="client-name" name="name" value="{{ client.name }}" placeholder="Nombre" class="input" required>
+    <input id="last_name" name="last_name" value="{{ client.last_name }}" placeholder="Apellido" class="input">
+    <input id="identifier" name="identifier" value="{{ client.identifier }}" placeholder="Cédula" class="input id-mask" data-doc-type="cedula">
+    <input name="phone" value="{{ client.phone }}" placeholder="Teléfono" class="input phone-mask">
+    <input name="email" value="{{ client.email }}" placeholder="Email" class="input">
+    <input name="street" value="{{ client.street }}" placeholder="Calle" class="input">
+    <input name="sector" value="{{ client.sector }}" placeholder="Sector" class="input">
+    <input name="province" value="{{ client.province }}" placeholder="Provincia" class="input">
+  </div>
+  <div class="flex space-x-4">
+    <label><input type="radio" name="type" value="final" {% if client.is_final_consumer %}checked{% endif %}> Consumidor Final</label>
+    <label><input type="radio" name="type" value="fiscal" {% if not client.is_final_consumer %}checked{% endif %}> Empresa</label>
+  </div>
+  <button class="btn-primary">Guardar</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.addEventListener('load', () => {
+  const typeRadios=document.querySelectorAll('input[name="type"]');
+  const idField=document.getElementById('identifier');
+  const lastField=document.getElementById('last_name');
+  function toggle(){
+    if(document.querySelector('input[name="type"]:checked').value==='final'){
+      lastField.classList.remove('hidden');
+      lastField.required=false;
+      idField.placeholder='Cédula';
+      idField.required=false;
+      idField.dataset.docType='cedula';
+    }else{
+      lastField.classList.add('hidden');
+      lastField.required=false;
+      idField.placeholder='RNC *';
+      idField.required=true;
+      idField.dataset.docType='rnc';
+    }
+    applyDocMask(idField);
+  }
+  typeRadios.forEach(r=>r.addEventListener('change',toggle));
+  toggle();
+});
+</script>
+{% endblock %}
+

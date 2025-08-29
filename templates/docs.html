@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}API Docs{% endblock %}
+{% block content %}
+<div id="swagger" class="w-full h-screen"></div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui-bundle.min.js"></script>
+<script>
+SwaggerUIBundle({url:'{{ url_for('static', filename='swagger.json') }}', dom_id:'#swagger'});
+</script>
+{% endblock %}

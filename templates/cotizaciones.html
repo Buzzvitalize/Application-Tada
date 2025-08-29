@@ -1,20 +1,47 @@
 {% extends 'base.html' %}
 {% block title %}Cotizaciones{% endblock %}
 {% block content %}
-<h1 class="text-2xl mb-4">Cotizaciones</h1>
-<a href="{{ url_for('new_quotation') }}" class="bg-blue-500 text-white px-4 py-2 mb-4 inline-block">Nueva Cotización</a>
-<table class="w-full border">
-  <tr class="bg-gray-100"><th class="border p-2">ID</th><th class="border p-2">Cliente</th><th class="border p-2">Total</th><th class="border p-2">Acciones</th></tr>
-  {% for q in quotations %}
-  <tr>
-    <td class="border p-2">{{ q.id }}</td>
-    <td class="border p-2">{{ q.client.name }}</td>
-    <td class="border p-2">{{ '%.2f'|format(q.total) }}</td>
-    <td class="border p-2 space-x-2">
-      <a class="text-blue-500" href="{{ url_for('quotation_pdf', quotation_id=q.id) }}">PDF</a>
-      <a class="text-green-500" href="{{ url_for('quotation_to_order', quotation_id=q.id) }}">Crear Pedido</a>
-    </td>
-  </tr>
-  {% endfor %}
-</table>
+<h1 class="text-2xl font-semibold mb-4">Cotizaciones</h1>
+<a href="{{ url_for('new_quotation') }}" class="btn-primary inline-block mb-4">Nueva Cotización</a>
+<form method="get" class="mb-4 flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 max-w-4xl mx-auto">
+  <input name="q" value="{{ q or '' }}" placeholder="Buscar..." class="input flex-1">
+  <button class="btn-secondary">Buscar</button>
+</form>
+<div class="card overflow-x-auto max-w-4xl mx-auto">
+  {% if quotations %}
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">ID</th>
+        <th class="p-2 text-left">Cliente</th>
+        <th class="p-2 text-left">Fecha</th>
+        <th class="p-2 text-left">Total</th>
+        <th class="p-2 text-left">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for q in quotations %}
+      <tr class="border-t">
+        <td class="p-2">{{ q.id }}</td>
+        <td class="p-2">{{ q.client.name }}</td>
+        <td class="p-2">{{ q.date.strftime('%d/%m/%Y %I:%M %p') }}</td>
+        <td class="p-2">{{ q.total | money }}</td>
+        <td class="p-2 space-x-2">
+          <a class="text-blue-500" href="{{ url_for('quotation_pdf', quotation_id=q.id) }}">PDF</a>
+          <a class="text-yellow-500" href="{{ url_for('edit_quotation', quotation_id=q.id) }}">Editar</a>
+          {% set expired = q.date + timedelta(days=30) < now %}
+          {% if expired %}
+            <span class="text-gray-400">Crear Pedido</span>
+          {% else %}
+            <a class="text-green-500" href="{{ url_for('quotation_to_order', quotation_id=q.id) }}">Crear Pedido</a>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="p-2">No se encontraron resultados.</p>
+  {% endif %}
+</div>
 {% endblock %}

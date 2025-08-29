@@ -1,23 +1,78 @@
 {% extends 'base.html' %}
 {% block title %}Clientes{% endblock %}
 {% block content %}
-<h1 class="text-2xl mb-4">Clientes</h1>
-<form method="post" class="mb-4 space-y-2">
-  <input name="name" placeholder="Nombre" class="border p-2 w-full" required>
-  <input name="identifier" placeholder="Cédula/RNC" class="border p-2 w-full" required>
-  <input name="phone" placeholder="Teléfono" class="border p-2 w-full" required>
-  <input name="email" placeholder="Email" class="border p-2 w-full">
-  <button class="bg-blue-500 text-white px-4 py-2">Agregar</button>
+<h1 class="text-2xl font-semibold mb-4">Clientes</h1>
+<form method="post" class="card mb-6 space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid md:grid-cols-2 gap-4">
+    <input name="name" placeholder="Nombre" class="input" required>
+    <input id="last_name" name="last_name" placeholder="Apellido" class="input">
+    <input name="identifier" placeholder="Cédula" class="input id-mask" id="identifier" data-doc-type="cedula">
+    <input name="phone" placeholder="Teléfono" class="input phone-mask">
+    <input name="email" placeholder="Email" class="input">
+    <input name="street" placeholder="Calle" class="input">
+    <input name="sector" placeholder="Sector" class="input">
+    <input name="province" placeholder="Provincia" class="input">
+  </div>
+  <div class="flex space-x-4">
+    <label><input type="radio" name="type" value="final" checked> Consumidor Final</label>
+    <label><input type="radio" name="type" value="fiscal"> Empresa</label>
+  </div>
+  <button class="btn-primary">Agregar</button>
 </form>
-<table class="w-full border">
-  <tr class="bg-gray-100"><th class="border p-2">Nombre</th><th class="border p-2">Identificador</th><th class="border p-2">Teléfono</th><th class="border p-2">Acciones</th></tr>
-  {% for c in clients %}
-  <tr>
-    <td class="border p-2">{{ c.name }}</td>
-    <td class="border p-2">{{ c.identifier }}</td>
-    <td class="border p-2">{{ c.phone }}</td>
-    <td class="border p-2"><a class="text-red-500" href="{{ url_for('delete_client', client_id=c.id) }}">Eliminar</a></td>
-  </tr>
-  {% endfor %}
-</table>
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Nombre</th>
+        <th class="p-2 text-left">Identificador</th>
+        <th class="p-2 text-left">Teléfono</th>
+        <th class="p-2 text-left">Tipo</th>
+        <th class="p-2 text-left">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for c in clients %}
+      <tr class="border-t">
+        <td class="p-2">{{ c.name }}{% if c.last_name %} {{ c.last_name }}{% endif %}</td>
+        <td class="p-2">{{ c.identifier|id_doc }}</td>
+        <td class="p-2">{{ c.phone|phone }}</td>
+        <td class="p-2">{{ 'Final' if c.is_final_consumer else 'Fiscal' }}</td>
+        <td class="p-2 space-x-2">
+          <a class="text-blue-500" href="{{ url_for('edit_client', client_id=c.id) }}">Editar</a>
+          <a class="text-red-500" href="{{ url_for('delete_client', client_id=c.id) }}">Eliminar</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.addEventListener('load', () => {
+  const typeRadios=document.querySelectorAll('input[name="type"]');
+  const idField=document.getElementById('identifier');
+  const lastField=document.getElementById('last_name');
+  function toggle(){
+    if(document.querySelector('input[name="type"]:checked').value==='final'){
+      lastField.classList.remove('hidden');
+      lastField.required=false;
+      idField.placeholder='Cédula';
+      idField.required=false;
+      idField.dataset.docType='cedula';
+    }else{
+      lastField.classList.add('hidden');
+      lastField.required=false;
+      idField.placeholder='RNC *';
+      idField.required=true;
+      idField.dataset.docType='rnc';
+    }
+    applyDocMask(idField);
+  }
+  typeRadios.forEach(r=>r.addEventListener('change',toggle));
+  toggle();
+});
+</script>
 {% endblock %}

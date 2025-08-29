@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Ajustes - Empresa{% endblock %}
+{% block content %}
+{% set is_manager = session.get('role')=='manager' %}
+<h1 class="text-2xl font-semibold mb-4">Ajustes</h1>
+<div class="mb-4 space-x-4">
+  <a href="{{ url_for('settings_company') }}" class="btn-secondary">Empresa</a>
+  <a href="{{ url_for('settings_add_user') }}" class="btn-secondary">Agregar Usuarios</a>
+  <a href="{{ url_for('settings_manage_users') }}" class="btn-secondary">Gestionar Usuarios</a>
+</div>
+<form method="post" enctype="multipart/form-data" class="card space-y-4 max-w-4xl mx-auto">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid md:grid-cols-2 gap-4">
+    <input name="name" value="{{ company.name }}" placeholder="Nombre" class="input" {% if is_manager %}disabled{% else %}required{% endif %}>
+    <input name="rnc" value="{{ company.rnc }}" placeholder="RNC" class="input id-mask" data-doc-type="rnc" {% if is_manager %}disabled{% endif %}>
+    <input name="phone" value="{{ company.phone }}" placeholder="Teléfono" class="input phone-mask" {% if is_manager %}disabled{% endif %}>
+    <input name="website" value="{{ company.website }}" placeholder="Sitio Web" class="input" {% if is_manager %}disabled{% endif %}>
+    <input name="street" value="{{ company.street }}" placeholder="Calle" class="input" {% if is_manager %}disabled{% endif %}>
+    <input name="sector" value="{{ company.sector }}" placeholder="Sector" class="input" {% if is_manager %}disabled{% endif %}>
+    <input name="province" value="{{ company.province }}" placeholder="Provincia" class="input" {% if is_manager %}disabled{% endif %}>
+    <div class="space-y-2">
+      <input type="file" name="logo" id="logo-input" class="input">
+      <img id="logo-preview" src="{% if company.logo %}{{ url_for('static', filename=company.logo) }}{% endif %}" class="h-16"/>
+      {% if company.logo %}
+      <button name="remove_logo" value="1" class="btn-secondary" onclick="return confirm('¿Eliminar logo?')">Eliminar logo</button>
+      {% endif %}
+    </div>
+    <input name="ncf_final" value="{{ company.ncf_final }}" placeholder="NCF Consumidor Final" class="input">
+    <input name="ncf_fiscal" value="{{ company.ncf_fiscal }}" placeholder="NCF Comprobante Fiscal" class="input">
+  </div>
+  <button class="btn-primary">Guardar</button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const input=document.getElementById('logo-input');
+const preview=document.getElementById('logo-preview');
+if(input){
+  input.addEventListener('change', e=>{
+    const file=e.target.files[0];
+    if(file){
+      const reader=new FileReader();
+      reader.onload=ev=>{preview.src=ev.target.result;};
+      reader.readAsDataURL(file);
+    }
+  });
+}
+</script>
+{% endblock %}

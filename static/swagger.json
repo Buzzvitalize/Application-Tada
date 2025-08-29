@@ -1,0 +1,28 @@
+{
+  "openapi": "3.0.0",
+  "info": {"title": "Tiendix API", "version": "1.0"},
+  "paths": {
+    "/reportes": {
+      "get": {
+        "summary": "Listar reportes",
+        "parameters": [
+          {"in":"query","name":"fecha_inicio","schema":{"type":"string","format":"date"}},
+          {"in":"query","name":"fecha_fin","schema":{"type":"string","format":"date"}},
+          {"in":"query","name":"estado","schema":{"type":"string"}},
+          {"in":"query","name":"categoria","schema":{"type":"string"}}
+        ],
+        "responses": {"200": {"description": "OK"}}
+      }
+    },
+    "/reportes/export": {
+      "get": {
+        "summary": "Exportar reportes",
+        "parameters": [
+          {"in":"query","name":"formato","schema":{"type":"string"}},
+          {"in":"query","name":"tipo","schema":{"type":"string"}}
+        ],
+        "responses": {"200": {"description": "Archivo exportado"}}
+      }
+    }
+  }
+}
