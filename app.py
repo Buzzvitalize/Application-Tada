@@ -24,17 +24,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import smtplib
 from email.mime.text import MIMEText
-try:
-    from flask_wtf import CSRFProtect
-except ModuleNotFoundError:  # pragma: no cover
-    class CSRFProtect:
-        def __init__(self, app=None):
-            if app:
-                self.init_app(app)
-        def init_app(self, app):
-            pass
-        def exempt(self, view):
-            return view
+from flask_wtf import CSRFProtect
 from models import (
     db,
     migrate,
@@ -77,6 +67,7 @@ from weasy_pdf import generate_pdf
 from account_pdf import generate_account_statement_pdf
 from functools import wraps
 from auth import auth_bp, generate_reset_token
+from forms import AccountRequestForm
 from config import DevelopmentConfig
 try:
     from dotenv import load_dotenv
@@ -151,8 +142,6 @@ app.jinja_env.filters['money'] = _fmt_money
 db.init_app(app)
 migrate.init_app(app, db)
 csrf = CSRFProtect(app)
-if 'csrf_token' not in app.jinja_env.globals:
-    app.jinja_env.globals['csrf_token'] = lambda: ''
 app.register_blueprint(auth_bp)
 
 # The database schema is managed via Flask-Migrate.  Tables should be
@@ -545,9 +534,9 @@ def index():
 
 
 @app.route('/solicitar-cuenta', methods=['GET', 'POST'])
-@csrf.exempt
 def request_account():
-    if request.method == 'POST':
+    form = AccountRequestForm()
+    if form.validate_on_submit():
         if request.form.get('password') != request.form.get('confirm_password'):
             flash('Las contraseñas no coinciden', 'request')
             return redirect(url_for('request_account'))
@@ -573,7 +562,7 @@ def request_account():
         db.session.commit()
         flash('Solicitud enviada, espere aprobación', 'login')
         return redirect(url_for('auth.login'))
-    return render_template('solicitar_cuenta.html')
+    return render_template('solicitar_cuenta.html', form=form)
 
 
 @app.route('/admin/solicitudes')
@@ -830,7 +819,6 @@ def edit_client(client_id):
         return redirect(url_for('clients'))
     return render_template('cliente_form.html', client=client)
 
-@csrf.exempt
 @app.post('/api/clients')
 def api_create_client():
     data = request.get_json() or {}
@@ -1180,7 +1168,6 @@ def list_quotations():
     return render_template('cotizaciones.html', quotations=quotations, q=q,
                            timedelta=timedelta, now=dom_now())
 
-@csrf.exempt
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 def new_quotation():
     if request.method == 'POST':

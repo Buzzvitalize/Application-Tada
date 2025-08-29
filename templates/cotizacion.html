@@ -155,7 +155,12 @@ window.addEventListener('load', () => {
       sector: document.getElementById('new-client-sector').value,
       province: document.getElementById('new-client-province').value
     };
-    const resp=await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const token=document.querySelector('input[name="csrf_token"]').value;
+    const resp=await fetch('/api/clients',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':token},
+      body:JSON.stringify(payload)
+    });
     const data=await resp.json();
     if(data.id){
       const select=document.querySelector('select[name="client_id"]');
