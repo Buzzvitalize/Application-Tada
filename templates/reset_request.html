@@ -1,15 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-  <meta charset="utf-8">
-  <title>Recuperar contraseña</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recuperar contraseña - Tiendix</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='pos.svg') }}">
 </head>
-<body>
-  <h2>Recuperar contraseña</h2>
-  <form method="post">
-    {{ form.hidden_tag() }}
-    {{ form.email(size=40, placeholder='Email') }}
-    {{ form.submit() }}
-  </form>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 p-4 relative">
+  <img src="{{ url_for('static', filename='pos.svg') }}" alt="POS" class="w-12 h-12 absolute top-4 left-1/2 -translate-x-1/2">
+  <div class="bg-white rounded-lg shadow-xl hover:shadow-2xl transition-shadow flex flex-col md:flex-row w-full max-w-4xl overflow-hidden">
+    <div class="hidden md:flex md:w-1/2 bg-blue-600 text-white items-center justify-center p-8">
+      <div class="text-center space-y-4">
+        <h2 class="text-3xl font-bold">Tiendix</h2>
+        <p class="text-blue-100">Tu negocio, tu control, tu Tiendix</p>
+      </div>
+    </div>
+    <div class="w-full md:w-1/2 p-8">
+      <h3 class="text-2xl font-semibold mb-2 text-center md:text-left">Recuperar contraseña</h3>
+      <form method="post" class="space-y-4" autocomplete="off">
+        {{ form.hidden_tag() }}
+        <div class="flex items-center border border-gray-300 rounded-md px-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 8h18a2 2 0 002-2V8a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+          {{ form.email(class_='flex-1 p-2 outline-none', placeholder='Email') }}
+        </div>
+        {{ form.submit(class_='btn-primary w-full') }}
+        {% with messages = get_flashed_messages(category_filter=['login']) %}
+          {% if messages %}
+            <div class="text-red-600 text-center">{{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+      </form>
+      <div class="mt-4">
+        <a href="{{ url_for('auth.login') }}" class="text-sm text-blue-600 hover:underline">Regresar al login</a>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
