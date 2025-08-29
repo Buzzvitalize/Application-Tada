@@ -1,0 +1,10 @@
+El sistema es una aplicacion web construida con Flask que utiliza una base de datos SQLite mediante SQLAlchemy.
+
+Caracteristicas principales:
+- Gestion de clientes y productos.
+- Creacion de cotizaciones que se pueden convertir en pedidos y facturas.
+- Generacion de documentos PDF para cotizaciones e facturas usando FPDF.
+- Estructura de modelos: Client, Product, Quotation, QuotationItem, Order, OrderItem, Invoice, InvoiceItem.
+- Plantillas HTML para clientes, productos, cotizaciones, pedidos y facturas.
+- Uso de Tailwind CSS para estilos.
+- Dependencias principales: Flask, Flask-SQLAlchemy y fpdf2.
