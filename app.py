@@ -1734,11 +1734,13 @@ def reportes():
     )
     invoices = pagination.items
 
-    all_invoices = q.options(
-        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status)
-    ).all()
-    total_sales = sum(i.total for i in all_invoices)
-    unique_clients = len({i.client_id for i in all_invoices})
+    total_sales, unique_clients, invoice_count = (
+        q.with_entities(
+            func.coalesce(func.sum(Invoice.total), 0),
+            func.count(func.distinct(Invoice.client_id)),
+            func.count(Invoice.id),
+        ).first()
+    )
 
     item_query = company_query(InvoiceItem).join(Invoice)
     if start:
@@ -1790,13 +1792,26 @@ def reportes():
 
     # monthly and yearly avg ticket
     today = datetime.utcnow()
-    month_invoices = [i for i in all_invoices if i.date.month == today.month and i.date.year == today.year]
-    month_total = sum(i.total for i in month_invoices)
-    month_clients = len({i.client_id for i in month_invoices})
+    month_total, month_clients = (
+        q.filter(
+            func.strftime('%Y', Invoice.date) == str(today.year),
+            func.strftime('%m', Invoice.date) == f"{today.month:02d}",
+        )
+        .with_entities(
+            func.coalesce(func.sum(Invoice.total), 0),
+            func.count(func.distinct(Invoice.client_id)),
+        )
+        .first()
+    )
     avg_ticket_month = month_total / month_clients if month_clients else 0
-    year_invoices = [i for i in all_invoices if i.date.year == today.year]
-    year_total = sum(i.total for i in year_invoices)
-    year_clients = len({i.client_id for i in year_invoices})
+    year_total, year_clients = (
+        q.filter(func.strftime('%Y', Invoice.date) == str(today.year))
+        .with_entities(
+            func.coalesce(func.sum(Invoice.total), 0),
+            func.count(func.distinct(Invoice.client_id)),
+        )
+        .first()
+    )
     avg_ticket_year = year_total / year_clients if year_clients else 0
 
     # trend last 24 months
@@ -1863,7 +1878,7 @@ def reportes():
     stats = {
         'total_sales': total_sales,
         'unique_clients': unique_clients,
-        'invoices': len(all_invoices),
+        'invoices': invoice_count,
         'pending': status_totals.get('Pendiente', 0),
         'paid': status_totals.get('Pagada', 0),
         'cash': payment_totals.get('Efectivo', 0),
