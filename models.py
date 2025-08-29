@@ -168,8 +168,10 @@ class InventoryMovement(db.Model):
     timestamp = db.Column(db.DateTime, default=dom_now)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+    executed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product = db.relationship('Product')
     warehouse = db.relationship('Warehouse')
+    user = db.relationship('User')
 
 
 class Warehouse(db.Model):

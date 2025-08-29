@@ -1032,6 +1032,7 @@ def inventory_report():
     warehouses = company_query(Warehouse).order_by(Warehouse.name).all()
     stocks = []
     pagination = None
+    movements = []
     if not wid and warehouses:
         wid = warehouses[0].id
     if wid:
@@ -1057,6 +1058,13 @@ def inventory_report():
             .paginate(page=page, per_page=per_page, error_out=False)
         )
         stocks = pagination.items
+        movements = (
+            company_query(InventoryMovement)
+            .filter_by(warehouse_id=wid)
+            .order_by(InventoryMovement.timestamp.desc())
+            .limit(20)
+            .all()
+        )
 
     sales_total = (
         db.session.query(func.sum(Invoice.total))
@@ -1076,6 +1084,7 @@ def inventory_report():
         status=status,
         categories=CATEGORIES,
         per_page=per_page,
+        movements=movements,
     )
 
 
@@ -1128,6 +1137,7 @@ def inventory_adjust():
             movement_type=mtype,
             warehouse_id=wid,
             company_id=current_company_id(),
+            executed_by=session.get('user_id'),
         )
         db.session.add(mov)
         db.session.commit()
@@ -1180,6 +1190,7 @@ def inventory_import():
                     reference_type='import',
                     warehouse_id=wid,
                     company_id=current_company_id(),
+                    executed_by=session.get('user_id'),
                 )
                 db.session.add(mov)
                 count += 1
@@ -1227,6 +1238,7 @@ def inventory_transfer():
             company_id=current_company_id(),
             reference_type='transfer',
             reference_id=dest,
+            executed_by=session.get('user_id'),
         )
         mov_in = InventoryMovement(
             product_id=pid,
@@ -1236,6 +1248,7 @@ def inventory_transfer():
             company_id=current_company_id(),
             reference_type='transfer',
             reference_id=origin,
+            executed_by=session.get('user_id'),
         )
         db.session.add_all([mov_out, mov_in])
         db.session.commit()
@@ -1634,6 +1647,7 @@ def quotation_to_order(quotation_id):
                 reference_id=order.id,
                 warehouse_id=wid,
                 company_id=current_company_id(),
+                executed_by=session.get('user_id'),
             )
             db.session.add(mov)
     db.session.commit()

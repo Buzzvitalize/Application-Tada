@@ -73,4 +73,30 @@
   {% endif %}
 </div>
 {% endif %}
+
+{% if movements %}
+<h2 class="text-xl font-bold mt-8 mb-2">Movimientos recientes</h2>
+<table class="min-w-full bg-white shadow mb-4">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="px-4 py-2 text-left">Fecha</th>
+      <th class="px-4 py-2 text-left">Producto</th>
+      <th class="px-4 py-2 text-left">Tipo</th>
+      <th class="px-4 py-2 text-right">Cantidad</th>
+      <th class="px-4 py-2 text-left">Responsable</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for m in movements %}
+    <tr class="border-t">
+      <td class="px-4 py-2">{{ m.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td class="px-4 py-2">{{ m.product.name }}</td>
+      <td class="px-4 py-2">{{ m.movement_type }}</td>
+      <td class="px-4 py-2 text-right">{{ m.quantity }}</td>
+      <td class="px-4 py-2">{{ m.user.username }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 {% endblock %}

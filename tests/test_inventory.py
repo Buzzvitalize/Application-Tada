@@ -162,3 +162,20 @@ def test_manager_create_delete_warehouse(manager_client):
     manager_client.post(f'/almacenes/{wid}/delete', follow_redirects=True)
     with app.app_context():
         assert Warehouse.query.get(wid) is None
+
+
+def test_inventory_movement_tracks_user(client):
+    client.post(
+        '/inventario/ajustar',
+        data={
+            'product_id': '1',
+            'warehouse_id': '1',
+            'quantity': '2',
+            'movement_type': 'entrada',
+        },
+        follow_redirects=True,
+    )
+    with app.app_context():
+        mov = InventoryMovement.query.first()
+        assert mov.executed_by == 1
+        assert mov.user.username == 'user'
