@@ -12,14 +12,7 @@ from flask import (
     g,
     current_app,
 )
-try:
-    from flask_migrate import Migrate
-except ModuleNotFoundError:  # pragma: no cover
-    class Migrate:
-        def __init__(self, *a, **k):
-            pass
-        def init_app(self, *a, **k):
-            pass
+from flask_migrate import Migrate
 import logging
 from logging.handlers import RotatingFileHandler
 import smtplib

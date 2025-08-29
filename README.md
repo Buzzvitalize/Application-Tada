@@ -15,6 +15,10 @@ Key features:
 - Quotation form reuses existing clients and products via auto-complete fields
 - Approved account requests trigger an email notification with login details
 
+The repository does not include a prebuilt `database.sqlite`; each
+environment should generate its own database using the migration
+commands below.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and define a random secret key:
@@ -47,6 +51,7 @@ pip install -r requirements.txt
 flask db init  # first run only
 flask db migrate -m "initial"
 flask db upgrade
+python scripts/seed_db.py  # optional: seed admin user and sample data
 pytest
 python app.py
 ```

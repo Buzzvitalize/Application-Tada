@@ -1,13 +1,6 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
-try:
-    from flask_migrate import Migrate
-except ModuleNotFoundError:  # pragma: no cover
-    class Migrate:
-        def __init__(self, *a, **k):
-            pass
-        def init_app(self, *a, **k):
-            pass
+from flask_migrate import Migrate
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
