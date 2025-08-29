@@ -82,10 +82,11 @@ def test_account_approval_sends_email(client, monkeypatch):
         db.session.commit()
         rid = req.id
     sent = {}
-    def fake_send(to, subject, html):
+    def fake_send(to, subject, html, attachments=None):
         sent['to'] = to
         sent['subject'] = subject
         sent['html'] = html
+        sent['attachments'] = attachments
     monkeypatch.setattr('app.send_email', fake_send)
     login(client, 'admin', '363636')
     client.post(f'/admin/solicitudes/{rid}/aprobar', data={'role': 'company'})

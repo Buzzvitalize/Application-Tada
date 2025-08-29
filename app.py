@@ -19,6 +19,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from flask_wtf import CSRFProtect
 from models import (
     db,
@@ -104,27 +106,33 @@ app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 app.logger.info('Tiendix startup')
 
-SMTP_HOST = os.getenv('SMTP_HOST')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-SMTP_USER = os.getenv('SMTP_USER')
-SMTP_PASS = os.getenv('SMTP_PASS')
-SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER)
+MAIL_SERVER = os.getenv('MAIL_SERVER')
+MAIL_PORT = int(os.getenv('MAIL_PORT', 587))
+MAIL_USERNAME = os.getenv('MAIL_USERNAME')
+MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
+MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', MAIL_USERNAME)
 
 
-def send_email(to, subject, html):
-    if not SMTP_HOST or not SMTP_FROM:
+def send_email(to, subject, html, attachments=None):
+    if not MAIL_SERVER or not MAIL_DEFAULT_SENDER:
         app.logger.warning('Email settings missing; skipping send to %s', to)
         return
-    msg = MIMEText(html, 'html')
+    msg = MIMEMultipart()
     msg['Subject'] = subject
-    msg['From'] = SMTP_FROM
+    msg['From'] = MAIL_DEFAULT_SENDER
     msg['To'] = to
+    msg.attach(MIMEText(html, 'html'))
+    for attachment in attachments or []:
+        filename, data = attachment
+        part = MIMEApplication(data, Name=filename)
+        part['Content-Disposition'] = f'attachment; filename="{filename}"'
+        msg.attach(part)
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-            if SMTP_USER and SMTP_PASS:
+        with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as s:
+            if MAIL_USERNAME and MAIL_PASSWORD:
                 s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(SMTP_FROM, [to], msg.as_string())
+                s.login(MAIL_USERNAME, MAIL_PASSWORD)
+            s.sendmail(MAIL_DEFAULT_SENDER, [to], msg.as_string())
     except Exception as e:  # pragma: no cover
         app.logger.error('Email send failed: %s', e)
 
@@ -1689,6 +1697,34 @@ def quotation_pdf(quotation_id):
                          "Los precios están sujetos a cambios sin previo aviso. "
                          "El ITBIS ha sido calculado conforme a la ley vigente."))
     return send_file(pdf_path, download_name=filename, as_attachment=True)
+
+
+@app.route('/cotizaciones/<int:quotation_id>/enviar', methods=['POST'])
+def send_quotation_email(quotation_id):
+    quotation = company_get(Quotation, quotation_id)
+    client = quotation.client
+    if not client.email:
+        flash('El cliente no tiene correo registrado')
+        return redirect(url_for('list_quotations'))
+    company = get_company_info()
+    filename = f'cotizacion_{quotation_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    generate_pdf('Cotización', company, client, quotation.items,
+                 quotation.subtotal, quotation.itbis, quotation.total,
+                 seller=quotation.seller, payment_method=quotation.payment_method,
+                 bank=quotation.bank, doc_number=quotation.id, note=quotation.note,
+                 output_path=pdf_path,
+                 date=quotation.date, valid_until=quotation.valid_until,
+                 footer=("Condiciones: Esta cotización es válida por 30 días a partir de la fecha de emisión. "
+                         "Los precios están sujetos a cambios sin previo aviso. "
+                         "El ITBIS ha sido calculado conforme a la ley vigente."))
+    with open(pdf_path, 'rb') as f:
+        pdf_data = f.read()
+    html = render_template('emails/quotation.html', client=client, company=company, quotation=quotation)
+    send_email(client.email, 'Cotización', html, attachments=[(filename, pdf_data)])
+    flash(f'Cotización enviada con éxito a {client.email}')
+    return redirect(url_for('list_quotations'))
 
 @app.route('/cotizaciones/<int:quotation_id>/convertir', methods=['GET', 'POST'])
 def quotation_to_order(quotation_id):

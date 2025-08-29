@@ -38,6 +38,10 @@
         <td class="p-2">{{ q.status }}</td>
         <td class="p-2 space-x-2">
           <a class="text-blue-500" href="{{ url_for('quotation_pdf', quotation_id=q.id) }}">PDF</a>
+          <form method="post" action="{{ url_for('send_quotation_email', quotation_id=q.id) }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="text-indigo-500">Enviar</button>
+          </form>
           <a class="text-yellow-500" href="{{ url_for('edit_quotation', quotation_id=q.id) }}">Editar</a>
           {% set expired = q.valid_until < now %}
           {% if expired %}
