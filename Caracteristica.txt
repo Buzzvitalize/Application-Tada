@@ -1,0 +1,8 @@
+Características del sistema:
+
+- Aplicación web desarrollada en Flask, configurada en `app.py` con extensiones como Migrate y CSRFProtect.
+- Modelado de datos usando SQLAlchemy, con soporte de migraciones a través de Flask-Migrate (ver `models.py`).
+- Autenticación de usuarios mediante un `Blueprint` que gestiona inicio y cierre de sesión (`auth.py`).
+- Dependencias principales listadas en `requirements.txt` como Flask, SQLAlchemy, WeasyPrint y herramientas de prueba.
+- Base de datos SQLite incluida (`database.sqlite`) para persistencia local.
+- Estructura del proyecto con directorios de plantillas, recursos estáticos, scripts y pruebas automatizadas.
