@@ -8,6 +8,11 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Entrar')
 
 
+class ResetRequestForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired()])
+    submit = SubmitField('Enviar')
+
+
 class AccountRequestForm(FlaskForm):
     """Simple form used solely for CSRF protection when requesting accounts."""
     pass

@@ -9,7 +9,7 @@ from flask import (
     current_app,
 )
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from forms import LoginForm
+from forms import LoginForm, ResetRequestForm
 from models import User, db
 
 auth_bp = Blueprint('auth', __name__)
@@ -34,6 +34,23 @@ def verify_reset_token(token, max_age=3600):
     if not user or user.password != data.get('pw'):
         return None
     return user
+
+
+@auth_bp.route('/reset', methods=['GET', 'POST'])
+def reset_request():
+    form = ResetRequestForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token = generate_reset_token(user)
+            reset_url = url_for('auth.reset_password', token=token, _external=True)
+            from app import send_email
+            html = render_template('emails/password_reset.html', reset_url=reset_url)
+            send_email(email, 'Restablecer contraseña', html)
+        flash('Si el correo existe, se enviará un enlace de restablecimiento', 'login')
+        return redirect(url_for('auth.login'))
+    return render_template('reset_request.html', form=form)
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():

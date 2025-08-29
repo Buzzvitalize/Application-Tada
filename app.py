@@ -233,21 +233,24 @@ def _migrate_legacy_schema():
     """
     inspector = inspect(db.engine)
     statements = []
-    product_cols = {c['name'] for c in inspector.get_columns('product')}
-    if 'category' not in product_cols:
-        statements.append("ALTER TABLE product ADD COLUMN category VARCHAR(50)")
-    if 'unit' not in product_cols:
-        statements.append("ALTER TABLE product ADD COLUMN unit VARCHAR(20) DEFAULT 'Unidad'")
-    if 'has_itbis' not in product_cols:
-        statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
 
-    user_cols = {c['name'] for c in inspector.get_columns('user')}
-    if 'email' not in user_cols:
-        statements.append("ALTER TABLE user ADD COLUMN email VARCHAR(120)")
-    if 'first_name' not in user_cols:
-        statements.append("ALTER TABLE user ADD COLUMN first_name VARCHAR(120) DEFAULT ''")
-    if 'last_name' not in user_cols:
-        statements.append("ALTER TABLE user ADD COLUMN last_name VARCHAR(120) DEFAULT ''")
+    if inspector.has_table('product'):
+        product_cols = {c['name'] for c in inspector.get_columns('product')}
+        if 'category' not in product_cols:
+            statements.append("ALTER TABLE product ADD COLUMN category VARCHAR(50)")
+        if 'unit' not in product_cols:
+            statements.append("ALTER TABLE product ADD COLUMN unit VARCHAR(20) DEFAULT 'Unidad'")
+        if 'has_itbis' not in product_cols:
+            statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
+
+    if inspector.has_table('user'):
+        user_cols = {c['name'] for c in inspector.get_columns('user')}
+        if 'email' not in user_cols:
+            statements.append("ALTER TABLE user ADD COLUMN email VARCHAR(120)")
+        if 'first_name' not in user_cols:
+            statements.append("ALTER TABLE user ADD COLUMN first_name VARCHAR(120) DEFAULT ''")
+        if 'last_name' not in user_cols:
+            statements.append("ALTER TABLE user ADD COLUMN last_name VARCHAR(120) DEFAULT ''")
 
     for stmt in statements:
         db.session.execute(db.text(stmt))
