@@ -5,6 +5,7 @@ import pytest
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app import app, db
 from models import User, CompanyInfo, AccountRequest
+from werkzeug.security import generate_password_hash
 
 @pytest.fixture
 def client(tmp_path):
@@ -74,7 +75,7 @@ def test_account_approval_sends_email(client, monkeypatch):
             phone='123',
             email='ana@example.com',
             username='anita',
-            password='pw',
+            password=generate_password_hash('pw'),
         )
         db.session.add(req)
         db.session.commit()
@@ -90,4 +91,9 @@ def test_account_approval_sends_email(client, monkeypatch):
     assert sent['to'] == 'ana@example.com'
     assert 'aprobada' in sent['subject'].lower()
     with app.app_context():
-        assert User.query.filter_by(username='anita').first() is not None
+        user = User.query.filter_by(username='anita').first()
+        assert user is not None
+        assert user.check_password('pw')
+        # El hash nunca debe aparecer en el correo
+        assert user.password not in sent['html']
+        assert '/reset/' in sent['html']

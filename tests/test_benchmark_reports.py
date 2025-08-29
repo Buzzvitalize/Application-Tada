@@ -30,5 +30,5 @@ def test_report_query(perf_app, benchmark, limit, threshold):
     with perf_app.app_context():
         def run_query():
             return list(Invoice.query.limit(limit).all())
-        result = benchmark(run_query)
-        assert result < threshold
+        benchmark(run_query)
+        assert benchmark.stats['mean'] < threshold

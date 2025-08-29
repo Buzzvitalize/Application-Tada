@@ -76,7 +76,7 @@ from ai import recommend_products
 from weasy_pdf import generate_pdf
 from account_pdf import generate_account_statement_pdf
 from functools import wraps
-from auth import auth_bp
+from auth import auth_bp, generate_reset_token
 from config import DevelopmentConfig
 try:
     from dotenv import load_dotenv
@@ -625,16 +625,20 @@ def approve_request(req_id):
     db.session.add(company)
     db.session.flush()
     user = User(username=username, first_name=req.first_name, last_name=req.last_name, role=role, company_id=company.id)
-    user.set_password(password)
+    # ``req.password`` ya contiene el hash generado al recibir la solicitud.
+    user.password = password
     db.session.add(user)
     db.session.delete(req)
     db.session.commit()
+
+    # Envío de enlace temporal para establecer o restablecer contraseña
+    token = generate_reset_token(user)
     html = render_template(
         'emails/account_approved.html',
         username=username,
-        password=password,
         company=company.name,
         login_url=url_for('auth.login', _external=True),
+        reset_url=url_for('auth.reset_password', token=token, _external=True),
     )
     send_email(email, 'Tu cuenta ha sido aprobada', html)
     flash('Cuenta aprobada')
