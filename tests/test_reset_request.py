@@ -51,8 +51,15 @@ def csrf_client(tmp_path):
 def test_reset_request_redirects(client):
     resp = client.post('/reset', data={'email': 'u@example.com'})
     assert resp.status_code == 302
+    assert resp.headers['Location'].endswith('/login')
 
 
 def test_reset_request_requires_csrf(csrf_client):
     resp = csrf_client.post('/reset', data={'email': 'x@example.com'})
     assert resp.status_code == 400
+
+
+def test_reset_request_page_accessible(client):
+    resp = client.get('/reset')
+    assert resp.status_code == 200
+    assert 'Recuperar contraseña' in resp.get_data(as_text=True)

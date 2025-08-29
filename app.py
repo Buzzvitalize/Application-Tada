@@ -507,7 +507,14 @@ def get_company_info():
 # Routes
 @app.before_request
 def require_login():
-    allowed = {'auth.login', 'static', 'request_account', 'auth.logout'}
+    allowed = {
+        'auth.login',
+        'static',
+        'request_account',
+        'auth.logout',
+        'auth.reset_request',
+        'auth.reset_password',
+    }
     if request.endpoint not in allowed and 'user_id' not in session:
         return redirect(url_for('auth.login'))
     admin_extra = {'admin_companies', 'select_company', 'clear_company',
