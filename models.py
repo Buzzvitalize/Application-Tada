@@ -15,6 +15,10 @@ def dom_now():
     return datetime.now(ZoneInfo("America/Santo_Domingo")).replace(tzinfo=None)
 
 class Client(db.Model):
+    __table_args__ = (
+        db.UniqueConstraint('identifier', 'company_id', name='uq_client_identifier_company'),
+        db.UniqueConstraint('email', 'company_id', name='uq_client_email_company'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     last_name = db.Column(db.String(120))

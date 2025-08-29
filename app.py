@@ -878,6 +878,17 @@ def clients():
         if not is_final and not identifier:
             flash('El RNC es obligatorio para empresas')
             return redirect(url_for('clients'))
+        if identifier:
+            exists = company_query(Client).filter(Client.identifier == identifier).first()
+            if exists:
+                flash('Ya existe un cliente con ese RNC/Cédula')
+                return redirect(url_for('clients'))
+        email = request.form.get('email')
+        if email:
+            exists = company_query(Client).filter(Client.email == email).first()
+            if exists:
+                flash('Ya existe un cliente con ese correo electrónico')
+                return redirect(url_for('clients'))
         client = Client(
             name=request.form['name'],
             last_name=last_name,
@@ -929,6 +940,21 @@ def edit_client(client_id):
         if not is_final and not identifier:
             flash('El RNC es obligatorio para empresas')
             return redirect(url_for('edit_client', client_id=client.id))
+        if identifier:
+            exists = company_query(Client).filter(
+                Client.identifier == identifier, Client.id != client.id
+            ).first()
+            if exists:
+                flash('Ya existe un cliente con ese RNC/Cédula')
+                return redirect(url_for('edit_client', client_id=client.id))
+        email = request.form.get('email')
+        if email:
+            exists = company_query(Client).filter(
+                Client.email == email, Client.id != client.id
+            ).first()
+            if exists:
+                flash('Ya existe un cliente con ese correo electrónico')
+                return redirect(url_for('edit_client', client_id=client.id))
         client.name = request.form['name']
         client.last_name = last_name
         client.identifier = identifier
@@ -953,6 +979,15 @@ def api_create_client():
     last_name = data.get('last_name') if is_final else None
     if not is_final and not identifier:
         return {'error': 'El RNC es obligatorio para empresas'}, 400
+    if identifier:
+        exists = company_query(Client).filter(Client.identifier == identifier).first()
+        if exists:
+            return {'error': 'Identifier already exists'}, 400
+    email = data.get('email')
+    if email:
+        exists = company_query(Client).filter(Client.email == email).first()
+        if exists:
+            return {'error': 'Email already exists'}, 400
     client = Client(
         name=data.get('name'),
         last_name=last_name,
