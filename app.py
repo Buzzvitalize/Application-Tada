@@ -50,7 +50,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     Workbook = None
 from datetime import datetime, timedelta
-from sqlalchemy import func, inspect
+from sqlalchemy import func, inspect, or_
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import load_only, joinedload
 from werkzeug.utils import secure_filename
@@ -1023,25 +1023,41 @@ def delete_product(product_id):
 @app.route('/inventario')
 def inventory_report():
     wid = request.args.get('warehouse_id', type=int)
+    q = request.args.get('q', '').strip()
+    category = request.args.get('category', '')
+    status = request.args.get('status', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 25, type=int)
+
     warehouses = company_query(Warehouse).order_by(Warehouse.name).all()
     stocks = []
-    if wid:
-        stocks = (
-            company_query(ProductStock)
-            .filter_by(warehouse_id=wid)
-            .join(Product)
-            .order_by(Product.name)
-            .all()
-        )
-    elif warehouses:
+    pagination = None
+    if not wid and warehouses:
         wid = warehouses[0].id
-        stocks = (
+    if wid:
+        query = (
             company_query(ProductStock)
             .filter_by(warehouse_id=wid)
             .join(Product)
-            .order_by(Product.name)
-            .all()
         )
+        if q:
+            like = f"%{q}%"
+            query = query.filter(or_(Product.name.ilike(like), Product.code.ilike(like)))
+        if category:
+            query = query.filter(Product.category == category)
+        if status == 'low':
+            query = query.filter(ProductStock.stock > 0, ProductStock.stock <= ProductStock.min_stock)
+        elif status == 'zero':
+            query = query.filter(ProductStock.stock == 0)
+        elif status == 'normal':
+            query = query.filter(ProductStock.stock > ProductStock.min_stock)
+
+        pagination = (
+            query.order_by(Product.name)
+            .paginate(page=page, per_page=per_page, error_out=False)
+        )
+        stocks = pagination.items
+
     sales_total = (
         db.session.query(func.sum(Invoice.total))
         .filter_by(company_id=current_company_id(), warehouse_id=wid)
@@ -1054,6 +1070,12 @@ def inventory_report():
         warehouses=warehouses,
         selected=wid,
         sales_total=sales_total,
+        pagination=pagination,
+        q=q,
+        category=category,
+        status=status,
+        categories=CATEGORIES,
+        per_page=per_page,
     )
 
 

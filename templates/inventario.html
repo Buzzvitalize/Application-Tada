@@ -6,12 +6,30 @@
   <a href="{{ url_for('inventory_transfer') }}" class="btn-secondary">Transferir</a>
   <a href="{{ url_for('warehouses') }}" class="btn-secondary">Almacenes</a>
   <a href="{{ url_for('inventory_import') }}" class="btn-secondary">Importar CSV</a>
-  <form method="get" class="ml-auto">
+  <form method="get" class="ml-auto flex flex-wrap items-center space-x-2">
     <select name="warehouse_id" class="input" onchange="this.form.submit()">
       {% for w in warehouses %}
       <option value="{{ w.id }}" {% if w.id==selected %}selected{% endif %}>{{ w.name }}</option>
       {% endfor %}
     </select>
+    <input name="q" value="{{ q }}" placeholder="Nombre o código" class="input" />
+    <select name="category" class="input">
+      <option value="">Todas</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {% if c==category %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+    <select name="status" class="input">
+      <option value="">Todo</option>
+      <option value="low" {% if status=='low' %}selected{% endif %}>Bajo mínimo</option>
+      <option value="zero" {% if status=='zero' %}selected{% endif %}>En cero</option>
+      <option value="normal" {% if status=='normal' %}selected{% endif %}>Normal</option>
+    </select>
+    <select name="per_page" class="input">
+      <option value="25" {% if per_page==25 %}selected{% endif %}>25</option>
+      <option value="50" {% if per_page==50 %}selected{% endif %}>50</option>
+    </select>
+    <button class="btn-secondary">Filtrar</button>
   </form>
 </div>
 {% if sales_total %}
@@ -43,4 +61,16 @@
   {% endfor %}
   </tbody>
 </table>
+{% if pagination %}
+{% set prev_url = url_for('inventory_report', warehouse_id=selected, page=pagination.prev_num, per_page=per_page, q=q, category=category, status=status) %}
+{% set next_url = url_for('inventory_report', warehouse_id=selected, page=pagination.next_num, per_page=per_page, q=q, category=category, status=status) %}
+<div class="mt-4 flex justify-between">
+  {% if pagination.has_prev %}
+  <a href="{{ prev_url }}" class="btn-secondary">Anterior</a>
+  {% endif %}
+  {% if pagination.has_next %}
+  <a href="{{ next_url }}" class="btn-secondary ml-auto">Siguiente</a>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}
