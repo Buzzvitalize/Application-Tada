@@ -895,8 +895,21 @@ def clients():
         flash('Cliente agregado')
         notify('Cliente agregado')
         return redirect(url_for('clients'))
-    clients = company_query(Client).all()
-    return render_template('clientes.html', clients=clients)
+    q = request.args.get('q', '').strip()
+    page = request.args.get('page', 1, type=int)
+    query = company_query(Client)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Client.name.ilike(like),
+                Client.last_name.ilike(like),
+                Client.identifier.ilike(like),
+                Client.email.ilike(like),
+            )
+        )
+    clients = query.order_by(Client.id).paginate(page=page, per_page=25, error_out=False)
+    return render_template('clientes.html', clients=clients, q=q)
 
 @app.route('/clientes/delete/<int:client_id>')
 def delete_client(client_id):

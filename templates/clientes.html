@@ -2,6 +2,10 @@
 {% block title %}Clientes{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Clientes</h1>
+<form method="get" class="mb-4 flex space-x-2">
+  <input name="q" value="{{ q }}" placeholder="Buscar por nombre, identificador o email" class="input flex-1">
+  <button class="btn-secondary">Buscar</button>
+</form>
 <form method="post" class="card mb-6 space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="grid md:grid-cols-2 gap-4">
@@ -32,7 +36,7 @@
       </tr>
     </thead>
     <tbody>
-    {% for c in clients %}
+    {% for c in clients.items %}
       <tr class="border-t">
         <td class="p-2">{{ c.name }}{% if c.last_name %} {{ c.last_name }}{% endif %}</td>
         <td class="p-2">{{ c.identifier|id_doc }}</td>
@@ -46,6 +50,15 @@
     {% endfor %}
     </tbody>
   </table>
+</div>
+<div class="mt-4 flex items-center gap-2">
+  {% if clients.has_prev %}
+  <a href="?page={{ clients.prev_num }}&q={{ q }}" class="px-2 py-1 bg-gray-200 rounded">Anterior</a>
+  {% endif %}
+  <span>Página {{ clients.page }} de {{ clients.pages }}</span>
+  {% if clients.has_next %}
+  <a href="?page={{ clients.next_num }}&q={{ q }}" class="px-2 py-1 bg-gray-200 rounded">Siguiente</a>
+  {% endif %}
 </div>
 {% endblock %}
 
