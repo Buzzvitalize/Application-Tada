@@ -49,6 +49,7 @@ except ModuleNotFoundError:  # pragma: no cover
     Workbook = None
 from datetime import datetime, timedelta
 from sqlalchemy import func, inspect
+from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import load_only, joinedload
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
@@ -235,7 +236,10 @@ def _migrate_legacy_schema():
     statements = []
 
     if inspector.has_table('product'):
-        product_cols = {c['name'] for c in inspector.get_columns('product')}
+        try:
+            product_cols = {c['name'] for c in inspector.get_columns('product')}
+        except NoSuchTableError:  # pragma: no cover - sqlite reflection race
+            product_cols = set()
         if 'category' not in product_cols:
             statements.append("ALTER TABLE product ADD COLUMN category VARCHAR(50)")
         if 'unit' not in product_cols:
@@ -244,7 +248,10 @@ def _migrate_legacy_schema():
             statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
 
     if inspector.has_table('user'):
-        user_cols = {c['name'] for c in inspector.get_columns('user')}
+        try:
+            user_cols = {c['name'] for c in inspector.get_columns('user')}
+        except NoSuchTableError:  # pragma: no cover - sqlite reflection race
+            user_cols = set()
         if 'email' not in user_cols:
             statements.append("ALTER TABLE user ADD COLUMN email VARCHAR(120)")
         if 'first_name' not in user_cols:
