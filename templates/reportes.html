@@ -338,12 +338,37 @@ const spinner = document.getElementById('exportSpinner');
 const exportTipo = document.getElementById('exportTipo');
 exportBtn.addEventListener('click', () => exportMenu.classList.toggle('hidden'));
 exportMenu.querySelectorAll('a').forEach(a => {
-  a.addEventListener('click', e => {
+  a.addEventListener('click', async e => {
     e.preventDefault();
     spinner.classList.remove('hidden');
     const params = new URLSearchParams(new FormData(document.getElementById('filters')));
-    window.location = `{{ url_for('export_reportes') }}?formato=${a.dataset.format}&tipo=${exportTipo.value}&` + params.toString();
-    setTimeout(() => spinner.classList.add('hidden'), 3000);
+    const base = `{{ url_for('export_reportes') }}?formato=${a.dataset.format}&tipo=${exportTipo.value}&`;
+    let resp = await fetch(base + params.toString());
+    if (resp.status === 400) {
+      const data = await resp.json();
+      if (data.suggest === 'async') {
+        resp = await fetch(base + params.toString() + '&async=1');
+      }
+    }
+    spinner.classList.add('hidden');
+    if (resp.headers.get('content-type')?.includes('application/json')) {
+      const data = await resp.json();
+      if (data.job) {
+        alert('Reporte en proceso, revise el historial de exportaciones.');
+      } else if (data.error) {
+        alert(data.error);
+      }
+    } else {
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `reportes.${a.dataset.format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }
     exportMenu.classList.add('hidden');
   });
 });

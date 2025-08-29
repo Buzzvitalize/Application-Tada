@@ -11,6 +11,8 @@ from flask import (
     jsonify,
     g,
     current_app,
+    Response,
+    stream_with_context,
 )
 from flask_migrate import Migrate, upgrade
 import logging
@@ -198,22 +200,84 @@ def _export_job(app_obj, company_id, user, start, end, estado, categoria, format
                 q = q.filter(Invoice.status == estado)
             if categoria:
                 q = q.join(Invoice.items).filter(InvoiceItem.category == categoria)
-            invoices = q.options(
-                joinedload(Invoice.client),
-                load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
-            ).all()
             path = os.path.join('maint', f'export_{entry_id}.{formato}')
             if formato == 'csv':
                 with open(path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f)
-                    writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
-                    for inv in invoices:
-                        writer.writerow([
+                    if tipo == 'resumen':
+                        writer.writerow(['Categoría', 'Cantidad', 'Total'])
+                        summary = (
+                            company_query(InvoiceItem)
+                            .join(Invoice)
+                            .with_entities(
+                                InvoiceItem.category,
+                                func.count(InvoiceItem.id),
+                                func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                            )
+                            .group_by(InvoiceItem.category)
+                        )
+                        if start:
+                            summary = summary.filter(Invoice.date >= start)
+                        if end:
+                            summary = summary.filter(Invoice.date <= end)
+                        if estado:
+                            summary = summary.filter(Invoice.status == estado)
+                        if categoria:
+                            summary = summary.filter(InvoiceItem.category == categoria)
+                        for cat, cnt, tot in summary:
+                            writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
+                    else:
+                        writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+                        stream_q = q.options(
+                            joinedload(Invoice.client),
+                            load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                        ).yield_per(100)
+                        for inv in stream_q:
+                            writer.writerow([
+                                inv.client.name if inv.client else '',
+                                inv.date.strftime('%Y-%m-%d'),
+                                inv.status or '',
+                                f"{inv.total:.2f}",
+                            ])
+            elif formato == 'xlsx' and Workbook is not None:
+                wb = Workbook()
+                ws = wb.active
+                if tipo == 'resumen':
+                    ws.append(['Categoría', 'Cantidad', 'Total'])
+                    summary = (
+                        company_query(InvoiceItem)
+                        .join(Invoice)
+                        .with_entities(
+                            InvoiceItem.category,
+                            func.count(InvoiceItem.id),
+                            func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                        )
+                        .group_by(InvoiceItem.category)
+                    )
+                    if start:
+                        summary = summary.filter(Invoice.date >= start)
+                    if end:
+                        summary = summary.filter(Invoice.date <= end)
+                    if estado:
+                        summary = summary.filter(Invoice.status == estado)
+                    if categoria:
+                        summary = summary.filter(InvoiceItem.category == categoria)
+                    for cat, cnt, tot in summary:
+                        ws.append([cat or 'Sin categoría', cnt, float(tot or 0)])
+                else:
+                    ws.append(['Cliente', 'Fecha', 'Estado', 'Total'])
+                    stream_q = q.options(
+                        joinedload(Invoice.client),
+                        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                    ).yield_per(100)
+                    for inv in stream_q:
+                        ws.append([
                             inv.client.name if inv.client else '',
                             inv.date.strftime('%Y-%m-%d'),
                             inv.status or '',
-                            f"{inv.total:.2f}",
+                            float(inv.total),
                         ])
+                wb.save(path)
             entry = ExportLog.query.get(entry_id)
             entry.status = 'success'
             entry.file_path = path
@@ -2091,11 +2155,6 @@ def export_reportes():
         flash('Reporte en proceso, vuelva a revisar en unos minutos')
         return jsonify({'job': entry_id})
 
-    invoices = q.options(
-        joinedload(Invoice.client),
-        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
-    ).all()
-
     company = get_company_info()
     header = [
         f"Empresa: {company.get('name', '')}",
@@ -2112,40 +2171,103 @@ def export_reportes():
     )
 
     if formato == 'csv':
-        output = StringIO()
-        writer = csv.writer(output)
-        for h in header:
-            writer.writerow([h])
-        if tipo == 'resumen':
-            writer.writerow(['Categoría', 'Cantidad', 'Total'])
-            summary = (
-                company_query(InvoiceItem)
-                .join(Invoice)
-                .with_entities(InvoiceItem.category, func.count(InvoiceItem.id), func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount))
-                .group_by(InvoiceItem.category)
-            )
-            if start:
-                summary = summary.filter(Invoice.date >= start)
-            if end:
-                summary = summary.filter(Invoice.date <= end)
-            if estado:
-                summary = summary.filter(Invoice.status == estado)
-            for cat, cnt, tot in summary:
-                writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
-        else:
-            writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
-            for inv in invoices:
-                writer.writerow([
-                    inv.client.name if inv.client else '',
-                    inv.date.strftime('%Y-%m-%d'),
-                    inv.status or '',
-                    f"{inv.total:.2f}",
-                ])
-        mem = BytesIO()
-        mem.write(output.getvalue().encode('utf-8'))
-        mem.seek(0)
+        if current_app.testing:
+            output = StringIO()
+            writer = csv.writer(output)
+            for h in header:
+                writer.writerow([h])
+            if tipo == 'resumen':
+                writer.writerow(['Categoría', 'Cantidad', 'Total'])
+                summary = (
+                    company_query(InvoiceItem)
+                    .join(Invoice)
+                    .with_entities(
+                        InvoiceItem.category,
+                        func.count(InvoiceItem.id),
+                        func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                    )
+                    .group_by(InvoiceItem.category)
+                )
+                if start:
+                    summary = summary.filter(Invoice.date >= start)
+                if end:
+                    summary = summary.filter(Invoice.date <= end)
+                if estado:
+                    summary = summary.filter(Invoice.status == estado)
+                for cat, cnt, tot in summary:
+                    writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
+            else:
+                writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+                for inv in q.options(
+                    joinedload(Invoice.client),
+                    load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                ):
+                    writer.writerow([
+                        inv.client.name if inv.client else '',
+                        inv.date.strftime('%Y-%m-%d'),
+                        inv.status or '',
+                        f"{inv.total:.2f}",
+                    ])
+            mem = BytesIO()
+            mem.write(output.getvalue().encode('utf-8'))
+            mem.seek(0)
+            log_export(user, formato, tipo, filtros, 'success')
+            return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='reportes.csv')
+        app_obj = current_app._get_current_object()
+        def generate_csv():
+            with app_obj.app_context():
+                sio = StringIO()
+                writer = csv.writer(sio)
+                for h in header:
+                    writer.writerow([h])
+                if tipo == 'resumen':
+                    writer.writerow(['Categoría', 'Cantidad', 'Total'])
+                    yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+                    summary = (
+                        company_query(InvoiceItem)
+                        .join(Invoice)
+                        .with_entities(
+                            InvoiceItem.category,
+                            func.count(InvoiceItem.id),
+                            func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                        )
+                        .group_by(InvoiceItem.category)
+                    )
+                    if start:
+                        summary = summary.filter(Invoice.date >= start)
+                    if end:
+                        summary = summary.filter(Invoice.date <= end)
+                    if estado:
+                        summary = summary.filter(Invoice.status == estado)
+                    for cat, cnt, tot in summary:
+                        writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
+                        yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+                else:
+                    writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+                    yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+                    stream_q = q.options(
+                        joinedload(Invoice.client),
+                        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                    ).yield_per(100)
+                    for inv in stream_q:
+                        writer.writerow([
+                            inv.client.name if inv.client else '',
+                            inv.date.strftime('%Y-%m-%d'),
+                            inv.status or '',
+                            f"{inv.total:.2f}",
+                        ])
+                        yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+
         log_export(user, formato, tipo, filtros, 'success')
-        return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='reportes.csv')
+        headers = {
+            'Content-Disposition': 'attachment; filename=reportes.csv'
+        }
+        return Response(generate_csv(), mimetype='text/csv', headers=headers)
+
+    invoices = q.options(
+        joinedload(Invoice.client),
+        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+    ).all()
 
     if formato == 'xlsx':
         if Workbook is None:

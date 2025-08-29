@@ -59,6 +59,30 @@ def test_export_async_job():
             assert log.status in ('queued','success')
 
 
+def test_export_async_xlsx_job():
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['role']='admin'; sess['company_id']=1; sess['username']='u'; sess['user_id']=1
+        app.config['MAX_EXPORT_ROWS']=1
+        resp = c.get('/reportes/export?formato=xlsx&tipo=detalle&async=1')
+        assert resp.status_code==200
+        job_id = resp.get_json()['job']
+        time.sleep(1)
+        with app.app_context():
+            log = ExportLog.query.get(job_id)
+            assert log.status in ('queued','success')
+
+
+def test_csv_export_streamed():
+    with app.test_client() as c:
+        with c.session_transaction() as sess:
+            sess['role']='admin'; sess['company_id']=1; sess['username']='u'; sess['user_id']=1
+    app.config['MAX_EXPORT_ROWS']=100000
+    resp = c.get('/reportes/export?formato=csv&tipo=detalle')
+    assert resp.status_code == 200
+    assert resp.is_streamed
+
+
 def test_report_performance():
     with app.test_client() as c:
         with c.session_transaction() as sess:
