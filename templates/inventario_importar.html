@@ -12,4 +12,14 @@
   <button class="btn-primary">Importar</button>
 </form>
 <p class="mt-4 text-sm text-gray-600">Formato: code,stock,min_stock</p>
+{% if errors %}
+<div class="mt-4">
+  <h2 class="font-semibold">Errores detectados:</h2>
+  <ul class="list-disc list-inside text-red-600">
+    {% for line, msg in errors %}
+    <li>Línea {{ line }}: {{ msg }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 {% endblock %}

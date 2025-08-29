@@ -97,6 +97,32 @@ def test_inventory_import_csv(client):
         assert InventoryMovement.query.count() == 1
 
 
+def test_inventory_import_invalid_header(client):
+    data = 'code,stock\nP1,10\n'
+    resp = client.post('/inventario/importar', data={
+        'file': (BytesIO(data.encode('utf-8')), 's.csv'),
+        'warehouse_id': '1'
+    }, follow_redirects=True)
+    assert 'Cabeceras inválidas' in resp.get_data(as_text=True)
+    with app.app_context():
+        prod = Product.query.get(1)
+        assert prod.stock == 5
+        assert InventoryMovement.query.count() == 0
+
+
+def test_inventory_import_invalid_row(client):
+    data = 'code,stock,min_stock\nP1,abc,8\n'
+    resp = client.post('/inventario/importar', data={
+        'file': (BytesIO(data.encode('utf-8')), 's.csv'),
+        'warehouse_id': '1'
+    }, follow_redirects=True)
+    assert 'Importación cancelada' in resp.get_data(as_text=True)
+    with app.app_context():
+        prod = Product.query.get(1)
+        assert prod.stock == 5
+        assert InventoryMovement.query.count() == 0
+
+
 def test_low_stock_alert(client):
     with app.app_context():
         ps = ProductStock.query.filter_by(product_id=1, warehouse_id=1).first()

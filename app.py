@@ -1157,46 +1157,75 @@ def inventory_import():
     if request.method == 'POST':
         wid = int(request.form['warehouse_id'])
         file = request.files.get('file')
-        if file and file.filename:
-            stream = StringIO(file.stream.read().decode('utf-8'))
-            reader = csv.DictReader(stream)
-            count = 0
-            for row in reader:
-                code = row.get('code')
-                if not code:
-                    continue
-                product = company_query(Product).filter_by(code=code).first()
-                if not product:
-                    continue
-                stock_qty = _to_int(row.get('stock'))
-                min_stock = _to_int(row.get('min_stock'))
-                product.stock = stock_qty
-                ps = (
-                    company_query(ProductStock)
-                    .filter_by(product_id=product.id, warehouse_id=wid)
-                    .first()
-                )
-                if not ps:
-                    ps = ProductStock(product_id=product.id, warehouse_id=wid, company_id=current_company_id())
-                    db.session.add(ps)
-                ps.stock = stock_qty
-                if min_stock:
-                    ps.min_stock = min_stock
-                    product.min_stock = min_stock
-                mov = InventoryMovement(
-                    product_id=product.id,
-                    quantity=stock_qty,
-                    movement_type='entrada',
-                    reference_type='import',
-                    warehouse_id=wid,
-                    company_id=current_company_id(),
-                    executed_by=session.get('user_id'),
-                )
-                db.session.add(mov)
-                count += 1
-            db.session.commit()
-            flash(f'Se importaron {count} productos')
-            return redirect(url_for('inventory_report', warehouse_id=wid))
+        if not file or not file.filename.lower().endswith('.csv'):
+            flash('Debe subir un archivo CSV válido')
+            return render_template('inventario_importar.html', warehouses=warehouses)
+
+        stream = StringIO(file.stream.read().decode('utf-8'))
+        reader = csv.DictReader(stream)
+        expected = {'code', 'stock', 'min_stock'}
+        if not reader.fieldnames or not expected.issubset(set(reader.fieldnames)):
+            flash('Cabeceras inválidas. Se requieren: code, stock, min_stock')
+            return render_template('inventario_importar.html', warehouses=warehouses)
+
+        errors = []
+        valid_rows = []
+        for idx, row in enumerate(reader, start=2):
+            code = (row.get('code') or '').strip()
+            if not code:
+                errors.append((idx, 'Código faltante'))
+                continue
+            product = company_query(Product).filter_by(code=code).first()
+            if not product:
+                errors.append((idx, f'Producto {code} no encontrado'))
+                continue
+            try:
+                stock_qty = int(row.get('stock'))
+            except (TypeError, ValueError):
+                errors.append((idx, f'Stock inválido para {code}'))
+                continue
+            min_val = row.get('min_stock')
+            try:
+                min_stock = int(min_val) if min_val not in (None, '') else None
+            except ValueError:
+                errors.append((idx, f'Min stock inválido para {code}'))
+                continue
+            valid_rows.append((product, stock_qty, min_stock))
+
+        if errors:
+            db.session.rollback()
+            flash(f'Importación cancelada. {len(errors)} filas con errores.')
+            return render_template('inventario_importar.html', warehouses=warehouses, errors=errors)
+
+        for product, stock_qty, min_stock in valid_rows:
+            product.stock = stock_qty
+            ps = (
+                company_query(ProductStock)
+                .filter_by(product_id=product.id, warehouse_id=wid)
+                .first()
+            )
+            if not ps:
+                ps = ProductStock(product_id=product.id, warehouse_id=wid, company_id=current_company_id())
+                db.session.add(ps)
+            ps.stock = stock_qty
+            if min_stock is not None:
+                ps.min_stock = min_stock
+                product.min_stock = min_stock
+            mov = InventoryMovement(
+                product_id=product.id,
+                quantity=stock_qty,
+                movement_type='entrada',
+                reference_type='import',
+                warehouse_id=wid,
+                company_id=current_company_id(),
+                executed_by=session.get('user_id'),
+            )
+            db.session.add(mov)
+
+        db.session.commit()
+        flash(f'Se importaron {len(valid_rows)} productos')
+        return redirect(url_for('inventory_report', warehouse_id=wid))
+
     return render_template('inventario_importar.html', warehouses=warehouses)
 
 
