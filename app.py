@@ -331,13 +331,11 @@ def _migrate_legacy_schema():
 
 def ensure_admin():  # pragma: no cover - optional helper for deployments
     with app.app_context():
+        try:  # Apply any pending migrations for safety
+            upgrade()
+        except Exception:  # pragma: no cover - fallback when migrations misconfigured
+            db.create_all()
         inspector = inspect(db.engine)
-        if not inspector.has_table('user'):
-            try:  # Prefer migrations for schema management
-                upgrade()
-            except Exception:  # pragma: no cover - fallback when migrations misconfigured
-                db.create_all()
-            inspector = inspect(db.engine)
         _migrate_legacy_schema()
         if inspector.has_table('user') and not User.query.filter_by(username='admin').first():
             admin = User(username='admin', role='admin', first_name='Admin', last_name='')
