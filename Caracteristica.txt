@@ -6,3 +6,4 @@ Características del sistema:
 - Dependencias principales listadas en `requirements.txt` como Flask, SQLAlchemy, WeasyPrint y herramientas de prueba.
 - Base de datos SQLite incluida (`database.sqlite`) para persistencia local.
 - Estructura del proyecto con directorios de plantillas, recursos estáticos, scripts y pruebas automatizadas.
+- Solicitud de cuenta con aceptación obligatoria de Términos y Condiciones, registrando IP, fecha y agente de usuario.

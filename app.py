@@ -514,6 +514,7 @@ def require_login():
         'auth.logout',
         'auth.reset_request',
         'auth.reset_password',
+        'terminos',
     }
     if request.endpoint not in allowed and 'user_id' not in session:
         return redirect(url_for('auth.login'))
@@ -554,6 +555,12 @@ def index():
 def request_account():
     form = AccountRequestForm()
     if form.validate_on_submit():
+        if not form.accepted_terms.data:
+            flash(
+                'Debe aceptar los Términos y Condiciones para crear una cuenta en Tiendix.',
+                'request',
+            )
+            return redirect(url_for('request_account'))
         if request.form.get('password') != request.form.get('confirm_password'):
             flash('Las contraseñas no coinciden', 'request')
             return redirect(url_for('request_account'))
@@ -574,12 +581,27 @@ def request_account():
             website=request.form.get('website'),
             username=request.form['username'],
             password=generate_password_hash(request.form['password']),
+            accepted_terms=True,
+            accepted_terms_at=dom_now(),
+            accepted_terms_ip=request.remote_addr,
+            accepted_terms_user_agent=request.headers.get('User-Agent', ''),
         )
         db.session.add(req)
         db.session.commit()
         flash('Solicitud enviada, espere aprobación', 'login')
         return redirect(url_for('auth.login'))
+    elif request.method == 'POST':
+        flash(
+            'Debe aceptar los Términos y Condiciones para crear una cuenta en Tiendix.',
+            'request',
+        )
+        return redirect(url_for('request_account'))
     return render_template('solicitar_cuenta.html', form=form)
+
+
+@app.route('/terminos')
+def terminos():
+    return render_template('terminos.html')
 
 
 @app.route('/admin/solicitudes')

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Términos y Condiciones - Tiendix</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="max-w-3xl mx-auto p-6 bg-white shadow mt-6 rounded">
+    <h1 class="text-2xl font-bold mb-4">Términos y Condiciones de Uso – Tiendix</h1>
+    <ol class="list-decimal space-y-4 pl-5">
+      <li>
+        <h2 class="font-semibold">Aceptación</h2>
+        <p>Al solicitar una cuenta o utilizar Tiendix usted reconoce haber leído y aceptado estos Términos y Condiciones.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Objeto</h2>
+        <p>Tiendix provee una plataforma de gestión comercial sujeta a los presentes términos.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Planes y Funcionalidades</h2>
+        <p>Las características y costos de Tiendix pueden variar según el plan contratado.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Uso</h2>
+        <p>El usuario se compromete a utilizar la plataforma conforme a la ley y a abstenerse de emplearla para fines ilícitos.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Datos y Confidencialidad</h2>
+        <p>La información proporcionada será tratada con confidencialidad según la política de privacidad de Tiendix.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Limitaciones</h2>
+        <p>Tiendix se reserva el derecho de limitar o suspender el servicio ante usos indebidos.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Responsabilidad</h2>
+        <p>El servicio se ofrece "tal cual" sin garantías de disponibilidad continua o ausencia de errores.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Pagos</h2>
+        <p>Los pagos efectuados por los planes contratados son no reembolsables salvo disposición legal.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Modificaciones</h2>
+        <p>Tiendix podrá modificar estos términos y las funcionalidades del servicio en cualquier momento.</p>
+      </li>
+      <li>
+        <h2 class="font-semibold">Jurisdicción</h2>
+        <p>Cualquier controversia se someterá a las leyes y tribunales de la República Dominicana.</p>
+      </li>
+    </ol>
+    <div class="text-center mt-6">
+      <a href="{{ url_for('request_account') }}" class="btn-primary">Regresar al registro</a>
+    </div>
+  </div>
+</body>
+</html>

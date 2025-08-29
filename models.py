@@ -236,6 +236,10 @@ class AccountRequest(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     created_at = db.Column(db.DateTime, default=dom_now)
+    accepted_terms = db.Column(db.Boolean, nullable=False, default=False)
+    accepted_terms_at = db.Column(db.DateTime)
+    accepted_terms_ip = db.Column(db.String(45))
+    accepted_terms_user_agent = db.Column(db.String(255))
 
 
 class ExportLog(db.Model):

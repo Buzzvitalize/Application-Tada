@@ -76,6 +76,7 @@ def test_account_approval_sends_email(client, monkeypatch):
             email='ana@example.com',
             username='anita',
             password=generate_password_hash('pw'),
+            accepted_terms=True,
         )
         db.session.add(req)
         db.session.commit()

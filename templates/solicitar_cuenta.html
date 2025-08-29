@@ -57,6 +57,10 @@
         <input type="email" name="email" placeholder="Correo" class="input" required>
         <input type="password" name="password" placeholder="Contraseña" class="input" required>
         <input type="password" name="confirm_password" placeholder="Confirmar contraseña" class="input" required>
+        <label class="flex items-center space-x-2 text-sm">
+          {{ form.accepted_terms(class_='form-checkbox', required=True) }}
+          <span>He leído y acepto los <a href="{{ url_for('terminos') }}" target="_blank" class="text-blue-600 underline">Términos y Condiciones</a></span>
+        </label>
         <button class="btn-primary w-full">Enviar solicitud</button>
         {% with messages = get_flashed_messages(category_filter=['request']) %}
           {% if messages %}

@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField
+from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired
 
 class LoginForm(FlaskForm):
@@ -14,5 +14,12 @@ class ResetRequestForm(FlaskForm):
 
 
 class AccountRequestForm(FlaskForm):
-    """Simple form used solely for CSRF protection when requesting accounts."""
-    pass
+    """Form for account requests, primarily for CSRF protection."""
+    accepted_terms = BooleanField(
+        "He leído y acepto los Términos y Condiciones",
+        validators=[
+            DataRequired(
+                message="Debe aceptar los Términos y Condiciones para crear una cuenta en Tiendix."
+            )
+        ],
+    )
