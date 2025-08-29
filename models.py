@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 # Initialize extensions without app; configured in app.py
@@ -53,6 +53,7 @@ class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     date = db.Column(db.DateTime, default=dom_now)
+    valid_until = db.Column(db.DateTime, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)

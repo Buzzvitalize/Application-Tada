@@ -27,13 +27,16 @@ def client(tmp_path):
         db.session.flush()
         now = datetime.utcnow()
         for i in range(25):
+            d = now - timedelta(days=i)
             q = Quotation(client_id=c1.id, subtotal=0, itbis=0, total=i,
-                          date=now - timedelta(days=i), company_id=comp.id)
+                          date=d, valid_until=d + timedelta(days=30), company_id=comp.id)
             db.session.add(q)
+        conv_date = now - timedelta(days=25)
         conv = Quotation(client_id=c2.id, subtotal=0, itbis=0, total=100,
-                          date=now - timedelta(days=25), status='convertida', company_id=comp.id)
+                          date=conv_date, valid_until=conv_date + timedelta(days=30), status='convertida', company_id=comp.id)
+        old_date = now - timedelta(days=40)
         old = Quotation(client_id=c2.id, subtotal=0, itbis=0, total=200,
-                         date=now - timedelta(days=40), company_id=comp.id)
+                         date=old_date, valid_until=old_date + timedelta(days=30), company_id=comp.id)
         db.session.add_all([conv, old])
         db.session.commit()
         conv_id, old_id = conv.id, old.id

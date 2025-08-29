@@ -1389,9 +1389,9 @@ def list_quotations():
     status = request.args.get('status')
     page = request.args.get('page', 1, type=int)
 
-    cutoff = dom_now() - timedelta(days=30)
+    now = dom_now()
     company_query(Quotation).filter(
-        Quotation.status == 'vigente', Quotation.date < cutoff
+        Quotation.status == 'vigente', Quotation.valid_until < now
     ).update({'status': 'vencida'}, synchronize_session=False)
     db.session.commit()
 
@@ -1419,8 +1419,7 @@ def list_quotations():
         date_from=date_from,
         date_to=date_to,
         status=status,
-        timedelta=timedelta,
-        now=dom_now(),
+        now=now,
     )
 
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
@@ -1446,11 +1445,14 @@ def new_quotation():
         subtotal, itbis, total = calculate_totals(items)
         payment_method = request.form.get('payment_method')
         bank = request.form.get('bank') if payment_method == 'Transferencia' else None
+        date = dom_now()
+        valid_until = date + timedelta(days=30)
         quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total,
                                seller=request.form.get('seller'), payment_method=payment_method,
                                bank=bank, note=request.form.get('note'),
                                warehouse_id=int(wid),
-                               company_id=current_company_id())
+                               company_id=current_company_id(),
+                               date=date, valid_until=valid_until)
         db.session.add(quotation)
         db.session.flush()
         for it in items:
@@ -1676,14 +1678,13 @@ def quotation_pdf(quotation_id):
     filename = f'cotizacion_{quotation_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-    valid_until = quotation.date + timedelta(days=30)
     app.logger.info("Generating quotation PDF %s", quotation_id)
     generate_pdf('Cotización', company, quotation.client, quotation.items,
                  quotation.subtotal, quotation.itbis, quotation.total,
                  seller=quotation.seller, payment_method=quotation.payment_method,
                  bank=quotation.bank, doc_number=quotation.id, note=quotation.note,
                  output_path=pdf_path,
-                 date=quotation.date, valid_until=valid_until,
+                 date=quotation.date, valid_until=quotation.valid_until,
                  footer=("Condiciones: Esta cotización es válida por 30 días a partir de la fecha de emisión. "
                          "Los precios están sujetos a cambios sin previo aviso. "
                          "El ITBIS ha sido calculado conforme a la ley vigente."))
@@ -1702,7 +1703,7 @@ def quotation_to_order(quotation_id):
     wid = int(wid)
     quotation.warehouse_id = wid
     customer_po = request.form.get('customer_po') or None
-    if dom_now() > quotation.date + timedelta(days=30):
+    if dom_now() > quotation.valid_until:
         flash('La cotización ha expirado')
         return redirect(url_for('list_quotations'))
     for item in quotation.items:
