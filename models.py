@@ -60,6 +60,7 @@ class Quotation(db.Model):
     payment_method = db.Column(db.String(20))
     bank = db.Column(db.String(50))
     note = db.Column(db.Text)
+    status = db.Column(db.String(20), default='vigente')
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
 

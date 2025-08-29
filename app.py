@@ -1383,13 +1383,45 @@ def edit_product(product_id):
 # Quotations
 @app.route('/cotizaciones')
 def list_quotations():
-    q = request.args.get('q')
+    client_q = request.args.get('client')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    status = request.args.get('status')
+    page = request.args.get('page', 1, type=int)
+
+    cutoff = dom_now() - timedelta(days=30)
+    company_query(Quotation).filter(
+        Quotation.status == 'vigente', Quotation.date < cutoff
+    ).update({'status': 'vencida'}, synchronize_session=False)
+    db.session.commit()
+
     query = company_query(Quotation).join(Client)
-    if q:
-        query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
-    quotations = query.order_by(Quotation.date.desc()).all()
-    return render_template('cotizaciones.html', quotations=quotations, q=q,
-                           timedelta=timedelta, now=dom_now())
+    if client_q:
+        query = query.filter(
+            (Client.name.contains(client_q)) | (Client.identifier.contains(client_q))
+        )
+    if date_from:
+        df = datetime.strptime(date_from, '%Y-%m-%d')
+        query = query.filter(Quotation.date >= df)
+    if date_to:
+        dt = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+        query = query.filter(Quotation.date < dt)
+    if status:
+        query = query.filter(Quotation.status == status)
+
+    quotations = query.order_by(Quotation.date.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    return render_template(
+        'cotizaciones.html',
+        quotations=quotations,
+        client=client_q,
+        date_from=date_from,
+        date_to=date_to,
+        status=status,
+        timedelta=timedelta,
+        now=dom_now(),
+    )
 
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 def new_quotation():
@@ -1698,6 +1730,7 @@ def quotation_to_order(quotation_id):
         company_id=current_company_id(),
     )
     db.session.add(order)
+    quotation.status = 'convertida'
     db.session.flush()
     for item in quotation.items:
         o_item = OrderItem(

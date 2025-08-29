@@ -3,12 +3,20 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Cotizaciones</h1>
 <a href="{{ url_for('new_quotation') }}" class="btn-primary inline-block mb-4">Nueva Cotización</a>
-<form method="get" class="mb-4 flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 max-w-4xl mx-auto">
-  <input name="q" value="{{ q or '' }}" placeholder="Buscar..." class="input flex-1">
-  <button class="btn-secondary">Buscar</button>
+<form method="get" class="mb-4 flex flex-wrap items-end gap-2 max-w-4xl mx-auto">
+  <input name="client" value="{{ client or '' }}" placeholder="Cliente" class="input">
+  <input type="date" name="date_from" value="{{ date_from or '' }}" class="input">
+  <input type="date" name="date_to" value="{{ date_to or '' }}" class="input">
+  <select name="status" class="input">
+    <option value="">Todos</option>
+    <option value="vigente" {% if status=='vigente' %}selected{% endif %}>Vigente</option>
+    <option value="convertida" {% if status=='convertida' %}selected{% endif %}>Convertida</option>
+    <option value="vencida" {% if status=='vencida' %}selected{% endif %}>Vencida</option>
+  </select>
+  <button class="btn-secondary">Filtrar</button>
 </form>
 <div class="card overflow-x-auto max-w-4xl mx-auto">
-  {% if quotations %}
+  {% if quotations.items %}
   <table class="min-w-full text-sm">
     <thead class="bg-gray-100">
       <tr>
@@ -16,16 +24,18 @@
         <th class="p-2 text-left">Cliente</th>
         <th class="p-2 text-left">Fecha</th>
         <th class="p-2 text-left">Total</th>
+        <th class="p-2 text-left">Estado</th>
         <th class="p-2 text-left">Acciones</th>
       </tr>
     </thead>
     <tbody>
-    {% for q in quotations %}
+    {% for q in quotations.items %}
       <tr class="border-t">
         <td class="p-2">{{ q.id }}</td>
         <td class="p-2">{{ q.client.name }}</td>
         <td class="p-2">{{ q.date.strftime('%d/%m/%Y %I:%M %p') }}</td>
         <td class="p-2">{{ q.total | money }}</td>
+        <td class="p-2">{{ q.status }}</td>
         <td class="p-2 space-x-2">
           <a class="text-blue-500" href="{{ url_for('quotation_pdf', quotation_id=q.id) }}">PDF</a>
           <a class="text-yellow-500" href="{{ url_for('edit_quotation', quotation_id=q.id) }}">Editar</a>
@@ -42,6 +52,29 @@
   </table>
   {% else %}
   <p class="p-2">No se encontraron resultados.</p>
+  {% endif %}
+</div>
+<div class="mt-4 flex items-center gap-2">
+  {% if quotations.has_prev %}
+  <a
+    href="{{ url_for('list_quotations',
+                     page=quotations.prev_num,
+                     client=client,
+                     date_from=date_from,
+                     date_to=date_to,
+                     status=status) }}"
+    class="px-2 py-1 bg-gray-200 rounded">Anterior</a>
+  {% endif %}
+  <span>Página {{ quotations.page }} de {{ quotations.pages }}</span>
+  {% if quotations.has_next %}
+  <a
+    href="{{ url_for('list_quotations',
+                     page=quotations.next_num,
+                     client=client,
+                     date_from=date_from,
+                     date_to=date_to,
+                     status=status) }}"
+    class="px-2 py-1 bg-gray-200 rounded">Siguiente</a>
   {% endif %}
 </div>
 {% endblock %}
