@@ -442,6 +442,29 @@ def _to_int(value):
         return 0
 
 
+def _validate_product_cost_inputs(price, use_cost, cost_price_raw):
+    """Validate optional product cost data and return normalized values.
+
+    Returns a tuple of: (is_valid, cost_price_or_none, warning_message_or_none).
+    """
+    if not use_cost:
+        return True, None, None
+
+    cost_price = _to_float(cost_price_raw)
+    if cost_price <= 0:
+        return False, None, 'El costo debe ser mayor que 0 cuando activa "Usar costo".'
+
+    margin = ((price - cost_price) / cost_price) * 100
+    if price < cost_price:
+        return True, cost_price, (
+            'Advertencia: el precio de venta está por debajo del costo. '
+            f'Margen actual: {margin:.1f}%.'
+        )
+    if margin < 5:
+        return True, cost_price, f'Advertencia: margen bajo ({margin:.1f}%).'
+    return True, cost_price, None
+
+
 def generate_reference(name: str) -> str:
     """Generate a unique reference based on product name."""
     prefix = ''.join(ch for ch in (name or '').upper() if ch.isalnum())[:3]
@@ -1053,13 +1076,22 @@ def products():
     if request.method == 'POST':
         reference = request.form.get('reference') or generate_reference(request.form['name'])
         use_cost = bool(request.form.get('use_cost'))
+        price = _to_float(request.form['price'])
+        valid_cost, cost_price, warning_msg = _validate_product_cost_inputs(
+            price,
+            use_cost,
+            request.form.get('cost_price'),
+        )
+        if not valid_cost:
+            flash('No se pudo guardar el producto: costo inválido. Debe ser mayor que 0.')
+            return redirect(url_for('products'))
         product = Product(
             code=request.form['code'],
             reference=reference,
             name=request.form['name'],
             unit=request.form['unit'],
-            price=_to_float(request.form['price']),
-            cost_price=_to_float(request.form.get('cost_price')) if use_cost else None,
+            price=price,
+            cost_price=cost_price,
             category=request.form.get('category'),
             has_itbis=bool(request.form.get('has_itbis')),
             company_id=current_company_id()
@@ -1067,6 +1099,8 @@ def products():
         db.session.add(product)
         db.session.commit()
         flash('Producto agregado')
+        if warning_msg:
+            flash(warning_msg)
         notify('Producto agregado')
         return redirect(url_for('products'))
     cat = request.args.get('cat')
@@ -1443,11 +1477,21 @@ def edit_product(product_id):
         product.name = request.form['name']
         product.unit = request.form['unit']
         product.price = _to_float(request.form['price'])
-        product.cost_price = _to_float(request.form.get('cost_price')) if request.form.get('use_cost') else None
+        valid_cost, cost_price, warning_msg = _validate_product_cost_inputs(
+            product.price,
+            bool(request.form.get('use_cost')),
+            request.form.get('cost_price'),
+        )
+        if not valid_cost:
+            flash('No se pudo actualizar el producto: costo inválido. Debe ser mayor que 0.')
+            return redirect(url_for('edit_product', product_id=product_id))
+        product.cost_price = cost_price
         product.category = request.form.get('category')
         product.has_itbis = bool(request.form.get('has_itbis'))
         db.session.commit()
         flash('Producto actualizado')
+        if warning_msg:
+            flash(warning_msg)
         return redirect(url_for('products'))
     return render_template('producto_form.html', product=product, units=UNITS, categories=CATEGORIES)
 

@@ -204,6 +204,54 @@ def test_create_product_with_cost_and_margin_inputs(client):
         assert prod.cost_price == 200
 
 
+def test_create_product_rejects_non_positive_cost(client):
+    resp = client.post(
+        '/productos',
+        data={
+            'name': 'Prod Invalido',
+            'unit': 'Unidad',
+            'code': 'PC_BAD',
+            'reference': 'PRO998',
+            'price': '400',
+            'use_cost': 'on',
+            'cost_price': '0',
+            'category': 'Alimentos y Bebidas',
+            'has_itbis': 'on',
+        },
+        follow_redirects=True,
+    )
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'No se pudo guardar el producto: costo inválido' in body
+    with app.app_context():
+        assert Product.query.filter_by(code='PC_BAD').first() is None
+
+
+def test_create_product_warns_when_price_below_cost(client):
+    resp = client.post(
+        '/productos',
+        data={
+            'name': 'Prod Margen Neg',
+            'unit': 'Unidad',
+            'code': 'PC_NEG',
+            'reference': 'PRO997',
+            'price': '100',
+            'use_cost': 'on',
+            'cost_price': '200',
+            'category': 'Alimentos y Bebidas',
+            'has_itbis': 'on',
+        },
+        follow_redirects=True,
+    )
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'Advertencia: el precio de venta está por debajo del costo' in body
+    with app.app_context():
+        prod = Product.query.filter_by(code='PC_NEG').first()
+        assert prod is not None
+        assert prod.cost_price == 200
+
+
 def test_company_cannot_create_warehouse(client):
     resp = client.post('/almacenes', data={'name': 'New'}, follow_redirects=True)
     assert b'Acceso restringido' in resp.data

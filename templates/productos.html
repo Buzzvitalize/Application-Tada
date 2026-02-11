@@ -8,6 +8,9 @@
 </div>
 <form method="post" class="card mb-6 space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p class="text-sm text-gray-600">
+    Si activa <strong>Usar costo</strong>, el costo debe ser mayor que 0. El sistema mostrará advertencias cuando el margen sea bajo o negativo.
+  </p>
   <div class="grid md:grid-cols-8 gap-4 items-center">
     <input id="name" name="name" placeholder="Nombre" class="input" required>
     <select name="unit" class="input" required>
