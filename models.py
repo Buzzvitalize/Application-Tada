@@ -1,14 +1,7 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
-try:
-    from flask_migrate import Migrate
-except ModuleNotFoundError:  # pragma: no cover
-    class Migrate:
-        def __init__(self, *a, **k):
-            pass
-        def init_app(self, *a, **k):
-            pass
-from datetime import datetime
+from flask_migrate import Migrate
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 # Initialize extensions without app; configured in app.py
@@ -22,6 +15,10 @@ def dom_now():
     return datetime.now(ZoneInfo("America/Santo_Domingo")).replace(tzinfo=None)
 
 class Client(db.Model):
+    __table_args__ = (
+        db.UniqueConstraint('identifier', 'company_id', name='uq_client_identifier_company'),
+        db.UniqueConstraint('email', 'company_id', name='uq_client_email_company'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     last_name = db.Column(db.String(120))
@@ -56,6 +53,7 @@ class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     date = db.Column(db.DateTime, default=dom_now)
+    valid_until = db.Column(db.DateTime, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
     itbis = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
@@ -63,6 +61,7 @@ class Quotation(db.Model):
     payment_method = db.Column(db.String(20))
     bank = db.Column(db.String(50))
     note = db.Column(db.Text)
+    status = db.Column(db.String(20), default='vigente')
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
 
@@ -175,8 +174,10 @@ class InventoryMovement(db.Model):
     timestamp = db.Column(db.DateTime, default=dom_now)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
     company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+    executed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product = db.relationship('Product')
     warehouse = db.relationship('Warehouse')
+    user = db.relationship('User')
 
 
 class Warehouse(db.Model):
@@ -243,6 +244,10 @@ class AccountRequest(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     created_at = db.Column(db.DateTime, default=dom_now)
+    accepted_terms = db.Column(db.Boolean, nullable=False, default=False)
+    accepted_terms_at = db.Column(db.DateTime)
+    accepted_terms_ip = db.Column(db.String(45))
+    accepted_terms_user_agent = db.Column(db.String(255))
 
 
 class ExportLog(db.Model):

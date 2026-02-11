@@ -15,17 +15,21 @@ Key features:
 - Quotation form reuses existing clients and products via auto-complete fields
 - Approved account requests trigger an email notification with login details
 
+The repository does not include a prebuilt `database.sqlite`; each
+environment should generate its own database using the migration
+commands below.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and define a random secret key:
 
 ```
 SECRET_KEY=replace_with_random_string
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=user@example.com
-SMTP_PASS=supersecret
-SMTP_FROM=tiendix@example.com
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=user@example.com
+MAIL_PASSWORD=supersecret
+MAIL_DEFAULT_SENDER=tiendix@example.com
 ```
 
 This value secures Flask sessions and is required for the application to start.
@@ -47,6 +51,7 @@ pip install -r requirements.txt
 flask db init  # first run only
 flask db migrate -m "initial"
 flask db upgrade
+python scripts/seed_db.py  # optional: seed admin user and sample data
 pytest
 python app.py
 ```
