@@ -1102,6 +1102,36 @@ def products_import():
         return redirect(url_for('products'))
     return render_template('productos_importar.html')
 
+
+@app.route('/productos/export')
+def export_products():
+    """Export product catalog as CSV, optionally filtered by category."""
+    cat = request.args.get('cat')
+    query = company_query(Product)
+    if cat:
+        query = query.filter_by(category=cat)
+    products = query.order_by(Product.name.asc()).all()
+
+    mem = StringIO()
+    writer = csv.writer(mem)
+    writer.writerow(['code', 'reference', 'name', 'unit', 'price', 'category', 'has_itbis'])
+    for p in products:
+        writer.writerow([
+            p.code,
+            p.reference or '',
+            p.name,
+            p.unit,
+            p.price,
+            p.category or '',
+            '1' if p.has_itbis else '0',
+        ])
+    mem.seek(0)
+    return Response(
+        mem.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=productos.csv'}
+    )
+
 @app.route('/productos/delete/<int:product_id>')
 def delete_product(product_id):
     product = company_get(Product, product_id)

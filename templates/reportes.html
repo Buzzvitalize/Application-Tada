@@ -2,26 +2,54 @@
 {% block title %}Reportes{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Reportes</h1>
-<div class="mb-4">
-  <a href="{{ url_for('account_statement_clients') }}" class="text-blue-600 underline">Estados de cuentas por clientes</a>
+<div class="grid md:grid-cols-4 gap-3 mb-4">
+  <a href="{{ url_for('account_statement_clients') }}" class="card p-3 hover:bg-blue-50 transition-colors">
+    <div class="text-sm font-semibold text-blue-700">Estados de cuenta</div>
+    <div class="text-xs text-gray-500">Ver balances por cliente</div>
+  </a>
+  <a href="{{ url_for('export_history') }}" class="card p-3 hover:bg-gray-100 transition-colors">
+    <div class="text-sm font-semibold text-gray-700">Historial de exportaciones</div>
+    <div class="text-xs text-gray-500">Revisar archivos generados</div>
+  </a>
+  <a href="{{ url_for('export_inventory') }}" class="card p-3 hover:bg-emerald-50 transition-colors">
+    <div class="text-sm font-semibold text-emerald-700">Exportar inventario</div>
+    <div class="text-xs text-gray-500">Descargar stock actual en CSV</div>
+  </a>
+  <a href="{{ url_for('products') }}" class="card p-3 hover:bg-violet-50 transition-colors">
+    <div class="text-sm font-semibold text-violet-700">Ir a productos</div>
+    <div class="text-xs text-gray-500">Gestionar catálogo y precios</div>
+  </a>
 </div>
 
 <form id="filters" class="card mb-6 grid md:grid-cols-5 gap-4" method="get" action="{{ url_for('reportes') }}">
-  <input type="date" name="fecha_inicio" value="{{ filters.fecha_inicio }}" class="input">
-  <input type="date" name="fecha_fin" value="{{ filters.fecha_fin }}" class="input">
-  <select name="estado" class="input">
-    <option value="">Todos los estados</option>
-    {% for s in statuses %}
-    <option value="{{ s }}" {% if filters.estado==s %}selected{% endif %}>{{ s }}</option>
-    {% endfor %}
-  </select>
-  <select name="categoria" class="input">
-    <option value="">Todas las categorías</option>
-    {% for c in categories %}
-    <option value="{{ c }}" {% if filters.categoria==c %}selected{% endif %}>{{ c }}</option>
-    {% endfor %}
-  </select>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha inicio</label>
+    <input type="date" name="fecha_inicio" value="{{ filters.fecha_inicio }}" class="input">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha fin</label>
+    <input type="date" name="fecha_fin" value="{{ filters.fecha_fin }}" class="input">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Estado de factura</label>
+    <select name="estado" class="input">
+      <option value="">Todos los estados</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if filters.estado==s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+    <select name="categoria" class="input">
+      <option value="">Todas las categorías</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {% if filters.categoria==c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
   <div class="relative">
+    <label class="block text-sm font-medium text-gray-700 mb-1">Exportación</label>
     <select id="exportTipo" class="input mb-2">
       <option value="detalle">Detalle</option>
       <option value="resumen">Resumen</option>
@@ -34,17 +62,17 @@
     </div>
   </div>
   <div class="md:col-span-5 flex flex-wrap gap-2 mt-2">
-    <button class="btn" type="submit">Filtrar</button>
-    <button class="btn" type="button" id="resetFilters">Reset</button>
+    <button class="btn" type="submit">Aplicar filtros</button>
+    <button class="btn" type="button" id="resetFilters">Limpiar filtros</button>
     <div class="flex gap-1">
       <button type="button" data-range="today" class="btn text-xs">Hoy</button>
-      <button type="button" data-range="7" class="btn text-xs">7 días</button>
-      <button type="button" data-range="month" class="btn text-xs">Mes</button>
-      <button type="button" data-range="year" class="btn text-xs">Año</button>
+      <button type="button" data-range="7" class="btn text-xs">Últimos 7 días</button>
+      <button type="button" data-range="month" class="btn text-xs">Este mes</button>
+      <button type="button" data-range="year" class="btn text-xs">Este año</button>
     </div>
     <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
-    <a href="{{ url_for('export_inventory') }}" class="btn">Inventario</a>
-    <a href="{{ url_for('export_history') }}" class="btn ml-auto">Historial</a>
+    <a href="{{ url_for('inventory_report') }}" class="btn">Ver inventario</a>
+    <a href="{{ url_for('export_history') }}" class="btn ml-auto">Ver historial</a>
   </div>
 </form>
 
@@ -402,4 +430,3 @@ document.getElementById('filters').addEventListener('submit', () => {
 });
 </script>
 {% endblock %}
-

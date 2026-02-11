@@ -171,6 +171,16 @@ def test_product_import_csv(manager_client):
         assert p.has_itbis is True
 
 
+def test_products_export_csv(client):
+    resp = client.get('/productos/export')
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert resp.headers['Content-Type'].startswith('text/csv')
+    assert 'attachment; filename=productos.csv' in resp.headers.get('Content-Disposition', '')
+    assert 'code,reference,name,unit,price,category,has_itbis' in body
+    assert 'P1' in body
+
+
 def test_company_cannot_create_warehouse(client):
     resp = client.post('/almacenes', data={'name': 'New'}, follow_redirects=True)
     assert b'Acceso restringido' in resp.data
