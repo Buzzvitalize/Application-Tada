@@ -2148,15 +2148,17 @@ def reportes():
         profit_query = profit_query.filter(Invoice.status == estado)
     if categoria:
         profit_query = profit_query.filter(InvoiceItem.category == categoria)
-    estimated_profit = (
-        profit_query.outerjoin(
-            Product,
-            (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
-        )
+    profit_base = profit_query.outerjoin(
+        Product,
+        (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
+    )
+    estimated_profit_with_cost = (
+        profit_base
+        .filter(Product.cost_price.isnot(None))
         .with_entities(
             func.coalesce(
                 func.sum(
-                    ((InvoiceItem.unit_price - func.coalesce(Product.cost_price, 0)) * InvoiceItem.quantity)
+                    ((InvoiceItem.unit_price - Product.cost_price) * InvoiceItem.quantity)
                     - InvoiceItem.discount
                 ),
                 0,
@@ -2164,6 +2166,18 @@ def reportes():
         )
         .scalar()
     )
+    revenue_without_cost_data = (
+        profit_base
+        .filter(Product.cost_price.is_(None))
+        .with_entities(
+            func.coalesce(
+                func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount),
+                0,
+            )
+        )
+        .scalar()
+    )
+    estimated_profit = estimated_profit_with_cost
 
     # trend last 24 months
     trend_query = (
@@ -2241,6 +2255,8 @@ def reportes():
         'itbis_accumulated': itbis_accumulated,
         'net_sales': net_sales,
         'estimated_profit': estimated_profit,
+        'estimated_profit_with_cost': estimated_profit_with_cost,
+        'revenue_without_cost_data': revenue_without_cost_data,
     }
 
     cat_labels = [c or 'Sin categoría' for c, *_ in sales_by_category]

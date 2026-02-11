@@ -179,6 +179,68 @@ def test_payment_method_stats(client):
     client.get('/logout')
 
 
+def test_profit_metrics_split_cost_vs_missing_cost(client):
+    target_date = datetime(2025, 1, 10)
+    with app.app_context():
+        comp = CompanyInfo.query.first()
+        cli = Client.query.first()
+        p_with_cost = Product(code='P_COST', name='Costo', unit='Unidad', price=100, cost_price=60, company_id=comp.id)
+        p_without_cost = Product(code='P_NOCOST', name='SinCosto', unit='Unidad', price=50, cost_price=None, company_id=comp.id)
+        db.session.add_all([p_with_cost, p_without_cost])
+        db.session.flush()
+
+        order = Order(client_id=cli.id, subtotal=250, itbis=45, total=295, company_id=comp.id)
+        db.session.add(order)
+        db.session.flush()
+
+        inv = Invoice(
+            client_id=cli.id,
+            order_id=order.id,
+            subtotal=250,
+            itbis=45,
+            total=295,
+            invoice_type='Consumidor Final',
+            status='Pagada',
+            payment_method='Efectivo',
+            company_id=comp.id,
+            date=target_date,
+        )
+        db.session.add(inv)
+        db.session.flush()
+
+        db.session.add_all([
+            InvoiceItem(
+                invoice_id=inv.id,
+                code='P_COST',
+                product_name='Costo',
+                unit='Unidad',
+                unit_price=100,
+                quantity=2,
+                category='Alimentos y Bebidas',
+                company_id=comp.id,
+            ),
+            InvoiceItem(
+                invoice_id=inv.id,
+                code='P_NOCOST',
+                product_name='SinCosto',
+                unit='Unidad',
+                unit_price=50,
+                quantity=1,
+                category='Alimentos y Bebidas',
+                company_id=comp.id,
+            ),
+        ])
+        db.session.commit()
+
+    login(client, 'user', 'pass')
+    resp = client.get('/reportes?fecha_inicio=2025-01-10&fecha_fin=2025-01-10&ajax=1')
+    data = resp.get_json()
+    assert data['stats']['estimated_profit_with_cost'] == 80
+    assert data['stats']['estimated_profit'] == 80
+    assert data['stats']['revenue_without_cost_data'] == 50
+    client.get('/logout')
+
+
 def test_mark_invoice_paid(client):
     with app.app_context():
         comp = CompanyInfo.query.first()

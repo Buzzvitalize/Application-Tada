@@ -134,8 +134,13 @@
     <div class="text-2xl font-bold">{{ stats.net_sales | money }}</div>
   </div>
   <div class="card text-center">
-    <div class="text-sm text-gray-500">Ganancia estimada</div>
-    <div class="text-2xl font-bold">{{ stats.estimated_profit | money }}</div>
+    <div class="text-sm text-gray-500">Ganancia estimada (con costo cargado)</div>
+    <div class="text-2xl font-bold">{{ stats.estimated_profit_with_cost | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ventas sin costo registrado</div>
+    <div class="text-2xl font-bold">{{ stats.revenue_without_cost_data | money }}</div>
+    <p class="text-xs text-gray-500 mt-1">Estas ventas no se incluyen en la ganancia estimada.</p>
   </div>
 </div>
 
