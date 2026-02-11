@@ -10,10 +10,22 @@
 <form method="post" class="card space-y-4 max-w-4xl mx-auto">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="grid md:grid-cols-2 gap-4">
-    <input name="first_name" placeholder="Nombre" class="input" required>
-    <input name="last_name" placeholder="Apellido" class="input" required>
-    <input name="username" placeholder="Usuario" class="input" required>
-    <input name="password" type="password" placeholder="Contraseña" class="input" required>
+    <div>
+      <label for="new-user-first-name" class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+      <input id="new-user-first-name" name="first_name" placeholder="Nombre" class="input" required>
+    </div>
+    <div>
+      <label for="new-user-last-name" class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+      <input id="new-user-last-name" name="last_name" placeholder="Apellido" class="input" required>
+    </div>
+    <div>
+      <label for="new-user-username" class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+      <input id="new-user-username" name="username" placeholder="Usuario" class="input" required>
+    </div>
+    <div>
+      <label for="new-user-password" class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+      <input id="new-user-password" name="password" type="password" placeholder="Contraseña" class="input" required>
+    </div>
   </div>
   {% if session.get('role')=='manager' %}<p class="text-sm text-gray-600">Máximo 2 usuarios.</p>{% endif %}
   <button class="btn-primary">Crear usuario</button>
