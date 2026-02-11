@@ -318,6 +318,8 @@ def _migrate_legacy_schema():
             statements.append("ALTER TABLE product ADD COLUMN unit VARCHAR(20) DEFAULT 'Unidad'")
         if 'has_itbis' not in product_cols:
             statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
+        if 'cost_price' not in product_cols:
+            statements.append("ALTER TABLE product ADD COLUMN cost_price FLOAT")
 
     if inspector.has_table('user'):
         try:
@@ -1050,12 +1052,14 @@ def api_reference():
 def products():
     if request.method == 'POST':
         reference = request.form.get('reference') or generate_reference(request.form['name'])
+        use_cost = bool(request.form.get('use_cost'))
         product = Product(
             code=request.form['code'],
             reference=reference,
             name=request.form['name'],
             unit=request.form['unit'],
             price=_to_float(request.form['price']),
+            cost_price=_to_float(request.form.get('cost_price')) if use_cost else None,
             category=request.form.get('category'),
             has_itbis=bool(request.form.get('has_itbis')),
             company_id=current_company_id()
@@ -1114,7 +1118,7 @@ def export_products():
 
     mem = StringIO()
     writer = csv.writer(mem)
-    writer.writerow(['code', 'reference', 'name', 'unit', 'price', 'category', 'has_itbis'])
+    writer.writerow(['code', 'reference', 'name', 'unit', 'price', 'cost_price', 'category', 'has_itbis'])
     for p in products:
         writer.writerow([
             p.code,
@@ -1122,6 +1126,7 @@ def export_products():
             p.name,
             p.unit,
             p.price,
+            p.cost_price if p.cost_price is not None else '',
             p.category or '',
             '1' if p.has_itbis else '0',
         ])
@@ -1438,6 +1443,7 @@ def edit_product(product_id):
         product.name = request.form['name']
         product.unit = request.form['unit']
         product.price = _to_float(request.form['price'])
+        product.cost_price = _to_float(request.form.get('cost_price')) if request.form.get('use_cost') else None
         product.category = request.form.get('category')
         product.has_itbis = bool(request.form.get('has_itbis'))
         db.session.commit()
@@ -2126,6 +2132,39 @@ def reportes():
     )
     avg_ticket_year = year_total / year_clients if year_clients else 0
 
+    itbis_accumulated, net_sales = (
+        q.with_entities(
+            func.coalesce(func.sum(Invoice.itbis), 0),
+            func.coalesce(func.sum(Invoice.subtotal), 0),
+        ).first()
+    )
+
+    profit_query = company_query(InvoiceItem).join(Invoice)
+    if start:
+        profit_query = profit_query.filter(Invoice.date >= start)
+    if end:
+        profit_query = profit_query.filter(Invoice.date <= end)
+    if estado:
+        profit_query = profit_query.filter(Invoice.status == estado)
+    if categoria:
+        profit_query = profit_query.filter(InvoiceItem.category == categoria)
+    estimated_profit = (
+        profit_query.outerjoin(
+            Product,
+            (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
+        )
+        .with_entities(
+            func.coalesce(
+                func.sum(
+                    ((InvoiceItem.unit_price - func.coalesce(Product.cost_price, 0)) * InvoiceItem.quantity)
+                    - InvoiceItem.discount
+                ),
+                0,
+            )
+        )
+        .scalar()
+    )
+
     # trend last 24 months
     trend_query = (
         q.with_entities(func.strftime('%Y-%m', Invoice.date), func.sum(Invoice.total))
@@ -2199,6 +2238,9 @@ def reportes():
         'avg_ticket_month': avg_ticket_month,
         'avg_ticket_year': avg_ticket_year,
         'retention': retention,
+        'itbis_accumulated': itbis_accumulated,
+        'net_sales': net_sales,
+        'estimated_profit': estimated_profit,
     }
 
     cat_labels = [c or 'Sin categoría' for c, *_ in sales_by_category]

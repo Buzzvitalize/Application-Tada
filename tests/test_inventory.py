@@ -177,8 +177,31 @@ def test_products_export_csv(client):
     assert resp.status_code == 200
     assert resp.headers['Content-Type'].startswith('text/csv')
     assert 'attachment; filename=productos.csv' in resp.headers.get('Content-Disposition', '')
-    assert 'code,reference,name,unit,price,category,has_itbis' in body
+    assert 'code,reference,name,unit,price,cost_price,category,has_itbis' in body
     assert 'P1' in body
+
+
+def test_create_product_with_cost_and_margin_inputs(client):
+    resp = client.post(
+        '/productos',
+        data={
+            'name': 'Prod Costo',
+            'unit': 'Unidad',
+            'code': 'PC1',
+            'reference': 'PRO999',
+            'price': '400',
+            'use_cost': 'on',
+            'cost_price': '200',
+            'category': 'Alimentos y Bebidas',
+            'has_itbis': 'on',
+        },
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        prod = Product.query.filter_by(code='PC1').first()
+        assert prod is not None
+        assert prod.cost_price == 200
 
 
 def test_company_cannot_create_warehouse(client):

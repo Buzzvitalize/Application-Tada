@@ -8,7 +8,7 @@
 </div>
 <form method="post" class="card mb-6 space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="grid md:grid-cols-7 gap-4 items-center">
+  <div class="grid md:grid-cols-8 gap-4 items-center">
     <input id="name" name="name" placeholder="Nombre" class="input" required>
     <select name="unit" class="input" required>
       {% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
@@ -16,6 +16,14 @@
     <input name="code" placeholder="Código" class="input" required>
     <input id="reference" name="reference" placeholder="Referencia" class="input" readonly>
     <input name="price" placeholder="Precio" class="input" required>
+    <div class="space-y-1">
+      <label class="flex items-center space-x-2 text-sm text-gray-700">
+        <input type="checkbox" id="use-cost" name="use_cost">
+        <span>Usar costo</span>
+      </label>
+      <input id="cost-price" name="cost_price" placeholder="Costo" class="input" disabled>
+      <p id="margin-preview" class="text-xs text-gray-500">Margen: —</p>
+    </div>
     <select name="category" class="input" required>
       {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
     </select>
@@ -46,6 +54,8 @@
         <th class="p-2 text-left">Nombre</th>
         <th class="p-2 text-left">Unidad</th>
         <th class="p-2 text-left">Precio</th>
+        <th class="p-2 text-left">Costo</th>
+        <th class="p-2 text-left">Margen</th>
         <th class="p-2 text-left">Categoría</th>
         <th class="p-2 text-left">ITBIS</th>
         <th class="p-2 text-left">Acciones</th>
@@ -59,6 +69,14 @@
         <td class="p-2">{{ p.name }}</td>
         <td class="p-2">{{ p.unit }}</td>
         <td class="p-2">{{ p.price | money }}</td>
+        <td class="p-2">{{ p.cost_price | money if p.cost_price is not none else '-' }}</td>
+        <td class="p-2">
+          {% if p.cost_price and p.cost_price > 0 %}
+            {{ '%.1f'|format(((p.price - p.cost_price) / p.cost_price) * 100) }}%
+          {% else %}
+            -
+          {% endif %}
+        </td>
         <td class="p-2">{{ p.category }}</td>
         <td class="p-2">{{ 'Sí' if p.has_itbis else 'No' }}</td>
         <td class="p-2 space-x-2">
@@ -81,5 +99,35 @@ document.getElementById('name').addEventListener('blur', async function(){
   const data = await res.json();
   document.getElementById('reference').value = data.reference;
 });
+
+const useCost=document.getElementById('use-cost');
+const costField=document.getElementById('cost-price');
+const priceField=document.querySelector('input[name="price"]');
+const marginPreview=document.getElementById('margin-preview');
+
+function renderMargin(){
+  if(!useCost.checked){
+    marginPreview.textContent='Margen: —';
+    return;
+  }
+  const cost=parseFloat(costField.value)||0;
+  const price=parseFloat(priceField.value)||0;
+  if(cost<=0){
+    marginPreview.textContent='Margen: defina costo mayor que 0';
+    return;
+  }
+  const margin=((price-cost)/cost)*100;
+  marginPreview.textContent=`Margen: ${margin.toFixed(1)}%`;
+}
+
+useCost.addEventListener('change',()=>{
+  costField.disabled=!useCost.checked;
+  if(!useCost.checked){
+    costField.value='';
+  }
+  renderMargin();
+});
+costField.addEventListener('input',renderMargin);
+priceField.addEventListener('input',renderMargin);
 </script>
 {% endblock %}

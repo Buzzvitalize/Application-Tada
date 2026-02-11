@@ -38,6 +38,7 @@ class Product(db.Model):
     name = db.Column(db.String(120), nullable=False)
     unit = db.Column(db.String(20), nullable=False)
     price = db.Column(db.Float, nullable=False)
+    cost_price = db.Column(db.Float)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
     stock = db.Column(db.Integer, default=0)

@@ -61,22 +61,26 @@
       <a href="#" data-format="pdf" class="block px-4 py-2 hover:bg-gray-100">PDF</a>
     </div>
   </div>
-  <div class="md:col-span-5 flex flex-wrap gap-2 mt-2">
-    <button class="btn" type="submit">Aplicar filtros</button>
-    <button class="btn" type="button" id="resetFilters">Limpiar filtros</button>
-    <div class="flex gap-1">
-      <button type="button" data-range="today" class="btn text-xs">Hoy</button>
-      <button type="button" data-range="7" class="btn text-xs">Últimos 7 días</button>
-      <button type="button" data-range="month" class="btn text-xs">Este mes</button>
-      <button type="button" data-range="year" class="btn text-xs">Este año</button>
+  <div class="md:col-span-5 mt-2">
+    <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <button class="btn-primary" type="submit">Aplicar filtros</button>
+      <button class="btn-secondary" type="button" id="resetFilters">Limpiar filtros</button>
+      <div class="h-6 w-px bg-gray-300 mx-1"></div>
+      <div class="flex flex-wrap gap-1">
+        <button type="button" data-range="today" class="btn-secondary text-xs">Hoy</button>
+        <button type="button" data-range="7" class="btn-secondary text-xs">Últimos 7 días</button>
+        <button type="button" data-range="month" class="btn-secondary text-xs">Este mes</button>
+        <button type="button" data-range="year" class="btn-secondary text-xs">Este año</button>
+      </div>
+      <div class="h-6 w-px bg-gray-300 mx-1"></div>
+      <a href="{{ url_for('inventory_report') }}" class="btn-secondary">Ver inventario</a>
+      <a href="{{ url_for('export_history') }}" class="btn-secondary ml-auto">Ver historial</a>
+      <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
     </div>
-    <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
-    <a href="{{ url_for('inventory_report') }}" class="btn">Ver inventario</a>
-    <a href="{{ url_for('export_history') }}" class="btn ml-auto">Ver historial</a>
   </div>
 </form>
 
-<div class="grid md:grid-cols-6 gap-4 mb-6">
+<div class="grid md:grid-cols-4 gap-4 mb-6">
   <div class="card text-center">
     <div class="text-sm text-gray-500">Ventas Totales</div>
     <div class="text-2xl font-bold">{{ stats.total_sales | money }}</div>
@@ -120,6 +124,18 @@
   <div class="card text-center">
     <div class="text-sm text-gray-500">Retención</div>
     <div class="text-2xl font-bold">{{ '%.1f%%'|format(stats.retention) }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">ITBIS acumulado</div>
+    <div class="text-2xl font-bold">{{ stats.itbis_accumulated | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ventas sin ITBIS</div>
+    <div class="text-2xl font-bold">{{ stats.net_sales | money }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ganancia estimada</div>
+    <div class="text-2xl font-bold">{{ stats.estimated_profit | money }}</div>
   </div>
 </div>
 
@@ -422,9 +438,6 @@ document.querySelectorAll('[data-range]').forEach(btn => {
   });
 });
 
-document.getElementById('filters').addEventListener('change', (e) => {
-  if(e.target.id !== 'exportTipo') document.getElementById('filters').submit();
-});
 document.getElementById('filters').addEventListener('submit', () => {
   spinner.classList.remove('hidden');
 });
