@@ -42,6 +42,63 @@ Each table stores a `company_id` and regular users with role `company` only acce
 
 An experimental endpoint `/api/recommendations` returns the top-selling products as basic "AI" suggestions.
 
+
+## Docker deployment
+
+You can run the project in Docker with SQLite persistence and uploads persistence:
+
+1. **Prepare environment variables**
+
+   Create a `.env` file next to `docker-compose.yml` (or export vars in your shell):
+
+   ```env
+   SECRET_KEY=your_long_random_secret
+   MAIL_SERVER=smtp.example.com
+   MAIL_PORT=587
+   MAIL_USERNAME=user@example.com
+   MAIL_PASSWORD=supersecret
+   MAIL_DEFAULT_SENDER=tiendix@example.com
+   ```
+
+2. **Build and start containers**
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. **Open the app**
+
+   - URL: `http://localhost:5000`
+
+4. **(Optional) seed initial data**
+
+   ```bash
+   docker compose exec web python scripts/seed_db.py
+   ```
+
+5. **See logs / stop service**
+
+   ```bash
+   docker compose logs -f web
+   docker compose down
+   ```
+
+### How this Docker setup works
+
+- `Dockerfile` builds a Python 3.11 image with dependencies needed by Flask and WeasyPrint.
+- `docker-compose.yml` runs the app as service `web` on port `5000`.
+- `APP_CONFIG=production` switches the app to `ProductionConfig`.
+- `DATABASE_URL=sqlite:////data/database.sqlite` stores the DB in the named volume `tiendix_data`.
+- Uploaded logos/files are stored in `tiendix_uploads` mounted at `/app/static/uploads`.
+
+### Deploying to a server (quick procedure)
+
+1. Install Docker + Docker Compose plugin on the server.
+2. Copy project files to server (`git clone ...`).
+3. Create `.env` with production values (`SECRET_KEY`, mail settings).
+4. Run `docker compose up -d --build`.
+5. Put Nginx/Caddy in front (optional but recommended) for HTTPS and custom domain.
+
 ## Setup
 
 ```

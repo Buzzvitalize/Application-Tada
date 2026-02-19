@@ -67,7 +67,7 @@ from account_pdf import generate_account_statement_pdf
 from functools import wraps
 from auth import auth_bp, generate_reset_token
 from forms import AccountRequestForm
-from config import DevelopmentConfig
+from config import DevelopmentConfig, ProductionConfig, TestingConfig
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover
@@ -96,7 +96,13 @@ if os.path.exists(DATA_PATH):
                     RNC_DATA[rnc] = name
 
 app = Flask(__name__)
-app.config.from_object(DevelopmentConfig)
+config_map = {
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'testing': TestingConfig,
+}
+app_config = os.getenv('APP_CONFIG', 'development').lower()
+app.config.from_object(config_map.get(app_config, DevelopmentConfig))
 
 if not os.path.exists('logs'):
     os.makedirs('logs')
