@@ -241,6 +241,86 @@ def test_profit_metrics_split_cost_vs_missing_cost(client):
     client.get('/logout')
 
 
+def test_kpi_percentage_changes_vs_previous_period(client):
+    with app.app_context():
+        comp = CompanyInfo.query.first()
+        cli = Client.query.first()
+        prod = Product(code='P_DELTA', name='Delta', unit='Unidad', price=100, cost_price=50, company_id=comp.id)
+        db.session.add(prod)
+        db.session.flush()
+
+        # Previous equivalent period (1 day): 2025-01-09
+        prev_order = Order(client_id=cli.id, subtotal=100, itbis=18, total=118, company_id=comp.id)
+        db.session.add(prev_order)
+        db.session.flush()
+        prev_inv = Invoice(
+            client_id=cli.id,
+            order_id=prev_order.id,
+            subtotal=100,
+            itbis=18,
+            total=118,
+            invoice_type='Consumidor Final',
+            status='Pagada',
+            payment_method='Efectivo',
+            company_id=comp.id,
+            date=datetime(2025, 1, 9),
+        )
+        db.session.add(prev_inv)
+        db.session.flush()
+        db.session.add(
+            InvoiceItem(
+                invoice_id=prev_inv.id,
+                code='P_DELTA',
+                product_name='Delta',
+                unit='Unidad',
+                unit_price=100,
+                quantity=1,
+                category='Alimentos y Bebidas',
+                company_id=comp.id,
+            )
+        )
+
+        # Current period (1 day): 2025-01-10 (double values => +100%)
+        cur_order = Order(client_id=cli.id, subtotal=200, itbis=36, total=236, company_id=comp.id)
+        db.session.add(cur_order)
+        db.session.flush()
+        cur_inv = Invoice(
+            client_id=cli.id,
+            order_id=cur_order.id,
+            subtotal=200,
+            itbis=36,
+            total=236,
+            invoice_type='Consumidor Final',
+            status='Pagada',
+            payment_method='Efectivo',
+            company_id=comp.id,
+            date=datetime(2025, 1, 10),
+        )
+        db.session.add(cur_inv)
+        db.session.flush()
+        db.session.add(
+            InvoiceItem(
+                invoice_id=cur_inv.id,
+                code='P_DELTA',
+                product_name='Delta',
+                unit='Unidad',
+                unit_price=100,
+                quantity=2,
+                category='Alimentos y Bebidas',
+                company_id=comp.id,
+            )
+        )
+        db.session.commit()
+
+    login(client, 'user', 'pass')
+    resp = client.get('/reportes?fecha_inicio=2025-01-10&fecha_fin=2025-01-10&ajax=1')
+    data = resp.get_json()
+    assert round(data['kpi_changes']['net_sales'], 1) == 100.0
+    assert round(data['kpi_changes']['itbis_accumulated'], 1) == 100.0
+    assert round(data['kpi_changes']['estimated_profit_with_cost'], 1) == 100.0
+    client.get('/logout')
+
+
 def test_mark_invoice_paid(client):
     with app.app_context():
         comp = CompanyInfo.query.first()

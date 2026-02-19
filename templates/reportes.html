@@ -128,14 +128,26 @@
   <div class="card text-center">
     <div class="text-sm text-gray-500">ITBIS acumulado</div>
     <div class="text-2xl font-bold">{{ stats.itbis_accumulated | money }}</div>
+    {% set itbis_change = kpi_changes.itbis_accumulated %}
+    <div class="mt-1 text-xs font-semibold {% if itbis_change is none %}text-gray-500{% elif itbis_change >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+      {% if itbis_change is none %}N/D{% elif itbis_change >= 0 %}+{{ '%.1f'|format(itbis_change) }}%{% else %}{{ '%.1f'|format(itbis_change) }}%{% endif %}
+    </div>
   </div>
   <div class="card text-center">
     <div class="text-sm text-gray-500">Ventas sin ITBIS</div>
     <div class="text-2xl font-bold">{{ stats.net_sales | money }}</div>
+    {% set net_change = kpi_changes.net_sales %}
+    <div class="mt-1 text-xs font-semibold {% if net_change is none %}text-gray-500{% elif net_change >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+      {% if net_change is none %}N/D{% elif net_change >= 0 %}+{{ '%.1f'|format(net_change) }}%{% else %}{{ '%.1f'|format(net_change) }}%{% endif %}
+    </div>
   </div>
   <div class="card text-center">
     <div class="text-sm text-gray-500">Ganancia estimada (con costo cargado)</div>
     <div class="text-2xl font-bold">{{ stats.estimated_profit_with_cost | money }}</div>
+    {% set profit_change = kpi_changes.estimated_profit_with_cost %}
+    <div class="mt-1 text-xs font-semibold {% if profit_change is none %}text-gray-500{% elif profit_change >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+      {% if profit_change is none %}N/D{% elif profit_change >= 0 %}+{{ '%.1f'|format(profit_change) }}%{% else %}{{ '%.1f'|format(profit_change) }}%{% endif %}
+    </div>
   </div>
   <div class="card text-center">
     <div class="text-sm text-gray-500">Ventas sin costo registrado</div>

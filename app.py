@@ -465,6 +465,13 @@ def _validate_product_cost_inputs(price, use_cost, cost_price_raw):
     return True, cost_price, None
 
 
+def _pct_change(current, previous):
+    """Return percentage change or None when previous is zero/missing."""
+    if previous in (None, 0):
+        return None
+    return ((current - previous) / previous) * 100
+
+
 def generate_reference(name: str) -> str:
     """Generate a unique reference based on product name."""
     prefix = ''.join(ch for ch in (name or '').upper() if ch.isalnum())[:3]
@@ -2223,6 +2230,55 @@ def reportes():
     )
     estimated_profit = estimated_profit_with_cost
 
+    kpi_changes = {
+        'net_sales': None,
+        'itbis_accumulated': None,
+        'estimated_profit_with_cost': None,
+    }
+    if start and end:
+        period_days = (end.date() - start.date()).days + 1
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=period_days - 1)
+
+        q_prev = _filtered_invoice_query(prev_start, prev_end, estado, categoria)
+        prev_itbis, prev_net_sales = (
+            q_prev.with_entities(
+                func.coalesce(func.sum(Invoice.itbis), 0),
+                func.coalesce(func.sum(Invoice.subtotal), 0),
+            ).first()
+        )
+
+        prev_profit_query = company_query(InvoiceItem).join(Invoice)
+        prev_profit_query = prev_profit_query.filter(Invoice.date >= prev_start, Invoice.date <= prev_end)
+        if estado:
+            prev_profit_query = prev_profit_query.filter(Invoice.status == estado)
+        if categoria:
+            prev_profit_query = prev_profit_query.filter(InvoiceItem.category == categoria)
+        prev_profit_with_cost = (
+            prev_profit_query
+            .outerjoin(
+                Product,
+                (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
+            )
+            .filter(Product.cost_price.isnot(None))
+            .with_entities(
+                func.coalesce(
+                    func.sum(
+                        ((InvoiceItem.unit_price - Product.cost_price) * InvoiceItem.quantity)
+                        - InvoiceItem.discount
+                    ),
+                    0,
+                )
+            )
+            .scalar()
+        )
+
+        kpi_changes = {
+            'net_sales': _pct_change(net_sales, prev_net_sales),
+            'itbis_accumulated': _pct_change(itbis_accumulated, prev_itbis),
+            'estimated_profit_with_cost': _pct_change(estimated_profit_with_cost, prev_profit_with_cost),
+        }
+
     # trend last 24 months
     trend_query = (
         q.with_entities(func.strftime('%Y-%m', Invoice.date), func.sum(Invoice.total))
@@ -2355,6 +2411,7 @@ def reportes():
                     for i in invoices
                 ],
                 'pagination': {'page': pagination.page, 'pages': pagination.pages},
+                'kpi_changes': kpi_changes,
             }
         )
 
@@ -2377,6 +2434,7 @@ def reportes():
         status_values=status_values,
         method_labels=method_labels,
         method_values=method_values,
+        kpi_changes=kpi_changes,
         months=months,
         year_current=year_current,
         year_prev=year_prev,
