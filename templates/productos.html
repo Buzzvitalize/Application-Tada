@@ -5,6 +5,7 @@
 <div class="mb-4 flex flex-wrap gap-2">
   <a href="{{ url_for('products_import') }}" class="btn-secondary">Importar CSV</a>
   <a href="{{ url_for('export_products', cat=current_cat) }}" class="btn-secondary">Exportar productos</a>
+  <a href="{{ url_for('product_price_history') }}" class="btn-secondary">Historial de precios</a>
 </div>
 <form method="post" class="card mb-6 space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

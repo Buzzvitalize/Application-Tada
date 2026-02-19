@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Historial de precios{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold">Historial de precios</h1>
+  <a href="{{ url_for('products') }}" class="btn-secondary">Volver a productos</a>
+</div>
+<form method="get" class="card mb-4 flex flex-wrap items-end gap-3">
+  <div>
+    <label class="block text-xs text-gray-600 mb-1">Producto</label>
+    <select name="product_id" class="input">
+      <option value="">Todos</option>
+      {% for p in products %}
+      <option value="{{ p.id }}" {% if current_product_id == p.id %}selected{% endif %}>{{ p.code }} - {{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn-primary">Filtrar</button>
+  <a href="{{ url_for('product_price_history') }}" class="btn-secondary">Limpiar</a>
+</form>
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">Fecha</th>
+        <th class="p-2 text-left">Producto</th>
+        <th class="p-2 text-left">Precio (antes → nuevo)</th>
+        <th class="p-2 text-left">Costo (antes → nuevo)</th>
+        <th class="p-2 text-left">Usuario</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr class="border-b">
+        <td class="p-2">{{ log.changed_at.strftime('%Y-%m-%d %H:%M') if log.changed_at else '-' }}</td>
+        <td class="p-2">{{ log.product.code if log.product else '-' }} - {{ log.product.name if log.product else '-' }}</td>
+        <td class="p-2">{{ log.old_price | money if log.old_price is not none else '-' }} → {{ log.new_price | money }}</td>
+        <td class="p-2">{{ log.old_cost_price | money if log.old_cost_price is not none else '-' }} → {{ log.new_cost_price | money if log.new_cost_price is not none else '-' }}</td>
+        <td class="p-2">{{ log.user.username if log.user else 'Sistema' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="p-4 text-center text-gray-500">Sin cambios registrados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

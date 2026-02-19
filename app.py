@@ -37,6 +37,7 @@ from models import (
     InventoryMovement,
     Warehouse,
     ProductStock,
+    ProductPriceLog,
     CompanyInfo,
     User,
     AccountRequest,
@@ -321,6 +322,21 @@ def _migrate_legacy_schema():
         if 'cost_price' not in product_cols:
             statements.append("ALTER TABLE product ADD COLUMN cost_price FLOAT")
 
+    if not inspector.has_table('product_price_log'):
+        statements.append(
+            """CREATE TABLE product_price_log (
+                id INTEGER PRIMARY KEY,
+                product_id INTEGER NOT NULL REFERENCES product(id),
+                old_price FLOAT,
+                new_price FLOAT NOT NULL,
+                old_cost_price FLOAT,
+                new_cost_price FLOAT,
+                changed_by INTEGER REFERENCES user(id),
+                changed_at DATETIME NOT NULL,
+                company_id INTEGER NOT NULL REFERENCES company_info(id)
+            )"""
+        )
+
     if inspector.has_table('user'):
         try:
             user_cols = {c['name'] for c in inspector.get_columns('user')}
@@ -471,6 +487,24 @@ def _pct_change(current, previous):
         return None
     return ((current - previous) / previous) * 100
 
+
+
+
+def _log_product_price_change(product, old_price, old_cost_price):
+    """Persist a price/cost change log row when values changed."""
+    if old_price == product.price and old_cost_price == product.cost_price:
+        return
+    db.session.add(
+        ProductPriceLog(
+            product_id=product.id,
+            old_price=old_price,
+            new_price=product.price,
+            old_cost_price=old_cost_price,
+            new_cost_price=product.cost_price,
+            changed_by=session.get('user_id'),
+            company_id=current_company_id(),
+        )
+    )
 
 def generate_reference(name: str) -> str:
     """Generate a unique reference based on product name."""
@@ -1104,6 +1138,8 @@ def products():
             company_id=current_company_id()
         )
         db.session.add(product)
+        db.session.flush()
+        _log_product_price_change(product, None, None)
         db.session.commit()
         flash('Producto agregado')
         if warning_msg:
@@ -1479,6 +1515,8 @@ def delete_warehouse(w_id):
 def edit_product(product_id):
     product = company_get(Product, product_id)
     if request.method == 'POST':
+        old_price = product.price
+        old_cost_price = product.cost_price
         product.code = request.form['code']
         product.reference = request.form.get('reference') or generate_reference(request.form['name'])
         product.name = request.form['name']
@@ -1495,12 +1533,30 @@ def edit_product(product_id):
         product.cost_price = cost_price
         product.category = request.form.get('category')
         product.has_itbis = bool(request.form.get('has_itbis'))
+        _log_product_price_change(product, old_price, old_cost_price)
         db.session.commit()
         flash('Producto actualizado')
         if warning_msg:
             flash(warning_msg)
         return redirect(url_for('products'))
     return render_template('producto_form.html', product=product, units=UNITS, categories=CATEGORIES)
+
+
+
+@app.route('/productos/historial-precios')
+def product_price_history():
+    product_id = request.args.get('product_id', type=int)
+    logs_q = (
+        company_query(ProductPriceLog)
+        .options(joinedload(ProductPriceLog.product), joinedload(ProductPriceLog.user))
+        .order_by(ProductPriceLog.changed_at.desc())
+    )
+    if product_id:
+        logs_q = logs_q.filter(ProductPriceLog.product_id == product_id)
+    logs = logs_q.limit(200).all()
+    products = company_query(Product).order_by(Product.name).all()
+    return render_template('product_price_history.html', logs=logs, products=products, current_product_id=product_id)
+
 
 # Quotations
 @app.route('/cotizaciones')
