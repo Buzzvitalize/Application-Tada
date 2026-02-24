@@ -18,12 +18,25 @@
       </button>
     </div>
     <nav class="px-2 py-4 space-y-1 flex-1 overflow-y-auto">
+      {% set endpoint = request.endpoint or '' %}
       <a href="{{ url_for('list_quotations') }}" class="nav-link">Cotizaciones</a>
       <a href="{{ url_for('list_orders') }}" class="nav-link">Pedidos</a>
       <a href="{{ url_for('list_invoices') }}" class="nav-link">Facturas</a>
       <a href="{{ url_for('clients') }}" class="nav-link">Clientes</a>
-      <a href="{{ url_for('products') }}" class="nav-link">Productos</a>
-      <a href="{{ url_for('inventory_report') }}" class="nav-link">Inventario</a>
+
+      <details class="rounded" {% if endpoint in ['products', 'products_import', 'inventory_report', 'inventory_adjust', 'inventory_import', 'inventory_transfer', 'warehouses'] %}open{% endif %}>
+        <summary class="nav-link cursor-pointer list-none flex items-center justify-between">
+          <span>Productos</span>
+          <span class="text-xs text-gray-400">Submenú</span>
+        </summary>
+        <div class="ml-3 mt-1 space-y-1 border-l border-gray-700 pl-3">
+          <a href="{{ url_for('products') }}" class="nav-link text-sm">Catálogo</a>
+          <a href="{{ url_for('inventory_report') }}" class="nav-link text-sm">Inventario</a>
+          <a href="{{ url_for('products_import') }}" class="nav-link text-sm">Importar productos</a>
+          <a href="{{ url_for('export_products') }}" class="nav-link text-sm">Exportar productos</a>
+        </div>
+      </details>
+
       <a href="{{ url_for('reportes') }}" class="nav-link">Reportes</a>
       <a href="{{ url_for('contabilidad') }}" class="nav-link">Contabilidad</a>
       {% if session.get('role') == 'admin' %}

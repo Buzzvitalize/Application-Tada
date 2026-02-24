@@ -4,7 +4,10 @@
 <h1 class="text-2xl font-semibold mb-4">Editar Producto</h1>
 <form method="post" class="card space-y-4 max-w-4xl mx-auto">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="grid md:grid-cols-7 gap-4 items-center">
+  <p class="text-sm text-gray-600">
+    Si activa <strong>Usar costo</strong>, ingrese un costo mayor que 0. Se mostrará advertencia si el margen queda bajo o por debajo de 0%.
+  </p>
+  <div class="grid md:grid-cols-8 gap-4 items-center">
     <input id="name" name="name" value="{{ product.name }}" placeholder="Nombre" class="input" required>
     <select name="unit" class="input" required>
       {% for u in units %}
@@ -14,6 +17,14 @@
     <input name="code" value="{{ product.code }}" placeholder="Código" class="input" required>
     <input id="reference" name="reference" value="{{ product.reference }}" placeholder="Referencia" class="input" readonly>
     <input name="price" value="{{ '%.2f'|format(product.price) }}" placeholder="Precio" class="input" required>
+    <div class="space-y-1">
+      <label class="flex items-center space-x-2 text-sm text-gray-700">
+        <input type="checkbox" id="use-cost" name="use_cost" {% if product.cost_price is not none %}checked{% endif %}>
+        <span>Usar costo</span>
+      </label>
+      <input id="cost-price" name="cost_price" value="{{ '%.2f'|format(product.cost_price) if product.cost_price is not none else '' }}" placeholder="Costo" class="input" {% if product.cost_price is none %}disabled{% endif %}>
+      <p id="margin-preview" class="text-xs text-gray-500">Margen: —</p>
+    </div>
     <select name="category" class="input" required>
       {% for c in categories %}
       <option value="{{ c }}" {% if product.category == c %}selected{% endif %}>{{ c }}</option>
@@ -37,6 +48,36 @@ document.getElementById('name').addEventListener('blur', async function(){
   const data = await res.json();
   document.getElementById('reference').value = data.reference;
 });
+
+const useCost=document.getElementById('use-cost');
+const costField=document.getElementById('cost-price');
+const priceField=document.querySelector('input[name="price"]');
+const marginPreview=document.getElementById('margin-preview');
+
+function renderMargin(){
+  if(!useCost.checked){
+    marginPreview.textContent='Margen: —';
+    return;
+  }
+  const cost=parseFloat(costField.value)||0;
+  const price=parseFloat(priceField.value)||0;
+  if(cost<=0){
+    marginPreview.textContent='Margen: defina costo mayor que 0';
+    return;
+  }
+  const margin=((price-cost)/cost)*100;
+  marginPreview.textContent=`Margen: ${margin.toFixed(1)}%`;
+}
+
+useCost.addEventListener('change',()=>{
+  costField.disabled=!useCost.checked;
+  if(!useCost.checked){
+    costField.value='';
+  }
+  renderMargin();
+});
+costField.addEventListener('input',renderMargin);
+priceField.addEventListener('input',renderMargin);
+renderMargin();
 </script>
 {% endblock %}
-

@@ -11,30 +11,17 @@ from flask import (
     jsonify,
     g,
     current_app,
+    Response,
+    stream_with_context,
 )
-try:
-    from flask_migrate import Migrate
-except ModuleNotFoundError:  # pragma: no cover
-    class Migrate:
-        def __init__(self, *a, **k):
-            pass
-        def init_app(self, *a, **k):
-            pass
+from flask_migrate import Migrate, upgrade
 import logging
 from logging.handlers import RotatingFileHandler
 import smtplib
 from email.mime.text import MIMEText
-try:
-    from flask_wtf import CSRFProtect
-except ModuleNotFoundError:  # pragma: no cover
-    class CSRFProtect:
-        def __init__(self, app=None):
-            if app:
-                self.init_app(app)
-        def init_app(self, app):
-            pass
-        def exempt(self, view):
-            return view
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from flask_wtf import CSRFProtect
 from models import (
     db,
     migrate,
@@ -50,6 +37,7 @@ from models import (
     InventoryMovement,
     Warehouse,
     ProductStock,
+    ProductPriceLog,
     CompanyInfo,
     User,
     AccountRequest,
@@ -65,7 +53,8 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     Workbook = None
 from datetime import datetime, timedelta
-from sqlalchemy import func, inspect
+from sqlalchemy import func, inspect, or_
+from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import load_only, joinedload
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
@@ -76,8 +65,9 @@ from ai import recommend_products
 from weasy_pdf import generate_pdf
 from account_pdf import generate_account_statement_pdf
 from functools import wraps
-from auth import auth_bp
-from config import DevelopmentConfig
+from auth import auth_bp, generate_reset_token
+from forms import AccountRequestForm
+from config import DevelopmentConfig, ProductionConfig, TestingConfig
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover
@@ -106,7 +96,13 @@ if os.path.exists(DATA_PATH):
                     RNC_DATA[rnc] = name
 
 app = Flask(__name__)
-app.config.from_object(DevelopmentConfig)
+config_map = {
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'testing': TestingConfig,
+}
+app_config = os.getenv('APP_CONFIG', 'development').lower()
+app.config.from_object(config_map.get(app_config, DevelopmentConfig))
 
 if not os.path.exists('logs'):
     os.makedirs('logs')
@@ -117,27 +113,33 @@ app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 app.logger.info('Tiendix startup')
 
-SMTP_HOST = os.getenv('SMTP_HOST')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-SMTP_USER = os.getenv('SMTP_USER')
-SMTP_PASS = os.getenv('SMTP_PASS')
-SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER)
+MAIL_SERVER = os.getenv('MAIL_SERVER')
+MAIL_PORT = int(os.getenv('MAIL_PORT', 587))
+MAIL_USERNAME = os.getenv('MAIL_USERNAME')
+MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
+MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', MAIL_USERNAME)
 
 
-def send_email(to, subject, html):
-    if not SMTP_HOST or not SMTP_FROM:
+def send_email(to, subject, html, attachments=None):
+    if not MAIL_SERVER or not MAIL_DEFAULT_SENDER:
         app.logger.warning('Email settings missing; skipping send to %s', to)
         return
-    msg = MIMEText(html, 'html')
+    msg = MIMEMultipart()
     msg['Subject'] = subject
-    msg['From'] = SMTP_FROM
+    msg['From'] = MAIL_DEFAULT_SENDER
     msg['To'] = to
+    msg.attach(MIMEText(html, 'html'))
+    for attachment in attachments or []:
+        filename, data = attachment
+        part = MIMEApplication(data, Name=filename)
+        part['Content-Disposition'] = f'attachment; filename="{filename}"'
+        msg.attach(part)
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-            if SMTP_USER and SMTP_PASS:
+        with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as s:
+            if MAIL_USERNAME and MAIL_PASSWORD:
                 s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(SMTP_FROM, [to], msg.as_string())
+                s.login(MAIL_USERNAME, MAIL_PASSWORD)
+            s.sendmail(MAIL_DEFAULT_SENDER, [to], msg.as_string())
     except Exception as e:  # pragma: no cover
         app.logger.error('Email send failed: %s', e)
 
@@ -151,8 +153,6 @@ app.jinja_env.filters['money'] = _fmt_money
 db.init_app(app)
 migrate.init_app(app, db)
 csrf = CSRFProtect(app)
-if 'csrf_token' not in app.jinja_env.globals:
-    app.jinja_env.globals['csrf_token'] = lambda: ''
 app.register_blueprint(auth_bp)
 
 # The database schema is managed via Flask-Migrate.  Tables should be
@@ -215,22 +215,84 @@ def _export_job(app_obj, company_id, user, start, end, estado, categoria, format
                 q = q.filter(Invoice.status == estado)
             if categoria:
                 q = q.join(Invoice.items).filter(InvoiceItem.category == categoria)
-            invoices = q.options(
-                joinedload(Invoice.client),
-                load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
-            ).all()
             path = os.path.join('maint', f'export_{entry_id}.{formato}')
             if formato == 'csv':
                 with open(path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f)
-                    writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
-                    for inv in invoices:
-                        writer.writerow([
+                    if tipo == 'resumen':
+                        writer.writerow(['Categoría', 'Cantidad', 'Total'])
+                        summary = (
+                            company_query(InvoiceItem)
+                            .join(Invoice)
+                            .with_entities(
+                                InvoiceItem.category,
+                                func.count(InvoiceItem.id),
+                                func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                            )
+                            .group_by(InvoiceItem.category)
+                        )
+                        if start:
+                            summary = summary.filter(Invoice.date >= start)
+                        if end:
+                            summary = summary.filter(Invoice.date <= end)
+                        if estado:
+                            summary = summary.filter(Invoice.status == estado)
+                        if categoria:
+                            summary = summary.filter(InvoiceItem.category == categoria)
+                        for cat, cnt, tot in summary:
+                            writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
+                    else:
+                        writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+                        stream_q = q.options(
+                            joinedload(Invoice.client),
+                            load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                        ).yield_per(100)
+                        for inv in stream_q:
+                            writer.writerow([
+                                inv.client.name if inv.client else '',
+                                inv.date.strftime('%Y-%m-%d'),
+                                inv.status or '',
+                                f"{inv.total:.2f}",
+                            ])
+            elif formato == 'xlsx' and Workbook is not None:
+                wb = Workbook()
+                ws = wb.active
+                if tipo == 'resumen':
+                    ws.append(['Categoría', 'Cantidad', 'Total'])
+                    summary = (
+                        company_query(InvoiceItem)
+                        .join(Invoice)
+                        .with_entities(
+                            InvoiceItem.category,
+                            func.count(InvoiceItem.id),
+                            func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                        )
+                        .group_by(InvoiceItem.category)
+                    )
+                    if start:
+                        summary = summary.filter(Invoice.date >= start)
+                    if end:
+                        summary = summary.filter(Invoice.date <= end)
+                    if estado:
+                        summary = summary.filter(Invoice.status == estado)
+                    if categoria:
+                        summary = summary.filter(InvoiceItem.category == categoria)
+                    for cat, cnt, tot in summary:
+                        ws.append([cat or 'Sin categoría', cnt, float(tot or 0)])
+                else:
+                    ws.append(['Cliente', 'Fecha', 'Estado', 'Total'])
+                    stream_q = q.options(
+                        joinedload(Invoice.client),
+                        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                    ).yield_per(100)
+                    for inv in stream_q:
+                        ws.append([
                             inv.client.name if inv.client else '',
                             inv.date.strftime('%Y-%m-%d'),
                             inv.status or '',
-                            f"{inv.total:.2f}",
+                            float(inv.total),
                         ])
+                wb.save(path)
             entry = ExportLog.query.get(entry_id)
             entry.status = 'success'
             entry.file_path = path
@@ -251,21 +313,40 @@ def _migrate_legacy_schema():
     """
     inspector = inspect(db.engine)
     statements = []
-    product_cols = {c['name'] for c in inspector.get_columns('product')}
-    if 'category' not in product_cols:
-        statements.append("ALTER TABLE product ADD COLUMN category VARCHAR(50)")
-    if 'unit' not in product_cols:
-        statements.append("ALTER TABLE product ADD COLUMN unit VARCHAR(20) DEFAULT 'Unidad'")
-    if 'has_itbis' not in product_cols:
-        statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
 
-    user_cols = {c['name'] for c in inspector.get_columns('user')}
-    if 'email' not in user_cols:
-        statements.append("ALTER TABLE user ADD COLUMN email VARCHAR(120)")
-    if 'first_name' not in user_cols:
-        statements.append("ALTER TABLE user ADD COLUMN first_name VARCHAR(120) DEFAULT ''")
-    if 'last_name' not in user_cols:
-        statements.append("ALTER TABLE user ADD COLUMN last_name VARCHAR(120) DEFAULT ''")
+    if inspector.has_table('product'):
+        try:
+            product_cols = {c['name'] for c in inspector.get_columns('product')}
+        except NoSuchTableError:  # pragma: no cover - sqlite reflection race
+            product_cols = set()
+        if 'category' not in product_cols:
+            statements.append("ALTER TABLE product ADD COLUMN category VARCHAR(50)")
+        if 'unit' not in product_cols:
+            statements.append("ALTER TABLE product ADD COLUMN unit VARCHAR(20) DEFAULT 'Unidad'")
+        if 'has_itbis' not in product_cols:
+            statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
+
+    if inspector.has_table('user'):
+        try:
+            user_cols = {c['name'] for c in inspector.get_columns('user')}
+        except NoSuchTableError:  # pragma: no cover - sqlite reflection race
+            user_cols = set()
+        if 'email' not in user_cols:
+            statements.append("ALTER TABLE user ADD COLUMN email VARCHAR(120)")
+        if 'first_name' not in user_cols:
+            statements.append("ALTER TABLE user ADD COLUMN first_name VARCHAR(120) DEFAULT ''")
+        if 'last_name' not in user_cols:
+            statements.append("ALTER TABLE user ADD COLUMN last_name VARCHAR(120) DEFAULT ''")
+
+    if inspector.has_table('inventory_movement'):
+        try:
+            im_cols = {c['name'] for c in inspector.get_columns('inventory_movement')}
+        except NoSuchTableError:  # pragma: no cover - sqlite reflection race
+            im_cols = set()
+        if 'executed_by' not in im_cols:
+            statements.append(
+                "ALTER TABLE inventory_movement ADD COLUMN executed_by INTEGER REFERENCES user(id)"
+            )
 
     for stmt in statements:
         db.session.execute(db.text(stmt))
@@ -273,15 +354,32 @@ def _migrate_legacy_schema():
         db.session.commit()
 
 
-def ensure_admin():  # pragma: no cover - optional helper for deployments
+def run_auto_migrations():
+    """Apply Alembic migrations or fallback to ``create_all``.
+
+    This runs on import so that new fields are added automatically for
+    existing SQLite databases where developers might forget to run
+    ``flask db upgrade``.  It also calls :func:`_migrate_legacy_schema`
+    to patch columns that predate Alembic.
+    """
     with app.app_context():
+        try:  # Apply any pending migrations for safety
+            upgrade()
+        except Exception:  # pragma: no cover - fallback when migrations misconfigured
+            db.create_all()
+        inspector = inspect(db.engine)
         _migrate_legacy_schema()
-        if not User.query.filter_by(username='admin').first():
+        if inspector.has_table('user') and not User.query.filter_by(username='admin').first():
             admin = User(username='admin', role='admin', first_name='Admin', last_name='')
             admin.set_password(os.environ.get('ADMIN_PASSWORD', '363636'))
             db.session.add(admin)
             db.session.commit()
         db.session.remove()
+
+
+# Run migrations when the module is imported so that new fields are available
+# even if ``flask db upgrade`` wasn't executed manually.
+run_auto_migrations()
 
 # Utility constants
 ITBIS_RATE = 0.18
@@ -333,6 +431,54 @@ def _to_int(value):
     except (TypeError, ValueError):
         return 0
 
+
+def _validate_product_cost_inputs(price, use_cost, cost_price_raw):
+    """Validate optional product cost data and return normalized values.
+
+    Returns a tuple of: (is_valid, cost_price_or_none, warning_message_or_none).
+    """
+    if not use_cost:
+        return True, None, None
+
+    cost_price = _to_float(cost_price_raw)
+    if cost_price <= 0:
+        return False, None, 'El costo debe ser mayor que 0 cuando activa "Usar costo".'
+
+    margin = ((price - cost_price) / cost_price) * 100
+    if price < cost_price:
+        return True, cost_price, (
+            'Advertencia: el precio de venta está por debajo del costo. '
+            f'Margen actual: {margin:.1f}%.'
+        )
+    if margin < 5:
+        return True, cost_price, f'Advertencia: margen bajo ({margin:.1f}%).'
+    return True, cost_price, None
+
+
+def _pct_change(current, previous):
+    """Return percentage change or None when previous is zero/missing."""
+    if previous in (None, 0):
+        return None
+    return ((current - previous) / previous) * 100
+
+
+
+
+def _log_product_price_change(product, old_price, old_cost_price):
+    """Persist a price/cost change log row when values changed."""
+    if old_price == product.price and old_cost_price == product.cost_price:
+        return
+    db.session.add(
+        ProductPriceLog(
+            product_id=product.id,
+            old_price=old_price,
+            new_price=product.price,
+            old_cost_price=old_cost_price,
+            new_cost_price=product.cost_price,
+            changed_by=session.get('user_id'),
+            company_id=current_company_id(),
+        )
+    )
 
 def generate_reference(name: str) -> str:
     """Generate a unique reference based on product name."""
@@ -508,7 +654,15 @@ def get_company_info():
 # Routes
 @app.before_request
 def require_login():
-    allowed = {'auth.login', 'static', 'request_account', 'auth.logout'}
+    allowed = {
+        'auth.login',
+        'static',
+        'request_account',
+        'auth.logout',
+        'auth.reset_request',
+        'auth.reset_password',
+        'terminos',
+    }
     if request.endpoint not in allowed and 'user_id' not in session:
         return redirect(url_for('auth.login'))
     admin_extra = {'admin_companies', 'select_company', 'clear_company',
@@ -545,9 +699,15 @@ def index():
 
 
 @app.route('/solicitar-cuenta', methods=['GET', 'POST'])
-@csrf.exempt
 def request_account():
-    if request.method == 'POST':
+    form = AccountRequestForm()
+    if form.validate_on_submit():
+        if not form.accepted_terms.data:
+            flash(
+                'Debe aceptar los Términos y Condiciones para crear una cuenta en Tiendix.',
+                'request',
+            )
+            return redirect(url_for('request_account'))
         if request.form.get('password') != request.form.get('confirm_password'):
             flash('Las contraseñas no coinciden', 'request')
             return redirect(url_for('request_account'))
@@ -568,12 +728,27 @@ def request_account():
             website=request.form.get('website'),
             username=request.form['username'],
             password=generate_password_hash(request.form['password']),
+            accepted_terms=True,
+            accepted_terms_at=dom_now(),
+            accepted_terms_ip=request.remote_addr,
+            accepted_terms_user_agent=request.headers.get('User-Agent', ''),
         )
         db.session.add(req)
         db.session.commit()
         flash('Solicitud enviada, espere aprobación', 'login')
         return redirect(url_for('auth.login'))
-    return render_template('solicitar_cuenta.html')
+    elif request.method == 'POST':
+        flash(
+            'Debe aceptar los Términos y Condiciones para crear una cuenta en Tiendix.',
+            'request',
+        )
+        return redirect(url_for('request_account'))
+    return render_template('solicitar_cuenta.html', form=form)
+
+
+@app.route('/terminos')
+def terminos():
+    return render_template('terminos.html')
 
 
 @app.route('/admin/solicitudes')
@@ -625,16 +800,20 @@ def approve_request(req_id):
     db.session.add(company)
     db.session.flush()
     user = User(username=username, first_name=req.first_name, last_name=req.last_name, role=role, company_id=company.id)
-    user.set_password(password)
+    # ``req.password`` ya contiene el hash generado al recibir la solicitud.
+    user.password = password
     db.session.add(user)
     db.session.delete(req)
     db.session.commit()
+
+    # Envío de enlace temporal para establecer o restablecer contraseña
+    token = generate_reset_token(user)
     html = render_template(
         'emails/account_approved.html',
         username=username,
-        password=password,
         company=company.name,
         login_url=url_for('auth.login', _external=True),
+        reset_url=url_for('auth.reset_password', token=token, _external=True),
     )
     send_email(email, 'Tu cuenta ha sido aprobada', html)
     flash('Cuenta aprobada')
@@ -774,6 +953,17 @@ def clients():
         if not is_final and not identifier:
             flash('El RNC es obligatorio para empresas')
             return redirect(url_for('clients'))
+        if identifier:
+            exists = company_query(Client).filter(Client.identifier == identifier).first()
+            if exists:
+                flash('Ya existe un cliente con ese RNC/Cédula')
+                return redirect(url_for('clients'))
+        email = request.form.get('email')
+        if email:
+            exists = company_query(Client).filter(Client.email == email).first()
+            if exists:
+                flash('Ya existe un cliente con ese correo electrónico')
+                return redirect(url_for('clients'))
         client = Client(
             name=request.form['name'],
             last_name=last_name,
@@ -791,10 +981,23 @@ def clients():
         flash('Cliente agregado')
         notify('Cliente agregado')
         return redirect(url_for('clients'))
-    clients = company_query(Client).all()
-    return render_template('clientes.html', clients=clients)
+    q = request.args.get('q', '').strip()
+    page = request.args.get('page', 1, type=int)
+    query = company_query(Client)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Client.name.ilike(like),
+                Client.last_name.ilike(like),
+                Client.identifier.ilike(like),
+                Client.email.ilike(like),
+            )
+        )
+    clients = query.order_by(Client.id).paginate(page=page, per_page=25, error_out=False)
+    return render_template('clientes.html', clients=clients, q=q)
 
-@app.route('/clientes/delete/<int:client_id>')
+@app.route('/clientes/delete/<int:client_id>', methods=['POST'])
 def delete_client(client_id):
     client = company_get(Client, client_id)
     db.session.delete(client)
@@ -812,6 +1015,21 @@ def edit_client(client_id):
         if not is_final and not identifier:
             flash('El RNC es obligatorio para empresas')
             return redirect(url_for('edit_client', client_id=client.id))
+        if identifier:
+            exists = company_query(Client).filter(
+                Client.identifier == identifier, Client.id != client.id
+            ).first()
+            if exists:
+                flash('Ya existe un cliente con ese RNC/Cédula')
+                return redirect(url_for('edit_client', client_id=client.id))
+        email = request.form.get('email')
+        if email:
+            exists = company_query(Client).filter(
+                Client.email == email, Client.id != client.id
+            ).first()
+            if exists:
+                flash('Ya existe un cliente con ese correo electrónico')
+                return redirect(url_for('edit_client', client_id=client.id))
         client.name = request.form['name']
         client.last_name = last_name
         client.identifier = identifier
@@ -826,7 +1044,6 @@ def edit_client(client_id):
         return redirect(url_for('clients'))
     return render_template('cliente_form.html', client=client)
 
-@csrf.exempt
 @app.post('/api/clients')
 def api_create_client():
     data = request.get_json() or {}
@@ -837,6 +1054,15 @@ def api_create_client():
     last_name = data.get('last_name') if is_final else None
     if not is_final and not identifier:
         return {'error': 'El RNC es obligatorio para empresas'}, 400
+    if identifier:
+        exists = company_query(Client).filter(Client.identifier == identifier).first()
+        if exists:
+            return {'error': 'Identifier already exists'}, 400
+    email = data.get('email')
+    if email:
+        exists = company_query(Client).filter(Client.email == email).first()
+        if exists:
+            return {'error': 'Email already exists'}, 400
     client = Client(
         name=data.get('name'),
         last_name=last_name,
@@ -864,19 +1090,34 @@ def api_reference():
 def products():
     if request.method == 'POST':
         reference = request.form.get('reference') or generate_reference(request.form['name'])
+        use_cost = bool(request.form.get('use_cost'))
+        price = _to_float(request.form['price'])
+        valid_cost, cost_price, warning_msg = _validate_product_cost_inputs(
+            price,
+            use_cost,
+            request.form.get('cost_price'),
+        )
+        if not valid_cost:
+            flash('No se pudo guardar el producto: costo inválido. Debe ser mayor que 0.')
+            return redirect(url_for('products'))
         product = Product(
             code=request.form['code'],
             reference=reference,
             name=request.form['name'],
             unit=request.form['unit'],
-            price=_to_float(request.form['price']),
+            price=price,
+            cost_price=cost_price,
             category=request.form.get('category'),
             has_itbis=bool(request.form.get('has_itbis')),
             company_id=current_company_id()
         )
         db.session.add(product)
+        db.session.flush()
+        _log_product_price_change(product, None, None)
         db.session.commit()
         flash('Producto agregado')
+        if warning_msg:
+            flash(warning_msg)
         notify('Producto agregado')
         return redirect(url_for('products'))
     cat = request.args.get('cat')
@@ -916,6 +1157,37 @@ def products_import():
         return redirect(url_for('products'))
     return render_template('productos_importar.html')
 
+
+@app.route('/productos/export')
+def export_products():
+    """Export product catalog as CSV, optionally filtered by category."""
+    cat = request.args.get('cat')
+    query = company_query(Product)
+    if cat:
+        query = query.filter_by(category=cat)
+    products = query.order_by(Product.name.asc()).all()
+
+    mem = StringIO()
+    writer = csv.writer(mem)
+    writer.writerow(['code', 'reference', 'name', 'unit', 'price', 'cost_price', 'category', 'has_itbis'])
+    for p in products:
+        writer.writerow([
+            p.code,
+            p.reference or '',
+            p.name,
+            p.unit,
+            p.price,
+            p.cost_price if p.cost_price is not None else '',
+            p.category or '',
+            '1' if p.has_itbis else '0',
+        ])
+    mem.seek(0)
+    return Response(
+        mem.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=productos.csv'}
+    )
+
 @app.route('/productos/delete/<int:product_id>')
 def delete_product(product_id):
     product = company_get(Product, product_id)
@@ -928,25 +1200,49 @@ def delete_product(product_id):
 @app.route('/inventario')
 def inventory_report():
     wid = request.args.get('warehouse_id', type=int)
+    q = request.args.get('q', '').strip()
+    category = request.args.get('category', '')
+    status = request.args.get('status', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 25, type=int)
+
     warehouses = company_query(Warehouse).order_by(Warehouse.name).all()
     stocks = []
-    if wid:
-        stocks = (
-            company_query(ProductStock)
-            .filter_by(warehouse_id=wid)
-            .join(Product)
-            .order_by(Product.name)
-            .all()
-        )
-    elif warehouses:
+    pagination = None
+    movements = []
+    if not wid and warehouses:
         wid = warehouses[0].id
-        stocks = (
+    if wid:
+        query = (
             company_query(ProductStock)
             .filter_by(warehouse_id=wid)
             .join(Product)
-            .order_by(Product.name)
+        )
+        if q:
+            like = f"%{q}%"
+            query = query.filter(or_(Product.name.ilike(like), Product.code.ilike(like)))
+        if category:
+            query = query.filter(Product.category == category)
+        if status == 'low':
+            query = query.filter(ProductStock.stock > 0, ProductStock.stock <= ProductStock.min_stock)
+        elif status == 'zero':
+            query = query.filter(ProductStock.stock == 0)
+        elif status == 'normal':
+            query = query.filter(ProductStock.stock > ProductStock.min_stock)
+
+        pagination = (
+            query.order_by(Product.name)
+            .paginate(page=page, per_page=per_page, error_out=False)
+        )
+        stocks = pagination.items
+        movements = (
+            company_query(InventoryMovement)
+            .filter_by(warehouse_id=wid)
+            .order_by(InventoryMovement.timestamp.desc())
+            .limit(20)
             .all()
         )
+
     sales_total = (
         db.session.query(func.sum(Invoice.total))
         .filter_by(company_id=current_company_id(), warehouse_id=wid)
@@ -959,6 +1255,13 @@ def inventory_report():
         warehouses=warehouses,
         selected=wid,
         sales_total=sales_total,
+        pagination=pagination,
+        q=q,
+        category=category,
+        status=status,
+        categories=CATEGORIES,
+        per_page=per_page,
+        movements=movements,
     )
 
 
@@ -1011,6 +1314,7 @@ def inventory_adjust():
             movement_type=mtype,
             warehouse_id=wid,
             company_id=current_company_id(),
+            executed_by=session.get('user_id'),
         )
         db.session.add(mov)
         db.session.commit()
@@ -1030,45 +1334,75 @@ def inventory_import():
     if request.method == 'POST':
         wid = int(request.form['warehouse_id'])
         file = request.files.get('file')
-        if file and file.filename:
-            stream = StringIO(file.stream.read().decode('utf-8'))
-            reader = csv.DictReader(stream)
-            count = 0
-            for row in reader:
-                code = row.get('code')
-                if not code:
-                    continue
-                product = company_query(Product).filter_by(code=code).first()
-                if not product:
-                    continue
-                stock_qty = _to_int(row.get('stock'))
-                min_stock = _to_int(row.get('min_stock'))
-                product.stock = stock_qty
-                ps = (
-                    company_query(ProductStock)
-                    .filter_by(product_id=product.id, warehouse_id=wid)
-                    .first()
-                )
-                if not ps:
-                    ps = ProductStock(product_id=product.id, warehouse_id=wid, company_id=current_company_id())
-                    db.session.add(ps)
-                ps.stock = stock_qty
-                if min_stock:
-                    ps.min_stock = min_stock
-                    product.min_stock = min_stock
-                mov = InventoryMovement(
-                    product_id=product.id,
-                    quantity=stock_qty,
-                    movement_type='entrada',
-                    reference_type='import',
-                    warehouse_id=wid,
-                    company_id=current_company_id(),
-                )
-                db.session.add(mov)
-                count += 1
-            db.session.commit()
-            flash(f'Se importaron {count} productos')
-            return redirect(url_for('inventory_report', warehouse_id=wid))
+        if not file or not file.filename.lower().endswith('.csv'):
+            flash('Debe subir un archivo CSV válido')
+            return render_template('inventario_importar.html', warehouses=warehouses)
+
+        stream = StringIO(file.stream.read().decode('utf-8'))
+        reader = csv.DictReader(stream)
+        expected = {'code', 'stock', 'min_stock'}
+        if not reader.fieldnames or not expected.issubset(set(reader.fieldnames)):
+            flash('Cabeceras inválidas. Se requieren: code, stock, min_stock')
+            return render_template('inventario_importar.html', warehouses=warehouses)
+
+        errors = []
+        valid_rows = []
+        for idx, row in enumerate(reader, start=2):
+            code = (row.get('code') or '').strip()
+            if not code:
+                errors.append((idx, 'Código faltante'))
+                continue
+            product = company_query(Product).filter_by(code=code).first()
+            if not product:
+                errors.append((idx, f'Producto {code} no encontrado'))
+                continue
+            try:
+                stock_qty = int(row.get('stock'))
+            except (TypeError, ValueError):
+                errors.append((idx, f'Stock inválido para {code}'))
+                continue
+            min_val = row.get('min_stock')
+            try:
+                min_stock = int(min_val) if min_val not in (None, '') else None
+            except ValueError:
+                errors.append((idx, f'Min stock inválido para {code}'))
+                continue
+            valid_rows.append((product, stock_qty, min_stock))
+
+        if errors:
+            db.session.rollback()
+            flash(f'Importación cancelada. {len(errors)} filas con errores.')
+            return render_template('inventario_importar.html', warehouses=warehouses, errors=errors)
+
+        for product, stock_qty, min_stock in valid_rows:
+            product.stock = stock_qty
+            ps = (
+                company_query(ProductStock)
+                .filter_by(product_id=product.id, warehouse_id=wid)
+                .first()
+            )
+            if not ps:
+                ps = ProductStock(product_id=product.id, warehouse_id=wid, company_id=current_company_id())
+                db.session.add(ps)
+            ps.stock = stock_qty
+            if min_stock is not None:
+                ps.min_stock = min_stock
+                product.min_stock = min_stock
+            mov = InventoryMovement(
+                product_id=product.id,
+                quantity=stock_qty,
+                movement_type='entrada',
+                reference_type='import',
+                warehouse_id=wid,
+                company_id=current_company_id(),
+                executed_by=session.get('user_id'),
+            )
+            db.session.add(mov)
+
+        db.session.commit()
+        flash(f'Se importaron {len(valid_rows)} productos')
+        return redirect(url_for('inventory_report', warehouse_id=wid))
+
     return render_template('inventario_importar.html', warehouses=warehouses)
 
 
@@ -1110,6 +1444,7 @@ def inventory_transfer():
             company_id=current_company_id(),
             reference_type='transfer',
             reference_id=dest,
+            executed_by=session.get('user_id'),
         )
         mov_in = InventoryMovement(
             product_id=pid,
@@ -1119,6 +1454,7 @@ def inventory_transfer():
             company_id=current_company_id(),
             reference_type='transfer',
             reference_id=origin,
+            executed_by=session.get('user_id'),
         )
         db.session.add_all([mov_out, mov_in])
         db.session.commit()
@@ -1153,30 +1489,91 @@ def delete_warehouse(w_id):
 def edit_product(product_id):
     product = company_get(Product, product_id)
     if request.method == 'POST':
+        old_price = product.price
+        old_cost_price = product.cost_price
         product.code = request.form['code']
         product.reference = request.form.get('reference') or generate_reference(request.form['name'])
         product.name = request.form['name']
         product.unit = request.form['unit']
         product.price = _to_float(request.form['price'])
+        valid_cost, cost_price, warning_msg = _validate_product_cost_inputs(
+            product.price,
+            bool(request.form.get('use_cost')),
+            request.form.get('cost_price'),
+        )
+        if not valid_cost:
+            flash('No se pudo actualizar el producto: costo inválido. Debe ser mayor que 0.')
+            return redirect(url_for('edit_product', product_id=product_id))
+        product.cost_price = cost_price
         product.category = request.form.get('category')
         product.has_itbis = bool(request.form.get('has_itbis'))
+        _log_product_price_change(product, old_price, old_cost_price)
         db.session.commit()
         flash('Producto actualizado')
+        if warning_msg:
+            flash(warning_msg)
         return redirect(url_for('products'))
     return render_template('producto_form.html', product=product, units=UNITS, categories=CATEGORIES)
+
+
+
+@app.route('/productos/historial-precios')
+def product_price_history():
+    product_id = request.args.get('product_id', type=int)
+    logs_q = (
+        company_query(ProductPriceLog)
+        .options(joinedload(ProductPriceLog.product), joinedload(ProductPriceLog.user))
+        .order_by(ProductPriceLog.changed_at.desc())
+    )
+    if product_id:
+        logs_q = logs_q.filter(ProductPriceLog.product_id == product_id)
+    logs = logs_q.limit(200).all()
+    products = company_query(Product).order_by(Product.name).all()
+    return render_template('product_price_history.html', logs=logs, products=products, current_product_id=product_id)
+
 
 # Quotations
 @app.route('/cotizaciones')
 def list_quotations():
-    q = request.args.get('q')
-    query = company_query(Quotation).join(Client)
-    if q:
-        query = query.filter((Client.name.contains(q)) | (Client.identifier.contains(q)))
-    quotations = query.order_by(Quotation.date.desc()).all()
-    return render_template('cotizaciones.html', quotations=quotations, q=q,
-                           timedelta=timedelta, now=dom_now())
+    client_q = request.args.get('client')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    status = request.args.get('status')
+    page = request.args.get('page', 1, type=int)
 
-@csrf.exempt
+    now = dom_now()
+    company_query(Quotation).filter(
+        Quotation.status == 'vigente', Quotation.valid_until < now
+    ).update({'status': 'vencida'}, synchronize_session=False)
+    db.session.commit()
+
+    query = company_query(Quotation).join(Client)
+    if client_q:
+        query = query.filter(
+            (Client.name.contains(client_q)) | (Client.identifier.contains(client_q))
+        )
+    if date_from:
+        df = datetime.strptime(date_from, '%Y-%m-%d')
+        query = query.filter(Quotation.date >= df)
+    if date_to:
+        dt = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+        query = query.filter(Quotation.date < dt)
+    if status:
+        query = query.filter(Quotation.status == status)
+
+    quotations = query.order_by(Quotation.date.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    return render_template(
+        'cotizaciones.html',
+        quotations=quotations,
+        client=client_q,
+        date_from=date_from,
+        date_to=date_to,
+        status=status,
+        now=now,
+    )
+
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 def new_quotation():
     if request.method == 'POST':
@@ -1200,11 +1597,14 @@ def new_quotation():
         subtotal, itbis, total = calculate_totals(items)
         payment_method = request.form.get('payment_method')
         bank = request.form.get('bank') if payment_method == 'Transferencia' else None
+        date = dom_now()
+        valid_until = date + timedelta(days=30)
         quotation = Quotation(client_id=client.id, subtotal=subtotal, itbis=itbis, total=total,
                                seller=request.form.get('seller'), payment_method=payment_method,
                                bank=bank, note=request.form.get('note'),
                                warehouse_id=int(wid),
-                               company_id=current_company_id())
+                               company_id=current_company_id(),
+                               date=date, valid_until=valid_until)
         db.session.add(quotation)
         db.session.flush()
         for it in items:
@@ -1430,18 +1830,45 @@ def quotation_pdf(quotation_id):
     filename = f'cotizacion_{quotation_id}.pdf'
     pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-    valid_until = quotation.date + timedelta(days=30)
     app.logger.info("Generating quotation PDF %s", quotation_id)
     generate_pdf('Cotización', company, quotation.client, quotation.items,
                  quotation.subtotal, quotation.itbis, quotation.total,
                  seller=quotation.seller, payment_method=quotation.payment_method,
                  bank=quotation.bank, doc_number=quotation.id, note=quotation.note,
                  output_path=pdf_path,
-                 date=quotation.date, valid_until=valid_until,
+                 date=quotation.date, valid_until=quotation.valid_until,
                  footer=("Condiciones: Esta cotización es válida por 30 días a partir de la fecha de emisión. "
                          "Los precios están sujetos a cambios sin previo aviso. "
                          "El ITBIS ha sido calculado conforme a la ley vigente."))
     return send_file(pdf_path, download_name=filename, as_attachment=True)
+
+
+@app.route('/cotizaciones/<int:quotation_id>/enviar', methods=['POST'])
+def send_quotation_email(quotation_id):
+    quotation = company_get(Quotation, quotation_id)
+    client = quotation.client
+    if not client.email:
+        flash('El cliente no tiene correo registrado')
+        return redirect(url_for('list_quotations'))
+    company = get_company_info()
+    filename = f'cotizacion_{quotation_id}.pdf'
+    pdf_path = os.path.join(app.static_folder, 'pdfs', filename)
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    generate_pdf('Cotización', company, client, quotation.items,
+                 quotation.subtotal, quotation.itbis, quotation.total,
+                 seller=quotation.seller, payment_method=quotation.payment_method,
+                 bank=quotation.bank, doc_number=quotation.id, note=quotation.note,
+                 output_path=pdf_path,
+                 date=quotation.date, valid_until=quotation.valid_until,
+                 footer=("Condiciones: Esta cotización es válida por 30 días a partir de la fecha de emisión. "
+                         "Los precios están sujetos a cambios sin previo aviso. "
+                         "El ITBIS ha sido calculado conforme a la ley vigente."))
+    with open(pdf_path, 'rb') as f:
+        pdf_data = f.read()
+    html = render_template('emails/quotation.html', client=client, company=company, quotation=quotation)
+    send_email(client.email, 'Cotización', html, attachments=[(filename, pdf_data)])
+    flash(f'Cotización enviada con éxito a {client.email}')
+    return redirect(url_for('list_quotations'))
 
 @app.route('/cotizaciones/<int:quotation_id>/convertir', methods=['GET', 'POST'])
 def quotation_to_order(quotation_id):
@@ -1456,7 +1883,7 @@ def quotation_to_order(quotation_id):
     wid = int(wid)
     quotation.warehouse_id = wid
     customer_po = request.form.get('customer_po') or None
-    if dom_now() > quotation.date + timedelta(days=30):
+    if dom_now() > quotation.valid_until:
         flash('La cotización ha expirado')
         return redirect(url_for('list_quotations'))
     for item in quotation.items:
@@ -1484,6 +1911,7 @@ def quotation_to_order(quotation_id):
         company_id=current_company_id(),
     )
     db.session.add(order)
+    quotation.status = 'convertida'
     db.session.flush()
     for item in quotation.items:
         o_item = OrderItem(
@@ -1518,6 +1946,7 @@ def quotation_to_order(quotation_id):
                 reference_id=order.id,
                 warehouse_id=wid,
                 company_id=current_company_id(),
+                executed_by=session.get('user_id'),
             )
             db.session.add(mov)
     db.session.commit()
@@ -1704,11 +2133,13 @@ def reportes():
     )
     invoices = pagination.items
 
-    all_invoices = q.options(
-        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status)
-    ).all()
-    total_sales = sum(i.total for i in all_invoices)
-    unique_clients = len({i.client_id for i in all_invoices})
+    total_sales, unique_clients, invoice_count = (
+        q.with_entities(
+            func.coalesce(func.sum(Invoice.total), 0),
+            func.count(func.distinct(Invoice.client_id)),
+            func.count(Invoice.id),
+        ).first()
+    )
 
     item_query = company_query(InvoiceItem).join(Invoice)
     if start:
@@ -1760,14 +2191,123 @@ def reportes():
 
     # monthly and yearly avg ticket
     today = datetime.utcnow()
-    month_invoices = [i for i in all_invoices if i.date.month == today.month and i.date.year == today.year]
-    month_total = sum(i.total for i in month_invoices)
-    month_clients = len({i.client_id for i in month_invoices})
+    month_total, month_clients = (
+        q.filter(
+            func.strftime('%Y', Invoice.date) == str(today.year),
+            func.strftime('%m', Invoice.date) == f"{today.month:02d}",
+        )
+        .with_entities(
+            func.coalesce(func.sum(Invoice.total), 0),
+            func.count(func.distinct(Invoice.client_id)),
+        )
+        .first()
+    )
     avg_ticket_month = month_total / month_clients if month_clients else 0
-    year_invoices = [i for i in all_invoices if i.date.year == today.year]
-    year_total = sum(i.total for i in year_invoices)
-    year_clients = len({i.client_id for i in year_invoices})
+    year_total, year_clients = (
+        q.filter(func.strftime('%Y', Invoice.date) == str(today.year))
+        .with_entities(
+            func.coalesce(func.sum(Invoice.total), 0),
+            func.count(func.distinct(Invoice.client_id)),
+        )
+        .first()
+    )
     avg_ticket_year = year_total / year_clients if year_clients else 0
+
+    itbis_accumulated, net_sales = (
+        q.with_entities(
+            func.coalesce(func.sum(Invoice.itbis), 0),
+            func.coalesce(func.sum(Invoice.subtotal), 0),
+        ).first()
+    )
+
+    profit_query = company_query(InvoiceItem).join(Invoice)
+    if start:
+        profit_query = profit_query.filter(Invoice.date >= start)
+    if end:
+        profit_query = profit_query.filter(Invoice.date <= end)
+    if estado:
+        profit_query = profit_query.filter(Invoice.status == estado)
+    if categoria:
+        profit_query = profit_query.filter(InvoiceItem.category == categoria)
+    profit_base = profit_query.outerjoin(
+        Product,
+        (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
+    )
+    estimated_profit_with_cost = (
+        profit_base
+        .filter(Product.cost_price.isnot(None))
+        .with_entities(
+            func.coalesce(
+                func.sum(
+                    ((InvoiceItem.unit_price - Product.cost_price) * InvoiceItem.quantity)
+                    - InvoiceItem.discount
+                ),
+                0,
+            )
+        )
+        .scalar()
+    )
+    revenue_without_cost_data = (
+        profit_base
+        .filter(Product.cost_price.is_(None))
+        .with_entities(
+            func.coalesce(
+                func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount),
+                0,
+            )
+        )
+        .scalar()
+    )
+    estimated_profit = estimated_profit_with_cost
+
+    kpi_changes = {
+        'net_sales': None,
+        'itbis_accumulated': None,
+        'estimated_profit_with_cost': None,
+    }
+    if start and end:
+        period_days = (end.date() - start.date()).days + 1
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=period_days - 1)
+
+        q_prev = _filtered_invoice_query(prev_start, prev_end, estado, categoria)
+        prev_itbis, prev_net_sales = (
+            q_prev.with_entities(
+                func.coalesce(func.sum(Invoice.itbis), 0),
+                func.coalesce(func.sum(Invoice.subtotal), 0),
+            ).first()
+        )
+
+        prev_profit_query = company_query(InvoiceItem).join(Invoice)
+        prev_profit_query = prev_profit_query.filter(Invoice.date >= prev_start, Invoice.date <= prev_end)
+        if estado:
+            prev_profit_query = prev_profit_query.filter(Invoice.status == estado)
+        if categoria:
+            prev_profit_query = prev_profit_query.filter(InvoiceItem.category == categoria)
+        prev_profit_with_cost = (
+            prev_profit_query
+            .outerjoin(
+                Product,
+                (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
+            )
+            .filter(Product.cost_price.isnot(None))
+            .with_entities(
+                func.coalesce(
+                    func.sum(
+                        ((InvoiceItem.unit_price - Product.cost_price) * InvoiceItem.quantity)
+                        - InvoiceItem.discount
+                    ),
+                    0,
+                )
+            )
+            .scalar()
+        )
+
+        kpi_changes = {
+            'net_sales': _pct_change(net_sales, prev_net_sales),
+            'itbis_accumulated': _pct_change(itbis_accumulated, prev_itbis),
+            'estimated_profit_with_cost': _pct_change(estimated_profit_with_cost, prev_profit_with_cost),
+        }
 
     # trend last 24 months
     trend_query = (
@@ -1833,7 +2373,7 @@ def reportes():
     stats = {
         'total_sales': total_sales,
         'unique_clients': unique_clients,
-        'invoices': len(all_invoices),
+        'invoices': invoice_count,
         'pending': status_totals.get('Pendiente', 0),
         'paid': status_totals.get('Pagada', 0),
         'cash': payment_totals.get('Efectivo', 0),
@@ -1842,6 +2382,11 @@ def reportes():
         'avg_ticket_month': avg_ticket_month,
         'avg_ticket_year': avg_ticket_year,
         'retention': retention,
+        'itbis_accumulated': itbis_accumulated,
+        'net_sales': net_sales,
+        'estimated_profit': estimated_profit,
+        'estimated_profit_with_cost': estimated_profit_with_cost,
+        'revenue_without_cost_data': revenue_without_cost_data,
     }
 
     cat_labels = [c or 'Sin categoría' for c, *_ in sales_by_category]
@@ -1896,6 +2441,7 @@ def reportes():
                     for i in invoices
                 ],
                 'pagination': {'page': pagination.page, 'pages': pagination.pages},
+                'kpi_changes': kpi_changes,
             }
         )
 
@@ -1918,6 +2464,7 @@ def reportes():
         status_values=status_values,
         method_labels=method_labels,
         method_values=method_values,
+        kpi_changes=kpi_changes,
         months=months,
         year_current=year_current,
         year_prev=year_prev,
@@ -2046,11 +2593,6 @@ def export_reportes():
         flash('Reporte en proceso, vuelva a revisar en unos minutos')
         return jsonify({'job': entry_id})
 
-    invoices = q.options(
-        joinedload(Invoice.client),
-        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
-    ).all()
-
     company = get_company_info()
     header = [
         f"Empresa: {company.get('name', '')}",
@@ -2067,40 +2609,103 @@ def export_reportes():
     )
 
     if formato == 'csv':
-        output = StringIO()
-        writer = csv.writer(output)
-        for h in header:
-            writer.writerow([h])
-        if tipo == 'resumen':
-            writer.writerow(['Categoría', 'Cantidad', 'Total'])
-            summary = (
-                company_query(InvoiceItem)
-                .join(Invoice)
-                .with_entities(InvoiceItem.category, func.count(InvoiceItem.id), func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount))
-                .group_by(InvoiceItem.category)
-            )
-            if start:
-                summary = summary.filter(Invoice.date >= start)
-            if end:
-                summary = summary.filter(Invoice.date <= end)
-            if estado:
-                summary = summary.filter(Invoice.status == estado)
-            for cat, cnt, tot in summary:
-                writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
-        else:
-            writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
-            for inv in invoices:
-                writer.writerow([
-                    inv.client.name if inv.client else '',
-                    inv.date.strftime('%Y-%m-%d'),
-                    inv.status or '',
-                    f"{inv.total:.2f}",
-                ])
-        mem = BytesIO()
-        mem.write(output.getvalue().encode('utf-8'))
-        mem.seek(0)
+        if current_app.testing:
+            output = StringIO()
+            writer = csv.writer(output)
+            for h in header:
+                writer.writerow([h])
+            if tipo == 'resumen':
+                writer.writerow(['Categoría', 'Cantidad', 'Total'])
+                summary = (
+                    company_query(InvoiceItem)
+                    .join(Invoice)
+                    .with_entities(
+                        InvoiceItem.category,
+                        func.count(InvoiceItem.id),
+                        func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                    )
+                    .group_by(InvoiceItem.category)
+                )
+                if start:
+                    summary = summary.filter(Invoice.date >= start)
+                if end:
+                    summary = summary.filter(Invoice.date <= end)
+                if estado:
+                    summary = summary.filter(Invoice.status == estado)
+                for cat, cnt, tot in summary:
+                    writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
+            else:
+                writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+                for inv in q.options(
+                    joinedload(Invoice.client),
+                    load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                ):
+                    writer.writerow([
+                        inv.client.name if inv.client else '',
+                        inv.date.strftime('%Y-%m-%d'),
+                        inv.status or '',
+                        f"{inv.total:.2f}",
+                    ])
+            mem = BytesIO()
+            mem.write(output.getvalue().encode('utf-8'))
+            mem.seek(0)
+            log_export(user, formato, tipo, filtros, 'success')
+            return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='reportes.csv')
+        app_obj = current_app._get_current_object()
+        def generate_csv():
+            with app_obj.app_context():
+                sio = StringIO()
+                writer = csv.writer(sio)
+                for h in header:
+                    writer.writerow([h])
+                if tipo == 'resumen':
+                    writer.writerow(['Categoría', 'Cantidad', 'Total'])
+                    yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+                    summary = (
+                        company_query(InvoiceItem)
+                        .join(Invoice)
+                        .with_entities(
+                            InvoiceItem.category,
+                            func.count(InvoiceItem.id),
+                            func.sum(InvoiceItem.unit_price * InvoiceItem.quantity - InvoiceItem.discount),
+                        )
+                        .group_by(InvoiceItem.category)
+                    )
+                    if start:
+                        summary = summary.filter(Invoice.date >= start)
+                    if end:
+                        summary = summary.filter(Invoice.date <= end)
+                    if estado:
+                        summary = summary.filter(Invoice.status == estado)
+                    for cat, cnt, tot in summary:
+                        writer.writerow([cat or 'Sin categoría', cnt, f"{tot or 0:.2f}"])
+                        yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+                else:
+                    writer.writerow(['Cliente', 'Fecha', 'Estado', 'Total'])
+                    yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+                    stream_q = q.options(
+                        joinedload(Invoice.client),
+                        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+                    ).yield_per(100)
+                    for inv in stream_q:
+                        writer.writerow([
+                            inv.client.name if inv.client else '',
+                            inv.date.strftime('%Y-%m-%d'),
+                            inv.status or '',
+                            f"{inv.total:.2f}",
+                        ])
+                        yield sio.getvalue(); sio.seek(0); sio.truncate(0)
+
         log_export(user, formato, tipo, filtros, 'success')
-        return send_file(mem, mimetype='text/csv', as_attachment=True, download_name='reportes.csv')
+        headers = {
+            'Content-Disposition': 'attachment; filename=reportes.csv'
+        }
+        return Response(generate_csv(), mimetype='text/csv', headers=headers)
+
+    invoices = q.options(
+        joinedload(Invoice.client),
+        load_only(Invoice.client_id, Invoice.total, Invoice.date, Invoice.status),
+    ).all()
 
     if formato == 'xlsx':
         if Workbook is None:

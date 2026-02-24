@@ -19,12 +19,16 @@
     {% for u in users %}
     <tr class="border-t">
       <td class="p-2">
-        <input form="f{{u.id}}" name="first_name" value="{{ u.first_name }}" class="input mb-2" required>
-        <input form="f{{u.id}}" name="last_name" value="{{ u.last_name }}" class="input" required>
+        <label for="first-name-{{u.id}}" class="block text-xs font-semibold text-gray-600 mb-1">Nombre</label>
+        <input id="first-name-{{u.id}}" form="f{{u.id}}" name="first_name" value="{{ u.first_name }}" class="input mb-2" required>
+        <label for="last-name-{{u.id}}" class="block text-xs font-semibold text-gray-600 mb-1">Apellido</label>
+        <input id="last-name-{{u.id}}" form="f{{u.id}}" name="last_name" value="{{ u.last_name }}" class="input" required>
       </td>
       <td class="p-2">
-        <input form="f{{u.id}}" name="username" value="{{ u.username }}" class="input mb-2" required>
-        <select form="f{{u.id}}" name="role" class="input">
+        <label for="username-{{u.id}}" class="block text-xs font-semibold text-gray-600 mb-1">Usuario</label>
+        <input id="username-{{u.id}}" form="f{{u.id}}" name="username" value="{{ u.username }}" class="input mb-2" required>
+        <label for="role-{{u.id}}" class="block text-xs font-semibold text-gray-600 mb-1">Rol</label>
+        <select id="role-{{u.id}}" form="f{{u.id}}" name="role" class="input">
           <option value="company" {% if u.role=='company' %}selected{% endif %}>Usuario</option>
           <option value="manager" {% if u.role=='manager' %}selected{% endif %}>Manager</option>
         </select>

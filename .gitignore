@@ -1,3 +1,4 @@
+# Ignore local SQLite database generated via migrations
 database.sqlite
 *.pyc
 __pycache__/
