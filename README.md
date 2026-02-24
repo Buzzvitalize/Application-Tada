@@ -45,59 +45,103 @@ An experimental endpoint `/api/recommendations` returns the top-selling products
 
 ## Docker deployment
 
-You can run the project in Docker with SQLite persistence and uploads persistence:
+Sí, ya quedó adaptado para Docker y aquí te dejo el procedimiento completo en español.
 
-1. **Prepare environment variables**
+### 1) Prerrequisitos
 
-   Create a `.env` file next to `docker-compose.yml` (or export vars in your shell):
+- Docker Engine instalado
+- Docker Compose plugin (`docker compose`)
 
-   ```env
-   SECRET_KEY=your_long_random_secret
-   MAIL_SERVER=smtp.example.com
-   MAIL_PORT=587
-   MAIL_USERNAME=user@example.com
-   MAIL_PASSWORD=supersecret
-   MAIL_DEFAULT_SENDER=tiendix@example.com
-   ```
+Verificación rápida:
 
-2. **Build and start containers**
+```bash
+docker --version
+docker compose version
+```
 
-   ```bash
-   docker compose up -d --build
-   ```
+### 2) Variables de entorno
 
-3. **Open the app**
+Crea un archivo `.env` (en la raíz del proyecto) a partir de `.env.example`:
 
-   - URL: `http://localhost:5000`
+```env
+SECRET_KEY=tu_clave_larga_y_segura
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=user@example.com
+MAIL_PASSWORD=supersecret
+MAIL_DEFAULT_SENDER=tiendix@example.com
+APP_CONFIG=production
+DATABASE_URL=sqlite:////data/database.sqlite
+```
 
-4. **(Optional) seed initial data**
+### 3) Construir y levantar
 
-   ```bash
-   docker compose exec web python scripts/seed_db.py
-   ```
+```bash
+docker compose up -d --build
+```
 
-5. **See logs / stop service**
+Qué pasa internamente:
+- Se construye la imagen desde `Dockerfile`.
+- El contenedor ejecuta `scripts/docker-entrypoint.sh`.
+- El entrypoint corre `flask db upgrade` automáticamente.
+- Luego inicia la app con Gunicorn en el puerto 5000.
 
-   ```bash
-   docker compose logs -f web
-   docker compose down
-   ```
+### 4) Abrir la aplicación
 
-### How this Docker setup works
+- URL: `http://localhost:5000`
 
-- `Dockerfile` builds a Python 3.11 image with dependencies needed by Flask and WeasyPrint.
-- `docker-compose.yml` runs the app as service `web` on port `5000`.
-- `APP_CONFIG=production` switches the app to `ProductionConfig`.
-- `DATABASE_URL=sqlite:////data/database.sqlite` stores the DB in the named volume `tiendix_data`.
-- Uploaded logos/files are stored in `tiendix_uploads` mounted at `/app/static/uploads`.
+### 5) (Opcional) Cargar datos iniciales
 
-### Deploying to a server (quick procedure)
+```bash
+docker compose exec web python scripts/seed_db.py
+```
 
-1. Install Docker + Docker Compose plugin on the server.
-2. Copy project files to server (`git clone ...`).
-3. Create `.env` with production values (`SECRET_KEY`, mail settings).
-4. Run `docker compose up -d --build`.
-5. Put Nginx/Caddy in front (optional but recommended) for HTTPS and custom domain.
+### 6) Comandos útiles de operación
+
+```bash
+# Ver logs en tiempo real
+docker compose logs -f web
+
+# Reiniciar servicio
+docker compose restart web
+
+# Detener contenedores
+docker compose down
+
+# Detener y borrar volúmenes (ELIMINA DB/upload persistidos)
+docker compose down -v
+```
+
+### 7) Persistencia de datos
+
+El `docker-compose.yml` ya define volúmenes:
+- `tiendix_data` → `/data` (SQLite)
+- `tiendix_uploads` → `/app/static/uploads` (logos/archivos)
+
+Por eso, aunque recrees el contenedor, la información se mantiene.
+
+### 8) Subir tu imagen a Docker Hub (opcional)
+
+```bash
+# 1) Login
+docker login
+
+# 2) Build con tag de tu usuario
+docker build -t TUUSUARIO/tiendix:latest .
+
+# 3) Push
+docker push TUUSUARIO/tiendix:latest
+```
+
+Luego, en un servidor, puedes usar esa imagen directamente en `docker-compose.yml` reemplazando `build: .` por `image: TUUSUARIO/tiendix:latest`.
+
+### 9) Despliegue recomendado en servidor
+
+1. Instala Docker + Compose.
+2. Copia `docker-compose.yml` y `.env` al servidor.
+3. Ejecuta `docker compose up -d`.
+4. Coloca Nginx/Caddy como reverse proxy para HTTPS y dominio.
+5. Configura backups del volumen `tiendix_data`.
 
 ## Setup
 
