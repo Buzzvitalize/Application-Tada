@@ -143,6 +143,27 @@ Luego, en un servidor, puedes usar esa imagen directamente en `docker-compose.ym
 4. Coloca Nginx/Caddy como reverse proxy para HTTPS y dominio.
 5. Configura backups del volumen `tiendix_data`.
 
+### 10) Reinstalación limpia de Docker (desde cero)
+
+Si borraste todo y quieres instalar de nuevo en limpio:
+
+```bash
+# Opción manual
+docker compose down -v --remove-orphans
+docker compose build --no-cache
+docker compose up -d
+
+# Opción automatizada (script incluido)
+bash scripts/docker_reinstall.sh
+```
+
+El script:
+- valida `docker` y `docker compose`,
+- crea `.env` desde `.env.example` si no existe,
+- limpia volúmenes/contenedores anteriores,
+- reconstruye imagen sin caché,
+- vuelve a levantar el servicio.
+
 ## Setup
 
 ```
