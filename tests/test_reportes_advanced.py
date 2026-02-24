@@ -1,4 +1,4 @@
-import time, os, sys
+import time, os, sys, pytest
 sys.path.append(os.getcwd())
 from app import app, db, Invoice, InvoiceItem, Client, Product, ExportLog
 from models import CompanyInfo
@@ -59,12 +59,47 @@ def test_export_async_job():
             assert log.status in ('queued','success')
 
 
-def test_report_performance():
+def test_export_async_xlsx_job():
         with app.test_client() as c:
             with c.session_transaction() as sess:
-                sess['role']='admin'; sess['company_id']=1; sess['username']='admin'; sess['user_id']=1
-        start=time.time()
-        resp=c.get('/reportes?ajax=1')
-        duration=time.time()-start
+                sess['role']='admin'; sess['company_id']=1; sess['username']='u'; sess['user_id']=1
+        app.config['MAX_EXPORT_ROWS']=1
+        resp = c.get('/reportes/export?formato=xlsx&tipo=detalle&async=1')
         assert resp.status_code==200
-        assert duration < 3
+        job_id = resp.get_json()['job']
+        time.sleep(1)
+        with app.app_context():
+            log = ExportLog.query.get(job_id)
+            assert log.status in ('queued','success')
+
+
+def test_csv_export_streamed():
+    with app.test_client() as c:
+        with c.session_transaction() as sess:
+            sess['role']='admin'; sess['company_id']=1; sess['username']='u'; sess['user_id']=1
+    app.config['MAX_EXPORT_ROWS']=100000
+    resp = c.get('/reportes/export?formato=csv&tipo=detalle')
+    assert resp.status_code == 200
+    assert resp.is_streamed
+
+
+def test_report_performance():
+    with app.test_client() as c:
+        with c.session_transaction() as sess:
+            sess['role']='admin'; sess['company_id']=1; sess['username']='admin'; sess['user_id']=1
+    start=time.time()
+    resp=c.get('/reportes?ajax=1')
+    duration=time.time()-start
+    assert resp.status_code==200
+    assert duration < 3
+
+
+def test_report_kpis_large_dataset():
+    with app.test_client() as c:
+        with c.session_transaction() as sess:
+            sess['role'] = 'admin'; sess['company_id'] = 1; sess['username'] = 'admin'; sess['user_id'] = 1
+    resp = c.get('/reportes?ajax=1')
+    data = resp.get_json()['stats']
+    assert data['total_sales'] == pytest.approx(118000)
+    assert data['unique_clients'] == 1
+    assert data['invoices'] == 10000

@@ -10,11 +10,13 @@
     <p>Hola {{ username }},</p>
     <p>Tu cuenta para <strong>{{ company }}</strong> ya está lista para utilizar <strong>Tiendix</strong>.</p>
     <p>
-      <strong>Usuario:</strong> {{ username }}<br>
-      <strong>Contraseña:</strong> {{ password }}
+      <strong>Usuario:</strong> {{ username }}
     </p>
     <p>Puedes iniciar sesión aquí:
       <a href="{{ login_url }}" style="color:#1e3a8a;">{{ login_url }}</a>
+    </p>
+    <p>Si necesitas establecer o restablecer tu contraseña utiliza el siguiente enlace temporal:
+      <a href="{{ reset_url }}" style="color:#1e3a8a;">Restablecer contraseña</a>
     </p>
     <p style="margin-top:20px;">Gracias por elegir Tiendix.</p>
   </div>

@@ -1,6 +1,7 @@
 import os
 import sys
 import pytest
+from datetime import datetime, timedelta
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app import app, db
@@ -48,6 +49,7 @@ def client(tmp_path):
         db.session.flush()
         ps = ProductStock(product_id=prod.id, warehouse_id=w.id, stock=10, min_stock=2, company_id=c1.id)
         db.session.add(ps)
+        now = datetime.utcnow()
         q = Quotation(
             client_id=cl1.id,
             subtotal=100,
@@ -57,6 +59,8 @@ def client(tmp_path):
             payment_method='Efectivo',
             warehouse_id=w.id,
             company_id=c1.id,
+            date=now,
+            valid_until=now + timedelta(days=30),
         )
         db.session.add(q)
         db.session.flush()

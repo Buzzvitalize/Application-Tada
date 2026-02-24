@@ -15,17 +15,21 @@ Key features:
 - Quotation form reuses existing clients and products via auto-complete fields
 - Approved account requests trigger an email notification with login details
 
+The repository does not include a prebuilt `database.sqlite`; each
+environment should generate its own database using the migration
+commands below.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and define a random secret key:
 
 ```
 SECRET_KEY=replace_with_random_string
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=user@example.com
-SMTP_PASS=supersecret
-SMTP_FROM=tiendix@example.com
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=user@example.com
+MAIL_PASSWORD=supersecret
+MAIL_DEFAULT_SENDER=tiendix@example.com
 ```
 
 This value secures Flask sessions and is required for the application to start.
@@ -38,6 +42,128 @@ Each table stores a `company_id` and regular users with role `company` only acce
 
 An experimental endpoint `/api/recommendations` returns the top-selling products as basic "AI" suggestions.
 
+
+## Docker deployment
+
+Sí, ya quedó adaptado para Docker y aquí te dejo el procedimiento completo en español.
+
+### 1) Prerrequisitos
+
+- Docker Engine instalado
+- Docker Compose plugin (`docker compose`)
+
+Verificación rápida:
+
+```bash
+docker --version
+docker compose version
+```
+
+### 2) Variables de entorno
+
+Crea un archivo `.env` (en la raíz del proyecto) a partir de `.env.example`:
+
+```env
+SECRET_KEY=tu_clave_larga_y_segura
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=user@example.com
+MAIL_PASSWORD=supersecret
+MAIL_DEFAULT_SENDER=tiendix@example.com
+APP_CONFIG=production
+DATABASE_URL=sqlite:////data/database.sqlite
+```
+
+### 3) Construir y levantar
+
+```bash
+docker compose up -d --build
+```
+
+Qué pasa internamente:
+- Se construye la imagen desde `Dockerfile`.
+- El contenedor ejecuta `scripts/docker-entrypoint.sh`.
+- El entrypoint corre `flask db upgrade` automáticamente.
+- Luego inicia la app con Gunicorn en el puerto 5000.
+
+### 4) Abrir la aplicación
+
+- URL: `http://localhost:5000`
+
+### 5) (Opcional) Cargar datos iniciales
+
+```bash
+docker compose exec web python scripts/seed_db.py
+```
+
+### 6) Comandos útiles de operación
+
+```bash
+# Ver logs en tiempo real
+docker compose logs -f web
+
+# Reiniciar servicio
+docker compose restart web
+
+# Detener contenedores
+docker compose down
+
+# Detener y borrar volúmenes (ELIMINA DB/upload persistidos)
+docker compose down -v
+```
+
+### 7) Persistencia de datos
+
+El `docker-compose.yml` ya define volúmenes:
+- `tiendix_data` → `/data` (SQLite)
+- `tiendix_uploads` → `/app/static/uploads` (logos/archivos)
+
+Por eso, aunque recrees el contenedor, la información se mantiene.
+
+### 8) Subir tu imagen a Docker Hub (opcional)
+
+```bash
+# 1) Login
+docker login
+
+# 2) Build con tag de tu usuario
+docker build -t TUUSUARIO/tiendix:latest .
+
+# 3) Push
+docker push TUUSUARIO/tiendix:latest
+```
+
+Luego, en un servidor, puedes usar esa imagen directamente en `docker-compose.yml` reemplazando `build: .` por `image: TUUSUARIO/tiendix:latest`.
+
+### 9) Despliegue recomendado en servidor
+
+1. Instala Docker + Compose.
+2. Copia `docker-compose.yml` y `.env` al servidor.
+3. Ejecuta `docker compose up -d`.
+4. Coloca Nginx/Caddy como reverse proxy para HTTPS y dominio.
+5. Configura backups del volumen `tiendix_data`.
+
+### 10) Reinstalación limpia de Docker (desde cero)
+
+Si borraste todo y quieres instalar de nuevo en limpio:
+
+```bash
+# Opción manual
+docker compose down -v --remove-orphans
+docker compose build --no-cache
+docker compose up -d
+
+# Opción automatizada (script incluido)
+bash scripts/docker_reinstall.sh
+```
+
+El script:
+- valida `docker` y `docker compose`,
+- crea `.env` desde `.env.example` si no existe,
+- limpia volúmenes/contenedores anteriores,
+- reconstruye imagen sin caché,
+- vuelve a levantar el servicio.
+
 ## Setup
 
 ```
@@ -47,6 +173,7 @@ pip install -r requirements.txt
 flask db init  # first run only
 flask db migrate -m "initial"
 flask db upgrade
+python scripts/seed_db.py  # optional: seed admin user and sample data
 pytest
 python app.py
 ```
