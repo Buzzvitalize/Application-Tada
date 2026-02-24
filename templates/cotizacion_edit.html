@@ -5,40 +5,81 @@
 <form method="post" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div id="new-client" class="grid md:grid-cols-2 gap-4">
-    <input name="client_name" value="{{ quotation.client.name }}" placeholder="Nombre" class="input" id="client-name" required>
-    <input id="client-last" name="client_last_name" value="{{ quotation.client.last_name }}" placeholder="Apellido" class="input {{ '' if quotation.client.is_final_consumer else 'hidden' }}">
-    <input name="client_identifier" value="{{ quotation.client.identifier }}" placeholder="{{ 'Cédula' if quotation.client.is_final_consumer else 'RNC *' }}" class="input id-mask" id="client-identifier" data-doc-type="{{ 'cedula' if quotation.client.is_final_consumer else 'rnc' }}" {% if not quotation.client.is_final_consumer %}required{% endif %}>
-    <input name="client_phone" value="{{ quotation.client.phone }}" placeholder="Teléfono" class="input phone-mask">
-    <input name="client_email" value="{{ quotation.client.email }}" placeholder="Email" class="input">
-    <input name="client_street" value="{{ quotation.client.street }}" placeholder="Calle" class="input">
-    <input name="client_sector" value="{{ quotation.client.sector }}" placeholder="Sector" class="input">
-    <input name="client_province" value="{{ quotation.client.province }}" placeholder="Provincia" class="input">
+    <div>
+      <label for="client-name" class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+      <input name="client_name" value="{{ quotation.client.name }}" placeholder="Nombre" class="input" id="client-name" required>
+    </div>
+    <div>
+      <label for="client-last" class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+      <input id="client-last" name="client_last_name" value="{{ quotation.client.last_name }}" placeholder="Apellido" class="input {{ '' if quotation.client.is_final_consumer else 'hidden' }}">
+    </div>
+    <div>
+      <label for="client-identifier" class="block text-sm font-medium text-gray-700 mb-1">Documento</label>
+      <input name="client_identifier" value="{{ quotation.client.identifier }}" placeholder="{{ 'Cédula' if quotation.client.is_final_consumer else 'RNC *' }}" class="input id-mask" id="client-identifier" data-doc-type="{{ 'cedula' if quotation.client.is_final_consumer else 'rnc' }}" {% if not quotation.client.is_final_consumer %}required{% endif %}>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+      <input name="client_phone" value="{{ quotation.client.phone }}" placeholder="Teléfono" class="input phone-mask">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+      <input name="client_email" value="{{ quotation.client.email }}" placeholder="Email" class="input">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Calle</label>
+      <input name="client_street" value="{{ quotation.client.street }}" placeholder="Calle" class="input">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Sector</label>
+      <input name="client_sector" value="{{ quotation.client.sector }}" placeholder="Sector" class="input">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+      <input name="client_province" value="{{ quotation.client.province }}" placeholder="Provincia" class="input">
+    </div>
     <div class="flex space-x-4 col-span-2">
       <label><input type="radio" name="client_type" value="final" {% if quotation.client.is_final_consumer %}checked{% endif %}> Consumidor Final</label>
       <label><input type="radio" name="client_type" value="fiscal" {% if not quotation.client.is_final_consumer %}checked{% endif %}> Comprobante Fiscal</label>
     </div>
   </div>
   <div class="grid md:grid-cols-3 gap-4">
-    <select name="seller" class="input" required>
-      {% for s in sellers %}
-      {% set full = s.first_name + (' ' + s.last_name if s.last_name else '') %}
-      <option value="{{ full }}" {% if quotation.seller==full %}selected{% endif %}>{{ full }}</option>
-      {% endfor %}
-    </select>
-    <select name="payment_method" id="payment-method" class="input">
-      <option value="Efectivo" {% if quotation.payment_method=='Efectivo' %}selected{% endif %}>Efectivo</option>
-      <option value="Transferencia" {% if quotation.payment_method=='Transferencia' %}selected{% endif %}>Transferencia bancaria</option>
-    </select>
-    <select name="bank" id="bank-select" class="input {% if quotation.payment_method!='Transferencia' %}hidden{% endif %}">
-      <option value="">Seleccione banco</option>
-      <option {% if quotation.bank=='Banco Popular' %}selected{% endif %}>Banco Popular</option>
-      <option {% if quotation.bank=='Banco BHD' %}selected{% endif %}>Banco BHD</option>
-      <option {% if quotation.bank=='Banco Banreservas' %}selected{% endif %}>Banco Banreservas</option>
-      <option {% if quotation.bank=='Banesco' %}selected{% endif %}>Banesco</option>
-    </select>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
+      <select name="seller" class="input" required>
+        {% for s in sellers %}
+        {% set full = s.first_name + (' ' + s.last_name if s.last_name else '') %}
+        <option value="{{ full }}" {% if quotation.seller==full %}selected{% endif %}>{{ full }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="payment-method" class="block text-sm font-medium text-gray-700 mb-1">Método de pago</label>
+      <select name="payment_method" id="payment-method" class="input">
+        <option value="Efectivo" {% if quotation.payment_method=='Efectivo' %}selected{% endif %}>Efectivo</option>
+        <option value="Transferencia" {% if quotation.payment_method=='Transferencia' %}selected{% endif %}>Transferencia bancaria</option>
+      </select>
+    </div>
+    <div id="bank-field" class="{% if quotation.payment_method!='Transferencia' %}hidden{% endif %}">
+      <label for="bank-select" class="block text-sm font-medium text-gray-700 mb-1">Banco</label>
+      <select name="bank" id="bank-select" class="input">
+        <option value="">Seleccione banco</option>
+        <option {% if quotation.bank=='Banco Popular' %}selected{% endif %}>Banco Popular</option>
+        <option {% if quotation.bank=='Banco BHD' %}selected{% endif %}>Banco BHD</option>
+        <option {% if quotation.bank=='Banco Banreservas' %}selected{% endif %}>Banco Banreservas</option>
+        <option {% if quotation.bank=='Banesco' %}selected{% endif %}>Banesco</option>
+      </select>
+    </div>
   </div>
   <div>
     <h2 class="text-xl font-semibold mb-2">Productos</h2>
+    <div class="hidden sm:grid sm:grid-cols-6 gap-2 mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <span>Producto</span>
+      <span>Unidad</span>
+      <span>Precio</span>
+      <span>Cantidad</span>
+      <span>Descuento</span>
+      <span>Acción</span>
+    </div>
     <div id="productos">
       {% for it in items %}
       <div class="grid grid-cols-1 sm:grid-cols-6 gap-2 mb-2 product-row">
@@ -58,7 +99,10 @@
     </div>
     <button type="button" id="add-product" class="btn-secondary mt-2">Agregar Producto</button>
   </div>
-  <textarea name="note" class="input w-full" placeholder="Nota">{{ quotation.note }}</textarea>
+  <div>
+    <label for="edit-quotation-note" class="block text-sm font-medium text-gray-700 mb-1">Nota</label>
+    <textarea id="edit-quotation-note" name="note" class="input w-full" placeholder="Nota">{{ quotation.note }}</textarea>
+  </div>
   <button class="btn-primary">Guardar</button>
 </form>
 {% endblock %}
@@ -90,9 +134,9 @@ window.addEventListener('load', () => {
   toggleType();
 
   const paySelect=document.getElementById('payment-method');
-  const bankSelect=document.getElementById('bank-select');
+  const bankField=document.getElementById('bank-field');
   paySelect.addEventListener('change',()=>{
-    bankSelect.classList.toggle('hidden', paySelect.value!=='Transferencia');
+    bankField.classList.toggle('hidden', paySelect.value!=='Transferencia');
   });
 
   function bindProduct(row) {
@@ -138,4 +182,3 @@ window.addEventListener('load', () => {
 });
 </script>
 {% endblock %}
-

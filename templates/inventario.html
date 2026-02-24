@@ -51,7 +51,8 @@
       <td class="px-4 py-2 text-right">
         <form method="post" action="{{ url_for('update_min_stock', stock_id=s.id) }}" class="flex justify-end space-x-1">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input name="min_stock" value="{{ s.min_stock }}" class="w-16 border px-1 text-right">
+          <label for="min-stock-{{ s.id }}" class="sr-only">Stock mínimo</label>
+          <input id="min-stock-{{ s.id }}" name="min_stock" value="{{ s.min_stock }}" class="w-16 border px-1 text-right" title="Stock mínimo">
           <button class="text-blue-600">&#10003;</button>
         </form>
       </td>

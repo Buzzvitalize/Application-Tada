@@ -38,6 +38,7 @@ class Product(db.Model):
     name = db.Column(db.String(120), nullable=False)
     unit = db.Column(db.String(20), nullable=False)
     price = db.Column(db.Float, nullable=False)
+    cost_price = db.Column(db.Float)
     category = db.Column(db.String(50))
     has_itbis = db.Column(db.Boolean, default=True)
     stock = db.Column(db.Integer, default=0)
@@ -48,6 +49,21 @@ class Product(db.Model):
     def needs_restock(self) -> bool:
         """Return True if product stock is at or below its minimum level."""
         return self.stock <= self.min_stock
+
+
+class ProductPriceLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    old_price = db.Column(db.Float)
+    new_price = db.Column(db.Float, nullable=False)
+    old_cost_price = db.Column(db.Float)
+    new_cost_price = db.Column(db.Float)
+    changed_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    changed_at = db.Column(db.DateTime, default=dom_now, nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company_info.id'), nullable=False)
+
+    product = db.relationship('Product')
+    user = db.relationship('User')
 
 class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)

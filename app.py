@@ -37,6 +37,7 @@ from models import (
     InventoryMovement,
     Warehouse,
     ProductStock,
+    ProductPriceLog,
     CompanyInfo,
     User,
     AccountRequest,
@@ -66,7 +67,7 @@ from account_pdf import generate_account_statement_pdf
 from functools import wraps
 from auth import auth_bp, generate_reset_token
 from forms import AccountRequestForm
-from config import DevelopmentConfig
+from config import DevelopmentConfig, ProductionConfig, TestingConfig
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover
@@ -95,7 +96,13 @@ if os.path.exists(DATA_PATH):
                     RNC_DATA[rnc] = name
 
 app = Flask(__name__)
-app.config.from_object(DevelopmentConfig)
+config_map = {
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'testing': TestingConfig,
+}
+app_config = os.getenv('APP_CONFIG', 'development').lower()
+app.config.from_object(config_map.get(app_config, DevelopmentConfig))
 
 if not os.path.exists('logs'):
     os.makedirs('logs')
@@ -347,7 +354,14 @@ def _migrate_legacy_schema():
         db.session.commit()
 
 
-def ensure_admin():  # pragma: no cover - optional helper for deployments
+def run_auto_migrations():
+    """Apply Alembic migrations or fallback to ``create_all``.
+
+    This runs on import so that new fields are added automatically for
+    existing SQLite databases where developers might forget to run
+    ``flask db upgrade``.  It also calls :func:`_migrate_legacy_schema`
+    to patch columns that predate Alembic.
+    """
     with app.app_context():
         try:  # Apply any pending migrations for safety
             upgrade()
@@ -361,6 +375,11 @@ def ensure_admin():  # pragma: no cover - optional helper for deployments
             db.session.add(admin)
             db.session.commit()
         db.session.remove()
+
+
+# Run migrations when the module is imported so that new fields are available
+# even if ``flask db upgrade`` wasn't executed manually.
+run_auto_migrations()
 
 # Utility constants
 ITBIS_RATE = 0.18
@@ -412,6 +431,54 @@ def _to_int(value):
     except (TypeError, ValueError):
         return 0
 
+
+def _validate_product_cost_inputs(price, use_cost, cost_price_raw):
+    """Validate optional product cost data and return normalized values.
+
+    Returns a tuple of: (is_valid, cost_price_or_none, warning_message_or_none).
+    """
+    if not use_cost:
+        return True, None, None
+
+    cost_price = _to_float(cost_price_raw)
+    if cost_price <= 0:
+        return False, None, 'El costo debe ser mayor que 0 cuando activa "Usar costo".'
+
+    margin = ((price - cost_price) / cost_price) * 100
+    if price < cost_price:
+        return True, cost_price, (
+            'Advertencia: el precio de venta está por debajo del costo. '
+            f'Margen actual: {margin:.1f}%.'
+        )
+    if margin < 5:
+        return True, cost_price, f'Advertencia: margen bajo ({margin:.1f}%).'
+    return True, cost_price, None
+
+
+def _pct_change(current, previous):
+    """Return percentage change or None when previous is zero/missing."""
+    if previous in (None, 0):
+        return None
+    return ((current - previous) / previous) * 100
+
+
+
+
+def _log_product_price_change(product, old_price, old_cost_price):
+    """Persist a price/cost change log row when values changed."""
+    if old_price == product.price and old_cost_price == product.cost_price:
+        return
+    db.session.add(
+        ProductPriceLog(
+            product_id=product.id,
+            old_price=old_price,
+            new_price=product.price,
+            old_cost_price=old_cost_price,
+            new_cost_price=product.cost_price,
+            changed_by=session.get('user_id'),
+            company_id=current_company_id(),
+        )
+    )
 
 def generate_reference(name: str) -> str:
     """Generate a unique reference based on product name."""
@@ -1023,19 +1090,34 @@ def api_reference():
 def products():
     if request.method == 'POST':
         reference = request.form.get('reference') or generate_reference(request.form['name'])
+        use_cost = bool(request.form.get('use_cost'))
+        price = _to_float(request.form['price'])
+        valid_cost, cost_price, warning_msg = _validate_product_cost_inputs(
+            price,
+            use_cost,
+            request.form.get('cost_price'),
+        )
+        if not valid_cost:
+            flash('No se pudo guardar el producto: costo inválido. Debe ser mayor que 0.')
+            return redirect(url_for('products'))
         product = Product(
             code=request.form['code'],
             reference=reference,
             name=request.form['name'],
             unit=request.form['unit'],
-            price=_to_float(request.form['price']),
+            price=price,
+            cost_price=cost_price,
             category=request.form.get('category'),
             has_itbis=bool(request.form.get('has_itbis')),
             company_id=current_company_id()
         )
         db.session.add(product)
+        db.session.flush()
+        _log_product_price_change(product, None, None)
         db.session.commit()
         flash('Producto agregado')
+        if warning_msg:
+            flash(warning_msg)
         notify('Producto agregado')
         return redirect(url_for('products'))
     cat = request.args.get('cat')
@@ -1074,6 +1156,37 @@ def products_import():
         flash('Productos importados')
         return redirect(url_for('products'))
     return render_template('productos_importar.html')
+
+
+@app.route('/productos/export')
+def export_products():
+    """Export product catalog as CSV, optionally filtered by category."""
+    cat = request.args.get('cat')
+    query = company_query(Product)
+    if cat:
+        query = query.filter_by(category=cat)
+    products = query.order_by(Product.name.asc()).all()
+
+    mem = StringIO()
+    writer = csv.writer(mem)
+    writer.writerow(['code', 'reference', 'name', 'unit', 'price', 'cost_price', 'category', 'has_itbis'])
+    for p in products:
+        writer.writerow([
+            p.code,
+            p.reference or '',
+            p.name,
+            p.unit,
+            p.price,
+            p.cost_price if p.cost_price is not None else '',
+            p.category or '',
+            '1' if p.has_itbis else '0',
+        ])
+    mem.seek(0)
+    return Response(
+        mem.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=productos.csv'}
+    )
 
 @app.route('/productos/delete/<int:product_id>')
 def delete_product(product_id):
@@ -1376,17 +1489,48 @@ def delete_warehouse(w_id):
 def edit_product(product_id):
     product = company_get(Product, product_id)
     if request.method == 'POST':
+        old_price = product.price
+        old_cost_price = product.cost_price
         product.code = request.form['code']
         product.reference = request.form.get('reference') or generate_reference(request.form['name'])
         product.name = request.form['name']
         product.unit = request.form['unit']
         product.price = _to_float(request.form['price'])
+        valid_cost, cost_price, warning_msg = _validate_product_cost_inputs(
+            product.price,
+            bool(request.form.get('use_cost')),
+            request.form.get('cost_price'),
+        )
+        if not valid_cost:
+            flash('No se pudo actualizar el producto: costo inválido. Debe ser mayor que 0.')
+            return redirect(url_for('edit_product', product_id=product_id))
+        product.cost_price = cost_price
         product.category = request.form.get('category')
         product.has_itbis = bool(request.form.get('has_itbis'))
+        _log_product_price_change(product, old_price, old_cost_price)
         db.session.commit()
         flash('Producto actualizado')
+        if warning_msg:
+            flash(warning_msg)
         return redirect(url_for('products'))
     return render_template('producto_form.html', product=product, units=UNITS, categories=CATEGORIES)
+
+
+
+@app.route('/productos/historial-precios')
+def product_price_history():
+    product_id = request.args.get('product_id', type=int)
+    logs_q = (
+        company_query(ProductPriceLog)
+        .options(joinedload(ProductPriceLog.product), joinedload(ProductPriceLog.user))
+        .order_by(ProductPriceLog.changed_at.desc())
+    )
+    if product_id:
+        logs_q = logs_q.filter(ProductPriceLog.product_id == product_id)
+    logs = logs_q.limit(200).all()
+    products = company_query(Product).order_by(Product.name).all()
+    return render_template('product_price_history.html', logs=logs, products=products, current_product_id=product_id)
+
 
 # Quotations
 @app.route('/cotizaciones')
@@ -2069,6 +2213,102 @@ def reportes():
     )
     avg_ticket_year = year_total / year_clients if year_clients else 0
 
+    itbis_accumulated, net_sales = (
+        q.with_entities(
+            func.coalesce(func.sum(Invoice.itbis), 0),
+            func.coalesce(func.sum(Invoice.subtotal), 0),
+        ).first()
+    )
+
+    profit_query = company_query(InvoiceItem).join(Invoice)
+    if start:
+        profit_query = profit_query.filter(Invoice.date >= start)
+    if end:
+        profit_query = profit_query.filter(Invoice.date <= end)
+    if estado:
+        profit_query = profit_query.filter(Invoice.status == estado)
+    if categoria:
+        profit_query = profit_query.filter(InvoiceItem.category == categoria)
+    profit_base = profit_query.outerjoin(
+        Product,
+        (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
+    )
+    estimated_profit_with_cost = (
+        profit_base
+        .filter(Product.cost_price.isnot(None))
+        .with_entities(
+            func.coalesce(
+                func.sum(
+                    ((InvoiceItem.unit_price - Product.cost_price) * InvoiceItem.quantity)
+                    - InvoiceItem.discount
+                ),
+                0,
+            )
+        )
+        .scalar()
+    )
+    revenue_without_cost_data = (
+        profit_base
+        .filter(Product.cost_price.is_(None))
+        .with_entities(
+            func.coalesce(
+                func.sum((InvoiceItem.unit_price * InvoiceItem.quantity) - InvoiceItem.discount),
+                0,
+            )
+        )
+        .scalar()
+    )
+    estimated_profit = estimated_profit_with_cost
+
+    kpi_changes = {
+        'net_sales': None,
+        'itbis_accumulated': None,
+        'estimated_profit_with_cost': None,
+    }
+    if start and end:
+        period_days = (end.date() - start.date()).days + 1
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=period_days - 1)
+
+        q_prev = _filtered_invoice_query(prev_start, prev_end, estado, categoria)
+        prev_itbis, prev_net_sales = (
+            q_prev.with_entities(
+                func.coalesce(func.sum(Invoice.itbis), 0),
+                func.coalesce(func.sum(Invoice.subtotal), 0),
+            ).first()
+        )
+
+        prev_profit_query = company_query(InvoiceItem).join(Invoice)
+        prev_profit_query = prev_profit_query.filter(Invoice.date >= prev_start, Invoice.date <= prev_end)
+        if estado:
+            prev_profit_query = prev_profit_query.filter(Invoice.status == estado)
+        if categoria:
+            prev_profit_query = prev_profit_query.filter(InvoiceItem.category == categoria)
+        prev_profit_with_cost = (
+            prev_profit_query
+            .outerjoin(
+                Product,
+                (Product.company_id == InvoiceItem.company_id) & (Product.code == InvoiceItem.code),
+            )
+            .filter(Product.cost_price.isnot(None))
+            .with_entities(
+                func.coalesce(
+                    func.sum(
+                        ((InvoiceItem.unit_price - Product.cost_price) * InvoiceItem.quantity)
+                        - InvoiceItem.discount
+                    ),
+                    0,
+                )
+            )
+            .scalar()
+        )
+
+        kpi_changes = {
+            'net_sales': _pct_change(net_sales, prev_net_sales),
+            'itbis_accumulated': _pct_change(itbis_accumulated, prev_itbis),
+            'estimated_profit_with_cost': _pct_change(estimated_profit_with_cost, prev_profit_with_cost),
+        }
+
     # trend last 24 months
     trend_query = (
         q.with_entities(func.strftime('%Y-%m', Invoice.date), func.sum(Invoice.total))
@@ -2142,6 +2382,11 @@ def reportes():
         'avg_ticket_month': avg_ticket_month,
         'avg_ticket_year': avg_ticket_year,
         'retention': retention,
+        'itbis_accumulated': itbis_accumulated,
+        'net_sales': net_sales,
+        'estimated_profit': estimated_profit,
+        'estimated_profit_with_cost': estimated_profit_with_cost,
+        'revenue_without_cost_data': revenue_without_cost_data,
     }
 
     cat_labels = [c or 'Sin categoría' for c, *_ in sales_by_category]
@@ -2196,6 +2441,7 @@ def reportes():
                     for i in invoices
                 ],
                 'pagination': {'page': pagination.page, 'pages': pagination.pages},
+                'kpi_changes': kpi_changes,
             }
         )
 
@@ -2218,6 +2464,7 @@ def reportes():
         status_values=status_values,
         method_labels=method_labels,
         method_values=method_values,
+        kpi_changes=kpi_changes,
         months=months,
         year_current=year_current,
         year_prev=year_prev,

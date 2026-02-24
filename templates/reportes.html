@@ -2,26 +2,54 @@
 {% block title %}Reportes{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Reportes</h1>
-<div class="mb-4">
-  <a href="{{ url_for('account_statement_clients') }}" class="text-blue-600 underline">Estados de cuentas por clientes</a>
+<div class="grid md:grid-cols-4 gap-3 mb-4">
+  <a href="{{ url_for('account_statement_clients') }}" class="card p-3 hover:bg-blue-50 transition-colors">
+    <div class="text-sm font-semibold text-blue-700">Estados de cuenta</div>
+    <div class="text-xs text-gray-500">Ver balances por cliente</div>
+  </a>
+  <a href="{{ url_for('export_history') }}" class="card p-3 hover:bg-gray-100 transition-colors">
+    <div class="text-sm font-semibold text-gray-700">Historial de exportaciones</div>
+    <div class="text-xs text-gray-500">Revisar archivos generados</div>
+  </a>
+  <a href="{{ url_for('export_inventory') }}" class="card p-3 hover:bg-emerald-50 transition-colors">
+    <div class="text-sm font-semibold text-emerald-700">Exportar inventario</div>
+    <div class="text-xs text-gray-500">Descargar stock actual en CSV</div>
+  </a>
+  <a href="{{ url_for('products') }}" class="card p-3 hover:bg-violet-50 transition-colors">
+    <div class="text-sm font-semibold text-violet-700">Ir a productos</div>
+    <div class="text-xs text-gray-500">Gestionar catálogo y precios</div>
+  </a>
 </div>
 
 <form id="filters" class="card mb-6 grid md:grid-cols-5 gap-4" method="get" action="{{ url_for('reportes') }}">
-  <input type="date" name="fecha_inicio" value="{{ filters.fecha_inicio }}" class="input">
-  <input type="date" name="fecha_fin" value="{{ filters.fecha_fin }}" class="input">
-  <select name="estado" class="input">
-    <option value="">Todos los estados</option>
-    {% for s in statuses %}
-    <option value="{{ s }}" {% if filters.estado==s %}selected{% endif %}>{{ s }}</option>
-    {% endfor %}
-  </select>
-  <select name="categoria" class="input">
-    <option value="">Todas las categorías</option>
-    {% for c in categories %}
-    <option value="{{ c }}" {% if filters.categoria==c %}selected{% endif %}>{{ c }}</option>
-    {% endfor %}
-  </select>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha inicio</label>
+    <input type="date" name="fecha_inicio" value="{{ filters.fecha_inicio }}" class="input">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha fin</label>
+    <input type="date" name="fecha_fin" value="{{ filters.fecha_fin }}" class="input">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Estado de factura</label>
+    <select name="estado" class="input">
+      <option value="">Todos los estados</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if filters.estado==s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+    <select name="categoria" class="input">
+      <option value="">Todas las categorías</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {% if filters.categoria==c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
   <div class="relative">
+    <label class="block text-sm font-medium text-gray-700 mb-1">Exportación</label>
     <select id="exportTipo" class="input mb-2">
       <option value="detalle">Detalle</option>
       <option value="resumen">Resumen</option>
@@ -33,22 +61,26 @@
       <a href="#" data-format="pdf" class="block px-4 py-2 hover:bg-gray-100">PDF</a>
     </div>
   </div>
-  <div class="md:col-span-5 flex flex-wrap gap-2 mt-2">
-    <button class="btn" type="submit">Filtrar</button>
-    <button class="btn" type="button" id="resetFilters">Reset</button>
-    <div class="flex gap-1">
-      <button type="button" data-range="today" class="btn text-xs">Hoy</button>
-      <button type="button" data-range="7" class="btn text-xs">7 días</button>
-      <button type="button" data-range="month" class="btn text-xs">Mes</button>
-      <button type="button" data-range="year" class="btn text-xs">Año</button>
+  <div class="md:col-span-5 mt-2">
+    <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <button class="btn-primary" type="submit">Aplicar filtros</button>
+      <button class="btn-secondary" type="button" id="resetFilters">Limpiar filtros</button>
+      <div class="h-6 w-px bg-gray-300 mx-1"></div>
+      <div class="flex flex-wrap gap-1">
+        <button type="button" data-range="today" class="btn-secondary text-xs">Hoy</button>
+        <button type="button" data-range="7" class="btn-secondary text-xs">Últimos 7 días</button>
+        <button type="button" data-range="month" class="btn-secondary text-xs">Este mes</button>
+        <button type="button" data-range="year" class="btn-secondary text-xs">Este año</button>
+      </div>
+      <div class="h-6 w-px bg-gray-300 mx-1"></div>
+      <a href="{{ url_for('inventory_report') }}" class="btn-secondary">Ver inventario</a>
+      <a href="{{ url_for('export_history') }}" class="btn-secondary ml-auto">Ver historial</a>
+      <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
     </div>
-    <span id="exportSpinner" class="hidden items-center text-sm text-gray-600">Generando...</span>
-    <a href="{{ url_for('export_inventory') }}" class="btn">Inventario</a>
-    <a href="{{ url_for('export_history') }}" class="btn ml-auto">Historial</a>
   </div>
 </form>
 
-<div class="grid md:grid-cols-6 gap-4 mb-6">
+<div class="grid md:grid-cols-4 gap-4 mb-6">
   <div class="card text-center">
     <div class="text-sm text-gray-500">Ventas Totales</div>
     <div class="text-2xl font-bold">{{ stats.total_sales | money }}</div>
@@ -92,6 +124,35 @@
   <div class="card text-center">
     <div class="text-sm text-gray-500">Retención</div>
     <div class="text-2xl font-bold">{{ '%.1f%%'|format(stats.retention) }}</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">ITBIS acumulado</div>
+    <div class="text-2xl font-bold">{{ stats.itbis_accumulated | money }}</div>
+    {% set itbis_change = kpi_changes.itbis_accumulated %}
+    <div class="mt-1 text-xs font-semibold {% if itbis_change is none %}text-gray-500{% elif itbis_change >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+      {% if itbis_change is none %}N/D{% elif itbis_change >= 0 %}+{{ '%.1f'|format(itbis_change) }}%{% else %}{{ '%.1f'|format(itbis_change) }}%{% endif %}
+    </div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ventas sin ITBIS</div>
+    <div class="text-2xl font-bold">{{ stats.net_sales | money }}</div>
+    {% set net_change = kpi_changes.net_sales %}
+    <div class="mt-1 text-xs font-semibold {% if net_change is none %}text-gray-500{% elif net_change >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+      {% if net_change is none %}N/D{% elif net_change >= 0 %}+{{ '%.1f'|format(net_change) }}%{% else %}{{ '%.1f'|format(net_change) }}%{% endif %}
+    </div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ganancia estimada (con costo cargado)</div>
+    <div class="text-2xl font-bold">{{ stats.estimated_profit_with_cost | money }}</div>
+    {% set profit_change = kpi_changes.estimated_profit_with_cost %}
+    <div class="mt-1 text-xs font-semibold {% if profit_change is none %}text-gray-500{% elif profit_change >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+      {% if profit_change is none %}N/D{% elif profit_change >= 0 %}+{{ '%.1f'|format(profit_change) }}%{% else %}{{ '%.1f'|format(profit_change) }}%{% endif %}
+    </div>
+  </div>
+  <div class="card text-center">
+    <div class="text-sm text-gray-500">Ventas sin costo registrado</div>
+    <div class="text-2xl font-bold">{{ stats.revenue_without_cost_data | money }}</div>
+    <p class="text-xs text-gray-500 mt-1">Estas ventas no se incluyen en la ganancia estimada.</p>
   </div>
 </div>
 
@@ -394,12 +455,8 @@ document.querySelectorAll('[data-range]').forEach(btn => {
   });
 });
 
-document.getElementById('filters').addEventListener('change', (e) => {
-  if(e.target.id !== 'exportTipo') document.getElementById('filters').submit();
-});
 document.getElementById('filters').addEventListener('submit', () => {
   spinner.classList.remove('hidden');
 });
 </script>
 {% endblock %}
-

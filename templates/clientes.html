@@ -2,21 +2,48 @@
 {% block title %}Clientes{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Clientes</h1>
-<form method="get" class="mb-4 flex space-x-2">
-  <input name="q" value="{{ q }}" placeholder="Buscar por nombre, identificador o email" class="input flex-1">
+<form method="get" class="mb-4 flex space-x-2 items-end">
+  <div class="flex-1">
+    <label for="clients-search" class="block text-sm font-medium text-gray-700 mb-1">Buscar cliente</label>
+    <input id="clients-search" name="q" value="{{ q }}" placeholder="Buscar por nombre, identificador o email" class="input w-full">
+  </div>
   <button class="btn-secondary">Buscar</button>
 </form>
 <form method="post" class="card mb-6 space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="grid md:grid-cols-2 gap-4">
-    <input name="name" placeholder="Nombre" class="input" required>
-    <input id="last_name" name="last_name" placeholder="Apellido" class="input">
-    <input name="identifier" placeholder="Cédula" class="input id-mask" id="identifier" data-doc-type="cedula">
-    <input name="phone" placeholder="Teléfono" class="input phone-mask">
-    <input name="email" placeholder="Email" class="input">
-    <input name="street" placeholder="Calle" class="input">
-    <input name="sector" placeholder="Sector" class="input">
-    <input name="province" placeholder="Provincia" class="input">
+    <div>
+      <label for="client-name" class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+      <input id="client-name" name="name" placeholder="Nombre" class="input" required>
+    </div>
+    <div id="last-name-wrapper">
+      <label for="last_name" class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+      <input id="last_name" name="last_name" placeholder="Apellido" class="input">
+    </div>
+    <div>
+      <label for="identifier" class="block text-sm font-medium text-gray-700 mb-1">Documento</label>
+      <input name="identifier" placeholder="Cédula" class="input id-mask" id="identifier" data-doc-type="cedula">
+    </div>
+    <div>
+      <label for="client-phone" class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+      <input id="client-phone" name="phone" placeholder="Teléfono" class="input phone-mask">
+    </div>
+    <div>
+      <label for="client-email" class="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+      <input id="client-email" name="email" placeholder="Email" class="input">
+    </div>
+    <div>
+      <label for="client-street" class="block text-sm font-medium text-gray-700 mb-1">Calle</label>
+      <input id="client-street" name="street" placeholder="Calle" class="input">
+    </div>
+    <div>
+      <label for="client-sector" class="block text-sm font-medium text-gray-700 mb-1">Sector</label>
+      <input id="client-sector" name="sector" placeholder="Sector" class="input">
+    </div>
+    <div>
+      <label for="client-province" class="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+      <input id="client-province" name="province" placeholder="Provincia" class="input">
+    </div>
   </div>
   <div class="flex space-x-4">
     <label><input type="radio" name="type" value="final" checked> Consumidor Final</label>
@@ -71,15 +98,16 @@ window.addEventListener('load', () => {
   const typeRadios=document.querySelectorAll('input[name="type"]');
   const idField=document.getElementById('identifier');
   const lastField=document.getElementById('last_name');
+  const lastFieldWrapper=document.getElementById('last-name-wrapper');
   function toggle(){
     if(document.querySelector('input[name="type"]:checked').value==='final'){
-      lastField.classList.remove('hidden');
+      lastFieldWrapper.classList.remove('hidden');
       lastField.required=false;
       idField.placeholder='Cédula';
       idField.required=false;
       idField.dataset.docType='cedula';
     }else{
-      lastField.classList.add('hidden');
+      lastFieldWrapper.classList.add('hidden');
       lastField.required=false;
       idField.placeholder='RNC *';
       idField.required=true;

@@ -5,27 +5,54 @@
 <form method="post" action="{{ url_for('new_quotation') }}" id="quotation-form" class="space-y-6 card max-w-4xl mx-auto">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="space-y-2">
-    <select name="client_id" class="input" required>
-      <option value="">Seleccione cliente</option>
-      {% for c in clients %}
-      <option value="{{ c.id }}">{{ c.name }} - {{ c.identifier }}</option>
-      {% endfor %}
-    </select>
+    <div>
+      <label for="client-id" class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+      <select id="client-id" name="client_id" class="input" required>
+        <option value="">Seleccione cliente</option>
+        {% for c in clients %}
+        <option value="{{ c.id }}">{{ c.name }} - {{ c.identifier }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <button type="button" id="toggle-client" class="text-sm text-blue-600 hover:underline">Agregar cliente</button>
     <div id="client-panel" class="hidden p-4 border rounded space-y-2">
       <div class="flex space-x-4">
         <label><input type="radio" name="new_client_type" value="final" checked> Personal</label>
         <label><input type="radio" name="new_client_type" value="fiscal"> Empresarial</label>
       </div>
-      <input id="new-client-name" name="new_client_name" class="input" placeholder="Nombre" required>
-      <input id="new-client-last" name="new_client_last" class="input hidden" placeholder="Apellido">
-      <input id="new-client-id" name="new_client_id" class="input id-mask" placeholder="Cédula">
-      <input id="new-client-phone" name="new_client_phone" class="input phone-mask" placeholder="Teléfono">
-      <input id="new-client-email" name="new_client_email" class="input" placeholder="Email">
+      <div>
+        <label for="new-client-name" class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+        <input id="new-client-name" name="new_client_name" class="input" placeholder="Nombre" required>
+      </div>
+      <div>
+        <label for="new-client-last" class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+        <input id="new-client-last" name="new_client_last" class="input hidden" placeholder="Apellido">
+      </div>
+      <div>
+        <label for="new-client-id" class="block text-sm font-medium text-gray-700 mb-1">Documento</label>
+        <input id="new-client-id" name="new_client_id" class="input id-mask" placeholder="Cédula">
+      </div>
+      <div>
+        <label for="new-client-phone" class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+        <input id="new-client-phone" name="new_client_phone" class="input phone-mask" placeholder="Teléfono">
+      </div>
+      <div>
+        <label for="new-client-email" class="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+        <input id="new-client-email" name="new_client_email" class="input" placeholder="Email">
+      </div>
       <div class="grid md:grid-cols-3 gap-2">
-        <input id="new-client-street" name="new_client_street" class="input" placeholder="Calle">
-        <input id="new-client-sector" name="new_client_sector" class="input" placeholder="Sector">
-        <input id="new-client-province" name="new_client_province" class="input" placeholder="Provincia">
+        <div>
+          <label for="new-client-street" class="block text-sm font-medium text-gray-700 mb-1">Calle</label>
+          <input id="new-client-street" name="new_client_street" class="input" placeholder="Calle">
+        </div>
+        <div>
+          <label for="new-client-sector" class="block text-sm font-medium text-gray-700 mb-1">Sector</label>
+          <input id="new-client-sector" name="new_client_sector" class="input" placeholder="Sector">
+        </div>
+        <div>
+          <label for="new-client-province" class="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+          <input id="new-client-province" name="new_client_province" class="input" placeholder="Provincia">
+        </div>
       </div>
       <div class="flex justify-end space-x-2 pt-2">
         <button type="button" id="cancel-client" class="btn-secondary">Cancelar</button>
@@ -34,32 +61,53 @@
     </div>
   </div>
   <div class="grid md:grid-cols-4 gap-4">
-    <select name="seller" class="input" required>
-      {% for s in sellers %}
-      {% set full = s.first_name + (' ' + s.last_name if s.last_name else '') %}
-      <option value="{{ full }}" {% if s.id==session.get('user_id') %}selected{% endif %}>{{ full }}</option>
-      {% endfor %}
-    </select>
-    <select name="payment_method" id="payment-method" class="input">
-      <option value="Efectivo">Efectivo</option>
-      <option value="Transferencia">Transferencia bancaria</option>
-    </select>
-    <select name="bank" id="bank-select" class="input hidden">
-      <option value="">Seleccione banco</option>
-      <option>Banco Popular</option>
-      <option>Banco BHD</option>
-      <option>Banco Banreservas</option>
-      <option>Banesco</option>
-    </select>
-    <select name="warehouse_id" class="input" required>
-      <option value="">Seleccione almacén</option>
-      {% for w in warehouses %}
-      <option value="{{ w.id }}">{{ w.name }}</option>
-      {% endfor %}
-    </select>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
+      <select name="seller" class="input" required>
+        {% for s in sellers %}
+        {% set full = s.first_name + (' ' + s.last_name if s.last_name else '') %}
+        <option value="{{ full }}" {% if s.id==session.get('user_id') %}selected{% endif %}>{{ full }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="payment-method" class="block text-sm font-medium text-gray-700 mb-1">Método de pago</label>
+      <select name="payment_method" id="payment-method" class="input">
+        <option value="Efectivo">Efectivo</option>
+        <option value="Transferencia">Transferencia bancaria</option>
+      </select>
+    </div>
+    <div id="bank-field" class="hidden">
+      <label for="bank-select" class="block text-sm font-medium text-gray-700 mb-1">Banco</label>
+      <select name="bank" id="bank-select" class="input">
+        <option value="">Seleccione banco</option>
+        <option>Banco Popular</option>
+        <option>Banco BHD</option>
+        <option>Banco Banreservas</option>
+        <option>Banesco</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Almacén</label>
+      <select name="warehouse_id" class="input" required>
+        <option value="">Seleccione almacén</option>
+        {% for w in warehouses %}
+        <option value="{{ w.id }}">{{ w.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
   <div>
     <h2 class="text-xl font-semibold mb-2">Productos</h2>
+    <div class="hidden sm:grid sm:grid-cols-7 gap-2 mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <span>Producto</span>
+      <span>Unidad</span>
+      <span>Precio</span>
+      <span>Cantidad</span>
+      <span>Descuento</span>
+      <span>Total</span>
+      <span>Acción</span>
+    </div>
     <datalist id="product-options">
       {% for p in products %}
       <option data-id="{{ p.id }}" data-unit="{{ p.unit }}" data-price="{{ p.price }}" value="{{ p.code }} - {{ p.name }}"></option>
@@ -79,7 +127,10 @@
     </div>
     <button type="button" id="add-product" class="btn-secondary mt-2">Agregar Producto</button>
   </div>
-  <textarea name="note" placeholder="Nota" class="input w-full"></textarea>
+  <div>
+    <label for="quotation-note" class="block text-sm font-medium text-gray-700 mb-1">Nota</label>
+    <textarea id="quotation-note" name="note" placeholder="Nota" class="input w-full"></textarea>
+  </div>
   <button type="submit" class="btn-primary">Guardar</button>
 </form>
 {% endblock %}
@@ -89,9 +140,11 @@
 window.addEventListener('load', () => {
   const paySelect=document.getElementById('payment-method');
   const bankSelect=document.getElementById('bank-select');
+  const bankField=document.getElementById('bank-field');
   paySelect.addEventListener('change',()=>{
-    bankSelect.classList.toggle('hidden', paySelect.value!=='Transferencia');
+    bankField.classList.toggle('hidden', paySelect.value!=='Transferencia');
   });
+  bankField.classList.toggle('hidden', paySelect.value!=='Transferencia');
 
   const clientPanel=document.getElementById('client-panel');
   const toggleClient=document.getElementById('toggle-client');
