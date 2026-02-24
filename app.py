@@ -67,7 +67,7 @@ from account_pdf import generate_account_statement_pdf
 from functools import wraps
 from auth import auth_bp, generate_reset_token
 from forms import AccountRequestForm
-from config import DevelopmentConfig
+from config import DevelopmentConfig, ProductionConfig, TestingConfig
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover
@@ -96,7 +96,13 @@ if os.path.exists(DATA_PATH):
                     RNC_DATA[rnc] = name
 
 app = Flask(__name__)
-app.config.from_object(DevelopmentConfig)
+config_map = {
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'testing': TestingConfig,
+}
+app_config = os.getenv('APP_CONFIG', 'development').lower()
+app.config.from_object(config_map.get(app_config, DevelopmentConfig))
 
 if not os.path.exists('logs'):
     os.makedirs('logs')
@@ -319,23 +325,6 @@ def _migrate_legacy_schema():
             statements.append("ALTER TABLE product ADD COLUMN unit VARCHAR(20) DEFAULT 'Unidad'")
         if 'has_itbis' not in product_cols:
             statements.append("ALTER TABLE product ADD COLUMN has_itbis BOOLEAN DEFAULT 1")
-        if 'cost_price' not in product_cols:
-            statements.append("ALTER TABLE product ADD COLUMN cost_price FLOAT")
-
-    if not inspector.has_table('product_price_log'):
-        statements.append(
-            """CREATE TABLE product_price_log (
-                id INTEGER PRIMARY KEY,
-                product_id INTEGER NOT NULL REFERENCES product(id),
-                old_price FLOAT,
-                new_price FLOAT NOT NULL,
-                old_cost_price FLOAT,
-                new_cost_price FLOAT,
-                changed_by INTEGER REFERENCES user(id),
-                changed_at DATETIME NOT NULL,
-                company_id INTEGER NOT NULL REFERENCES company_info(id)
-            )"""
-        )
 
     if inspector.has_table('user'):
         try:
@@ -359,16 +348,6 @@ def _migrate_legacy_schema():
                 "ALTER TABLE inventory_movement ADD COLUMN executed_by INTEGER REFERENCES user(id)"
             )
 
-    if inspector.has_table('quotation'):
-        try:
-            quote_cols = {c['name'] for c in inspector.get_columns('quotation')}
-        except NoSuchTableError:  # pragma: no cover
-            quote_cols = set()
-        if 'status' not in quote_cols:
-            statements.append("ALTER TABLE quotation ADD COLUMN status VARCHAR(20)")
-        if 'valid_until' not in quote_cols:
-            statements.append("ALTER TABLE quotation ADD COLUMN valid_until DATETIME")
-
     for stmt in statements:
         db.session.execute(db.text(stmt))
     if statements:
@@ -384,17 +363,12 @@ def run_auto_migrations():
     to patch columns that predate Alembic.
     """
     with app.app_context():
-        try:
+        try:  # Apply any pending migrations for safety
             upgrade()
-        except Exception:  # pragma: no cover - for environments without migrations
+        except Exception:  # pragma: no cover - fallback when migrations misconfigured
             db.create_all()
-        _migrate_legacy_schema()
-
-
-def ensure_admin():  # pragma: no cover - optional helper for deployments
-    with app.app_context():
-        run_auto_migrations()
         inspector = inspect(db.engine)
+        _migrate_legacy_schema()
         if inspector.has_table('user') and not User.query.filter_by(username='admin').first():
             admin = User(username='admin', role='admin', first_name='Admin', last_name='')
             admin.set_password(os.environ.get('ADMIN_PASSWORD', '363636'))

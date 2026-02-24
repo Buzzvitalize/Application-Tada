@@ -3,40 +3,18 @@
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Cotizaciones</h1>
 <a href="{{ url_for('new_quotation') }}" class="btn-primary inline-block mb-4">Nueva Cotización</a>
-<div class="max-w-4xl mx-auto space-y-3 mb-4">
-  <form method="get" class="card p-4 flex flex-wrap items-end gap-2">
-    <input type="hidden" name="status" value="{{ status or '' }}">
-    <div>
-      <label for="quotation-client-search" class="block text-sm font-medium text-gray-700 mb-1">Buscar cliente</label>
-      <input id="quotation-client-search" name="client" value="{{ client or '' }}" placeholder="Nombre o identificador" class="input">
-    </div>
-    <div>
-      <label for="quotation-date-from" class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
-      <input id="quotation-date-from" type="date" name="date_from" value="{{ date_from or '' }}" class="input">
-    </div>
-    <div>
-      <label for="quotation-date-to" class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-      <input id="quotation-date-to" type="date" name="date_to" value="{{ date_to or '' }}" class="input">
-    </div>
-    <button class="btn-secondary">Buscar cotización</button>
-  </form>
-
-  <form method="get" class="card p-4 flex flex-wrap items-end gap-2">
-    <input type="hidden" name="client" value="{{ client or '' }}">
-    <input type="hidden" name="date_from" value="{{ date_from or '' }}">
-    <input type="hidden" name="date_to" value="{{ date_to or '' }}">
-    <div>
-      <label for="quotation-status" class="block text-sm font-medium text-gray-700 mb-1">Estado de cotización</label>
-      <select id="quotation-status" name="status" class="input">
-        <option value="">Todos</option>
-        <option value="vigente" {% if status=='vigente' %}selected{% endif %}>Vigentes</option>
-        <option value="convertida" {% if status=='convertida' %}selected{% endif %}>Convertidas</option>
-        <option value="vencida" {% if status=='vencida' %}selected{% endif %}>Vencidas</option>
-      </select>
-    </div>
-    <button class="btn-secondary">Aplicar estado</button>
-  </form>
-</div>
+<form method="get" class="mb-4 flex flex-wrap items-end gap-2 max-w-4xl mx-auto">
+  <input name="client" value="{{ client or '' }}" placeholder="Cliente" class="input">
+  <input type="date" name="date_from" value="{{ date_from or '' }}" class="input">
+  <input type="date" name="date_to" value="{{ date_to or '' }}" class="input">
+  <select name="status" class="input">
+    <option value="">Todos</option>
+    <option value="vigente" {% if status=='vigente' %}selected{% endif %}>Vigente</option>
+    <option value="convertida" {% if status=='convertida' %}selected{% endif %}>Convertida</option>
+    <option value="vencida" {% if status=='vencida' %}selected{% endif %}>Vencida</option>
+  </select>
+  <button class="btn-secondary">Filtrar</button>
+</form>
 <div class="card overflow-x-auto max-w-4xl mx-auto">
   {% if quotations.items %}
   <table class="min-w-full text-sm">

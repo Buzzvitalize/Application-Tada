@@ -1,0 +1,29 @@
+services:
+  web:
+    build: .
+    container_name: tiendix-web
+    ports:
+      - "5000:5000"
+    environment:
+      APP_CONFIG: production
+      DATABASE_URL: sqlite:////data/database.sqlite
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      MAIL_SERVER: ${MAIL_SERVER:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-}
+    volumes:
+      - tiendix_data:/data
+      - tiendix_uploads:/app/static/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  tiendix_data:
+  tiendix_uploads:
